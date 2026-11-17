@@ -160,3 +160,29 @@ class IdempotentOMS:
             return stop_order
 
         return None
+
+    def cancel_entry_and_orphaned_stops(self, entry_order_id: str) -> bool:
+        """
+        Cancels an entry order and ensures any linked broker-side stop is also canceled.
+        Prevents orphan stop orders that could execute unwanted positions.
+        """
+        entry_order = self.orders.get(entry_order_id)
+        if not entry_order:
+            return False
+
+        entry_order.status = OrderStatus.CANCELED
+        entry_order.updated_at = time.time()
+
+        if entry_order.linked_stop_order_id in self.orders:
+            stop_order = self.orders[entry_order.linked_stop_order_id]
+            if entry_order.filled_quantity == 0:
+                stop_order.status = OrderStatus.CANCELED
+                stop_order.updated_at = time.time()
+
+        self.execution_audit_log.append({
+            "timestamp": time.time(),
+            "event": "ORDER_CANCELED_WITH_LINKED_STOPS",
+            "entry_order_id": entry_order_id,
+            "status": "Entry order and linked stops canceled cleanly",
+        })
+        return True

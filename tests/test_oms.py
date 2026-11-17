@@ -46,3 +46,24 @@ def test_oms_bracket_entry_and_partial_fill_sync():
     assert synced_stop_2.quantity == 1000
     assert entry_ord.status == OrderStatus.FILLED
     assert oms.positions["RELIANCE"].shares == 1000
+
+
+def test_oms_cancel_entry_and_orphaned_stops():
+    oms = IdempotentOMS()
+
+    entry_ord, stop_ord = oms.create_bracket_entry(
+        symbol="TCS",
+        quantity=500,
+        entry_price=3500.0,
+        stop_price=3430.0,
+        target_price=3640.0,
+    )
+
+    assert entry_ord.status == OrderStatus.SUBMITTED
+    assert stop_ord.status == OrderStatus.ACCEPTED
+
+    # Cancel entry order before fill -> linked stop must be canceled as well
+    res = oms.cancel_entry_and_orphaned_stops(entry_ord.order_id)
+    assert res is True
+    assert entry_ord.status == OrderStatus.CANCELED
+    assert stop_ord.status == OrderStatus.CANCELED

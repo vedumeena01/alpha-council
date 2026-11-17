@@ -100,12 +100,31 @@ def test_circuit_proximity_long_ingress_blocked():
     assert not res.can_enter
     assert "ENTRY_BLOCKED" in res.reason
 
+    # Lower circuit is 800.0. Current price is 808.0 (1% distance <= 1.5%) -> must also be blocked on entry
+    res_lower = guard.evaluate_long_position(
+        current_price=808.0,
+        upper_circuit=1000.0,
+        lower_circuit=800.0,
+        is_entry=True,
+    )
+    assert not res_lower.can_enter
+    assert "Lower Circuit" in res_lower.reason
+
 
 def test_intraday_kill_switch_halt_on_2_percent():
-    switch = IntradayKillSwitch(intraday_halt_threshold=0.02)
+    switch = IntradayKillSwitch(intraday_halt_threshold=0.02, monthly_freeze_threshold=0.06)
     switch.reset_daily_session(10_000_000.0)
 
     # Drops to 9,750,000 (2.5% drawdown)
     status = switch.update_valuation(9_750_000.0)
     assert status.is_session_halted
     assert "SESSION_HALTED" in status.action_taken
+
+    # Drops to 9,300,000 (7.0% drawdown) -> Monthly strategy freeze
+    status_freeze = switch.update_valuation(9_300_000.0)
+    assert status_freeze.is_strategy_frozen
+
+    # Committee unfreezes after audit
+    switch.risk_committee_unfreeze(authorized_by="Chief_Risk_Officer", reason="Circuit breaker audit cleared")
+    assert not switch.is_strategy_frozen
+    assert not switch.is_session_halted

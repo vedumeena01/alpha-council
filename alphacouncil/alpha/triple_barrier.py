@@ -50,9 +50,13 @@ class TripleBarrierLabeler:
         try:
             coeffs, _, _, _ = np.linalg.lstsq(x, delta_p, rcond=None)
             beta = coeffs[1]
-            if beta < -1e-6:
-                half_life = -np.log(2.0) / beta
+            if -1.0 < beta < -1e-6:
+                # Exact continuous solution: half_life = -ln(2) / ln(1 + beta)
+                half_life = -np.log(2.0) / np.log(1.0 + beta)
                 return float(np.clip(half_life, 1.0, 10.0))
+            elif beta <= -1.0:
+                # Non-stationary / oscillating alternating series fallback
+                return 3.0
         except Exception:
             pass
         return 3.0

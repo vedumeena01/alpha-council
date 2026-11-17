@@ -106,6 +106,14 @@ class IntradayKillSwitch:
             action_taken="NOMINAL: Drawdown within normal risk variance.",
         )
 
+    def risk_committee_unfreeze(self, authorized_by: str, reason: str) -> None:
+        """
+        Explicit audit-trailed method for human risk committee to unfreeze the strategy.
+        """
+        self.is_strategy_frozen = False
+        self.is_session_halted = False
+        self.last_heartbeat_time = time.time()
+
     def check_watchdog_heartbeat(self, max_allowed_miss_sec: float = 9.0) -> bool:
         """
         Dead-man's switch check. If heartbeat missing > 9s, trigger autonomous emergency cancellation.

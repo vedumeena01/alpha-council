@@ -40,6 +40,7 @@ class CircuitBandGuard:
         dist_to_lower_pct = (current_price - lower_circuit) / current_price
 
         # 1. Ingress Check: Prohibit buying near Upper Circuit (Momentum Exhaustion Trap)
+        # and prohibit buying near Lower Circuit (Zero Liquidity / Frozen Bid Trap)
         if is_entry:
             if dist_to_upper_pct <= self.proximity_threshold_pct:
                 return CircuitCheckResult(
@@ -48,6 +49,14 @@ class CircuitBandGuard:
                     proximity_pct_upper=round(dist_to_upper_pct * 100, 2),
                     proximity_pct_lower=round(dist_to_lower_pct * 100, 2),
                     reason=f"ENTRY_BLOCKED: Price is within {dist_to_upper_pct*100:.2f}% of Upper Circuit ({upper_circuit}). Exhaustion risk.",
+                )
+            if dist_to_lower_pct <= self.proximity_threshold_pct:
+                return CircuitCheckResult(
+                    can_enter=False,
+                    should_emergency_exit=False,
+                    proximity_pct_upper=round(dist_to_upper_pct * 100, 2),
+                    proximity_pct_lower=round(dist_to_lower_pct * 100, 2),
+                    reason=f"ENTRY_BLOCKED: Price is within {dist_to_lower_pct*100:.2f}% of Lower Circuit ({lower_circuit}). Zero liquidity lock risk.",
                 )
             return CircuitCheckResult(
                 can_enter=True,
