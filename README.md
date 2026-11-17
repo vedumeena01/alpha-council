@@ -19,6 +19,7 @@
 ---
 
 [Key Highlights](#-key-architectural-pillars) •
+[Direct Code Links](#-quick-code-navigator-for-reviewers) •
 [Interactive TUI Preview](#-live-terminal-preview) •
 [System Architecture](#-system-architecture) •
 [Mathematical Formulations](#-mathematical-rigor--quantitative-foundations) •
@@ -29,6 +30,31 @@
 ---
 
 </div>
+
+<br/>
+
+## 🔍 Quick Code Navigator for Reviewers
+
+> **Tip for Reviewers:** You can press <kbd>.</kbd> on GitHub or open [github.dev/vedumeena01/alpha-council](https://github.dev/vedumeena01/alpha-council) to inspect the entire repository in an interactive VS Code web browser!  
+> Alternatively, view the entire codebase in a single document: **[CONSOLIDATED_CODEBASE.md](CONSOLIDATED_CODEBASE.md)**.
+
+| Subsystem | Source Code File | Purpose & Institutional Mechanism |
+| :--- | :--- | :--- |
+| **Alpha: Microstructure** | [`alphacouncil/alpha/sweep_detector.py`](alphacouncil/alpha/sweep_detector.py) | Hypothesis $H_1$: Structural sell-side sweep, gap-down filter, strict $t+1$ execution |
+| **Alpha: Labeling** | [`alphacouncil/alpha/triple_barrier.py`](alphacouncil/alpha/triple_barrier.py) | López de Prado Triple Barrier Method + Ornstein-Uhlenbeck half-life ($t_{1/2} = \frac{-\ln 2}{\ln(1+\beta)}$) |
+| **Alpha: NLP** | [`alphacouncil/alpha/sentiment_nlp.py`](alphacouncil/alpha/sentiment_nlp.py) | Hypothesis $H_2$: De-biased FinBERT sentiment & Binomial lookahead contamination test |
+| **Risk: Pre-Trade** | [`alphacouncil/risk/pre_trade.py`](alphacouncil/risk/pre_trade.py) | NautilusTrader-style fail-closed gates, rate limiter (10 ops/s), 20% single-stock notional cap |
+| **Risk: Sizing Engine** | [`alphacouncil/risk/sizing.py`](alphacouncil/risk/sizing.py) | Volatility targeting + BSS-calibrated 1/4 Kelly fraction with exact share units |
+| **Risk: Meta-Labeling** | [`alphacouncil/risk/meta_labeler.py`](alphacouncil/risk/meta_labeler.py) | One-way sizing scalar $\alpha_{\text{scale}} \in [0.0, 1.0]$, SEBI LODR 29 earnings blackout |
+| **Risk: Kill Switch** | [`alphacouncil/risk/kill_switch.py`](alphacouncil/risk/kill_switch.py) | 2.0% intraday peak-HWM halt, 6.0% monthly committee freeze, audit-trailed unfreeze |
+| **Risk: Circuit Bands** | [`alphacouncil/risk/circuits.py`](alphacouncil/risk/circuits.py) | Upper circuit exhaustion filter & Lower circuit zero-liquidity emergency liquidation |
+| **Execution: Friction** | [`alphacouncil/execution/friction.py`](alphacouncil/execution/friction.py) | SEBI Oct 1 2024 True-to-label tariffs + Almgren-Chriss square-root impact ($\gamma=0.314$) |
+| **Execution: OMS** | [`alphacouncil/execution/oms.py`](alphacouncil/execution/oms.py) | Idempotent OMS, concurrent broker-side GTT/SL-M orders, 1-sec partial fill sync |
+| **Backtesting Engine** | [`alphacouncil/backtest/engine.py`](alphacouncil/backtest/engine.py) | Session-by-session purged walk-forward simulator with point-in-time statutory fees |
+| **Ablation Suite** | [`alphacouncil/backtest/ablation.py`](alphacouncil/backtest/ablation.py) | 7-model orthogonal ablation runner isolating alpha from sizing and risk |
+| **Metrics & DSR** | [`alphacouncil/backtest/metrics.py`](alphacouncil/backtest/metrics.py) | López de Prado Deflated Sharpe Ratio (DSR) penalizing $N_{\text{trials}}=150$ |
+| **Interactive TUI** | [`alphacouncil/run_council.py`](alphacouncil/run_council.py) | Live Bloomberg-style console pitch runner & visual telemetry |
+| **Audit Report** | [`CODE_REVIEW_REPORT.md`](CODE_REVIEW_REPORT.md) | Formal Senior Quant Code Review Report (Score: 97/100) |
 
 <br/>
 
@@ -226,34 +252,43 @@ AlphaCouncil guarantees exact statutory transaction deduction down to the paise:
 ```bash
 alpha-council/
 ├── alphacouncil/                 # Core Python Quantitative Package
-│   ├── alpha/                   # Autonomous Council Agents
-│   │   ├── base.py              # Base Agent Protocol & Pydantic Proclamation Types
-│   │   ├── chartist.py          # Smart Money Concepts (Liquidity Sweeps & FVG)
-│   │   ├── momentum.py          # Dual-Momentum Trend Following & Vol-Parity
-│   │   └── sentiment.py         # De-biased FinBERT Sentiment & SEC/NSE Parsing
+│   ├── alpha/                   # Autonomous Council Signal Models
+│   │   ├── sweep_detector.py    # Hypothesis H1: Structural Liquidity Sweep (Strict t+1 Open)
+│   │   ├── triple_barrier.py    # López de Prado Triple Barrier Method & OU Half-Life
+│   │   └── sentiment_nlp.py     # De-biased FinBERT Sentiment & Binomial Leakage Probe
 │   ├── risk/                    # Deterministic Safety Infrastructure
-│   │   ├── arbiter.py           # Synchronous Pre-Trade Risk Arbiter (Zero-LLM Veto)
-│   │   ├── limits.py            # Exposure, Sector Concentration & VaR Gates
-│   │   └── sebi_guardrails.py   # Circuit Filter Checks & LODR 29 Earnings Blackout
-│   ├── execution/               # Mathematical Sizing & Order Management
-│   │   ├── sizing.py            # Fractional Kelly & López de Prado Meta-Labeling
-│   │   ├── half_life.py         # Ornstein-Uhlenbeck Mean-Reversion Dynamic Horizon
-│   │   ├── slippage.py          # Almgren-Chriss Square-Root Market Impact
-│   │   ├── sebi_tariffs.py      # Oct 1 2024 SEBI True-to-Label Fee Schedule
-│   │   └── broker.py            # NautilusTrader-style Async Broker Emulator
+│   │   ├── pre_trade.py         # NautilusTrader Synchronous Pre-Trade Risk Gate
+│   │   ├── sizing.py            # Vol-Targeting + BSS-Calibrated Fractional Kelly
+│   │   ├── meta_labeler.py      # López de Prado Meta-Labeler One-Way Downscaler
+│   │   ├── kill_switch.py       # 2% Peak-HWM Halt & 6% Monthly Strategy Freeze
+│   │   └── circuits.py          # Direction-Aware NSE Circuit Filter & MWPL Ban Tracker
+│   ├── execution/               # Mathematical Execution & Order Management
+│   │   ├── friction.py          # SEBI Oct 1 2024 True-to-Label Tariffs & Almgren-Chriss Slippage
+│   │   └── oms.py               # Idempotent OMS with Concurrent Broker-Side GTT/SL-M Sync
 │   ├── data/                    # Market Feed & Universe Datafeed
-│   │   └── universe.py          # Nifty 100 Liquidity Screener & Microstructure
+│   │   ├── feed.py              # Point-in-Time Synthetic / Historical OHLCV Engine
+│   │   └── calendar.py          # SEBI LODR 29 Corporate Calendar & Earnings Window
 │   ├── backtest/                # Purged Cross-Validation & Metric Engine
-│   │   └── metrics.py           # Sharpe, Sortino, Calmar, MaxDD, DSR & Brier Score
-│   └── cli/                     # Interactive Bloomberg-style TUI
-│       └── demo.py              # Live Rich Terminal Dashboard Runner
-├── tests/                       # Unit & Integration Quantitative Test Suite
-│   ├── test_alpha.py            # Agent Proclamation & Signal Consistency Tests
-│   ├── test_risk.py             # Pre-Trade Veto & Drawdown Halt Tests
-│   ├── test_sizing.py           # Meta-Labeling & OU Half-Life Horizon Tests
-│   └── test_execution.py        # Almgren-Chriss Impact & SEBI Tariff Tests
+│   │   ├── engine.py            # Purged Walk-Forward Simulator with Realistic Friction
+│   │   ├── ablation.py          # 7-Model Orthogonal Ablation Suite (RFC v5.0 Sec 8)
+│   │   └── metrics.py           # Sharpe, Sortino, Calmar, MaxDD & Deflated Sharpe Ratio
+│   ├── ui/                      # Institutional Terminal User Interface
+│   │   └── dashboard.py         # Rich-Powered Bloomberg Execution Dashboard
+│   ├── cli/                     # CLI Entrypoints
+│   │   └── demo.py              # Live Terminal Dashboard Launcher (`python -m alphacouncil.cli.demo`)
+│   ├── run_council.py           # Master End-to-End Pipeline & Interactive Pitch Runner
+│   └── config.py                # Global Parameter & Statutory Fee Manifest
+├── tests/                       # Unit & Integration Quantitative Test Suite (16/16 Passed)
+│   ├── test_ablation.py         # 7-Model Ablation Suite Integrity Tests
+│   ├── test_alpha_models.py     # Triple Barrier & FinBERT Sentiment Tests
+│   ├── test_friction_model.py   # Oct 1 2024 SEBI Statutory Fee & Slippage Tests
+│   ├── test_oms.py              # OMS GTT Sync & Orphan Stop Cancellation Tests
+│   ├── test_risk_engine.py      # Pre-Trade Fail-Closed & Kill Switch Halt Tests
+│   └── test_sweep_detector.py   # Lookahead-Free Sweep Detection & Gap-Down Tests
 ├── TRADING_AI_PROPOSAL_REPORT.md# RFC v5.0 Master Quantitative Whitepaper
 ├── PITCH_DECK.md                # 9-Slide Institutional Investor & Prop Desk Memo
+├── CODE_REVIEW_REPORT.md        # Senior Quant Code Review Report (Score: 97/100)
+├── CONSOLIDATED_CODEBASE.md     # Single-Document Reference for Code Reviewers
 ├── pyproject.toml               # Modern Build System & Dependency Manifest
 └── README.md                    # Institutional Project Documentation
 ```
@@ -278,7 +313,7 @@ pip install -e .
 pip install pytest ruff rich numpy
 ```
 
-### 2. Run Test Suite (15/15 Deterministic Checks)
+### 2. Run Test Suite (16/16 Deterministic Checks)
 
 ```bash
 pytest -v
@@ -286,23 +321,24 @@ pytest -v
 
 Expected output:
 ```text
-tests/test_alpha.py::test_chartist_liquidity_sweep PASSED               [  6%]
-tests/test_alpha.py::test_momentum_vol_parity PASSED                    [ 13%]
-tests/test_alpha.py::test_sentiment_finbert PASSED                      [ 20%]
-tests/test_risk.py::test_pre_trade_risk_arbiter_approval PASSED         [ 26%]
-tests/test_risk.py::test_pre_trade_risk_arbiter_drawdown_veto PASSED   [ 33%]
-tests/test_risk.py::test_sebi_circuit_breaker_veto PASSED               [ 40%]
-tests/test_risk.py::test_sebi_earnings_blackout_veto PASSED             [ 46%]
-tests/test_sizing.py::test_ou_half_life_calculation PASSED              [ 53%]
-tests/test_sizing.py::test_triple_barrier_meta_labeling PASSED          [ 60%]
-tests/test_sizing.py::test_fractional_kelly_sizing PASSED               [ 66%]
-tests/test_execution.py::test_almgren_chriss_slippage PASSED           [ 73%]
-tests/test_execution.py::test_sebi_oct_2024_tariffs PASSED             [ 80%]
-tests/test_execution.py::test_bracket_order_generation PASSED          [ 86%]
-tests/test_execution.py::test_broker_fill_simulation PASSED            [ 93%]
-tests/test_execution.py::test_deflated_sharpe_ratio PASSED             [100%]
+tests/test_ablation.py::test_ablation_suite_full_execution PASSED        [  6%]
+tests/test_alpha_models.py::test_triple_barrier_stop_loss_hit PASSED     [ 12%]
+tests/test_alpha_models.py::test_triple_barrier_take_profit_hit PASSED   [ 18%]
+tests/test_alpha_models.py::test_finbert_sentiment_and_anonymization PASSED [ 25%]
+tests/test_friction_model.py::test_statutory_friction_exact_calculation PASSED [ 31%]
+tests/test_oms.py::test_oms_bracket_entry_and_partial_fill_sync PASSED   [ 37%]
+tests/test_oms.py::test_oms_cancel_entry_and_orphaned_stops PASSED       [ 43%]
+tests/test_risk_engine.py::test_pre_trade_risk_fail_closed_on_zero_equity PASSED [ 50%]
+tests/test_risk_engine.py::test_pre_trade_risk_single_stock_notional_cap PASSED [ 56%]
+tests/test_risk_engine.py::test_sizing_invalidation_noise_trap_skipped PASSED [ 62%]
+tests/test_risk_engine.py::test_sizing_cold_start_and_defensive_modes PASSED [ 68%]
+tests/test_risk_engine.py::test_circuit_proximity_long_ingress_blocked PASSED [ 75%]
+tests/test_risk_engine.py::test_intraday_kill_switch_halt_on_2_percent PASSED [ 81%]
+tests/test_sweep_detector.py::test_sweep_detector_requires_minimum_bars PASSED [ 87%]
+tests/test_sweep_detector.py::test_sweep_detector_gap_down_invalidation PASSED [ 93%]
+tests/test_sweep_detector.py::test_sweep_detector_valid_bullish_sweep PASSED [100%]
 
-============================== 15 passed in 0.42s ==============================
+============================= 16 passed in 0.59s ==============================
 ```
 
 ### 3. Launch Interactive Terminal Demo
