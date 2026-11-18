@@ -387,15 +387,15 @@ class IdentifiedZone:
     base_end_idx: int
     base_candles_count: int
     first_leg_out_idx: int
-    
+
     # Exact Zone Marking (Episode 3 Formulas)
     proximal_line: float       # Entry Reference
     distal_line: float         # Stop-Loss Reference
     zone_width: float          # Inherent risk per share (Proximal - Distal)
-    
+
     departure_strength: int    # Consecutive exciting candles leaving the zone
     departure_velocity: float  # Total price expansion in leg-out
-    
+
     is_fresh: bool             # True if price has NEVER touched proximal line since leg-out
     tested_at_idx: Optional[int] = None
     is_high_quality: bool = True
