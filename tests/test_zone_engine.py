@@ -32,6 +32,15 @@ from alphacouncil.alpha.zone_engine import (
     TradingStyleCategory,
     RejectionAudit,
 )
+from alphacouncil.risk.gtf_risk import (
+    RiskTier,
+    ExecutionErrorType,
+    SizingBreakdown,
+    GrowthProjection,
+    TradeLogEntry,
+    GTFTradingJournal,
+    GTFRiskManager,
+)
 
 
 # =====================================================================
@@ -1474,3 +1483,249 @@ def test_episode_09_rejection_mindset_audit_pipeline():
     assert audit_flawed.survived_rejection_mindset is False
     assert audit_flawed.is_rejected is True
     assert len(audit_flawed.rejection_reasons) >= 2
+
+
+# =====================================================================
+# EPISODE 10 TESTS: RISK MANAGEMENT, CAPITAL PROTECTION & SIZING FORMULA
+# =====================================================================
+
+def test_episode_10_exact_position_sizing_and_monetary_risk_invariance():
+    """
+    Episode 10 Concept 3: The Exact Position Sizing Formula (TVS Motor Case Study).
+    Quantity = floor(Risk_Per_Trade / abs(Entry - StopLoss))
+    Monetary risk remains strictly identical and capped regardless of share price or SL distance.
+    """
+    capital = 100000.0  # ₹1 Lakh
+    risk_tier = RiskTier.BEGINNER  # 1% = ₹1,000
+
+    # 1. Scenario 1: ₹20 Stop-Loss -> 50 shares
+    s1 = GTFRiskManager.calculate_position_size(capital, risk_tier, entry_price=1000.0, stop_loss=980.0)
+    assert isinstance(s1, SizingBreakdown)
+    assert s1.risk_distance_points == 20.0
+    assert s1.quantity_shares == 50
+    assert s1.actual_monetary_risk_inr == 1000.0
+    assert s1.total_capital_required_inr == 50000.0
+
+    # 2. Scenario 2: ₹30 Stop-Loss -> 33 shares
+    s2 = GTFRiskManager.calculate_position_size(capital, risk_tier, entry_price=1000.0, stop_loss=970.0)
+    assert s2.quantity_shares == 33
+    assert s2.actual_monetary_risk_inr == 990.0 <= 1000.0
+
+    # 3. Scenario 3: ₹40 Stop-Loss -> 25 shares
+    s3 = GTFRiskManager.calculate_position_size(capital, risk_tier, entry_price=1000.0, stop_loss=960.0)
+    assert s3.quantity_shares == 25
+    assert s3.actual_monetary_risk_inr == 1000.0
+
+    # 4. Scenario 4: ₹12 Stop-Loss (Refined Entry) -> 83 shares
+    s4 = GTFRiskManager.calculate_position_size(capital, risk_tier, entry_price=1000.0, stop_loss=988.0)
+    assert s4.quantity_shares == 83
+    assert s4.actual_monetary_risk_inr == 996.0 <= 1000.0
+
+    # 5. Short Trade: ₹23 Stop-Loss -> 43 shares
+    s5 = GTFRiskManager.calculate_position_size(capital, risk_tier, entry_price=1000.0, stop_loss=1023.0)
+    assert s5.quantity_shares == 43
+    assert s5.actual_monetary_risk_inr == 989.0 <= 1000.0
+
+    # 6. Short Trade: ₹65 Stop-Loss -> 15 shares
+    s6 = GTFRiskManager.calculate_position_size(capital, risk_tier, entry_price=1000.0, stop_loss=1065.0)
+    assert s6.quantity_shares == 15
+    assert s6.actual_monetary_risk_inr == 975.0 <= 1000.0
+
+
+def test_episode_10_anti_tamper_chasing_widening_averaging_guards():
+    """
+    Episode 10 Concept 4: Anti-Tamper Execution Guards.
+    1. Chasing Missed Entry
+    2. Modifying / Widening Stop-Loss Post-Entry
+    3. Averaging Down Trap
+    """
+    # 1. Clean Order (No violations)
+    clean, violations = GTFRiskManager.detect_anti_tamper_violations(
+        original_entry=100.0,
+        current_market_price=100.5,
+        original_sl=90.0,
+        new_sl=90.0,
+        is_demand=True,
+        is_averaging_down=False,
+    )
+    assert clean is True
+    assert len(violations) == 0
+
+    # 2. Chasing Missed Entry (CMP rallied 3% past entry)
+    chase, v_chase = GTFRiskManager.detect_anti_tamper_violations(
+        original_entry=100.0,
+        current_market_price=103.0,
+        original_sl=90.0,
+        new_sl=90.0,
+        is_demand=True,
+    )
+    assert chase is False
+    assert any("Chasing Missed Entry Prohibited" in v for v in v_chase)
+
+    # 3. Widening Stop-Loss on Long Setup (Moving SL down from 90 to 80)
+    widen, v_widen = GTFRiskManager.detect_anti_tamper_violations(
+        original_entry=100.0,
+        current_market_price=100.0,
+        original_sl=90.0,
+        new_sl=80.0,
+        is_demand=True,
+    )
+    assert widen is False
+    assert any("Stop-Loss Widening Prohibited" in v for v in v_widen)
+
+    # 4. Averaging Down Trap
+    avg_down, v_avg = GTFRiskManager.detect_anti_tamper_violations(
+        original_entry=100.0,
+        current_market_price=95.0,
+        original_sl=90.0,
+        new_sl=90.0,
+        is_averaging_down=True,
+    )
+    assert avg_down is False
+    assert any("Averaging Down Trap" in v for v in v_avg)
+
+
+def test_episode_10_journal_monthly_cap_and_repeat_mistake_tracker():
+    """
+    Episode 10 Concept 6 & 11: The 10 Trades/Month Cap & 40-Mistake Rule.
+    'A mistake repeated more than once is a decision.'
+    """
+    journal = GTFTradingJournal(initial_capital=100000.0)
+
+    # Log 10 trades in month 2026-11
+    for i in range(1, 11):
+        entry = TradeLogEntry(
+            trade_id=i,
+            date="2026-11-15",
+            symbol="TCS",
+            entry_price=3500.0,
+            stop_loss=3450.0,
+            target_price=3600.0,
+            quantity=20,
+            outcome="TARGET_HIT",
+            pnl_inr=2000.0,
+        )
+        ok, msg = journal.log_trade(entry)
+        assert ok is True
+
+    assert journal.total_trades_count == 10
+
+    # 11th trade in the same month -> BLOCKED by monthly cap
+    entry_11 = TradeLogEntry(
+        trade_id=11,
+        date="2026-11-20",
+        symbol="INFY",
+        entry_price=1800.0,
+        stop_loss=1780.0,
+        target_price=1840.0,
+        quantity=50,
+        outcome="OPEN",
+    )
+    ok_11, msg_11 = journal.log_trade(entry_11)
+    assert ok_11 is False
+    assert "Monthly Cap Reached" in msg_11
+
+    # Test Repeat Mistake Detection in a new month (2026-12)
+    entry_mistake_1 = TradeLogEntry(
+        trade_id=12,
+        date="2026-12-01",
+        symbol="RELIANCE",
+        entry_price=2500.0,
+        stop_loss=2480.0,
+        target_price=2540.0,
+        quantity=50,
+        outcome="STOP_LOSS_HIT",
+        mistakes=[ExecutionErrorType.TREND_CONFLICT],
+    )
+    ok_m1, msg_m1 = journal.log_trade(entry_mistake_1)
+    assert ok_m1 is True
+    assert "Repeat Mistake Detected" not in msg_m1
+
+    # Second time repeating TREND_CONFLICT -> Warning surfaced!
+    entry_mistake_2 = TradeLogEntry(
+        trade_id=13,
+        date="2026-12-05",
+        symbol="HDFCBANK",
+        entry_price=1600.0,
+        stop_loss=1580.0,
+        target_price=1640.0,
+        quantity=50,
+        outcome="STOP_LOSS_HIT",
+        mistakes=[ExecutionErrorType.TREND_CONFLICT],
+    )
+    ok_m2, msg_m2 = journal.log_trade(entry_mistake_2)
+    assert ok_m2 is True
+    assert "Repeat Mistake Detected: TREND_CONFLICT logged 2 times!" in msg_m2
+
+
+def test_episode_10_quantitative_growth_model_excel_projections():
+    """
+    Episode 10 Concept 7: Quantitative Excel Growth Model.
+    Verifies exact mathematical returns across win rates and RRR tiers.
+    """
+    capital = 100000.0
+
+    # Model 1: Beginner Phase (1% RPT = ₹1,000 Risk, 2:1 RRR = ₹2,000 Target)
+    # 50% Win Rate (5 Wins, 5 Losses): 5 * 2000 - 5 * 1000 = +₹5,000 (+5%/month, +60% annual)
+    p_50 = GTFRiskManager.project_growth(capital, RiskTier.BEGINNER, win_rate=0.50, target_rrr=2.0)
+    assert isinstance(p_50, GrowthProjection)
+    assert p_50.net_monthly_profit == 5000.0
+    assert p_50.monthly_return_pct == 5.0
+    assert p_50.annual_return_pct == 60.0
+
+    # 60% Win Rate (6 Wins, 4 Losses): 6 * 2000 - 4 * 1000 = +₹8,000 (+8%/month, +96% annual)
+    p_60 = GTFRiskManager.project_growth(capital, RiskTier.BEGINNER, win_rate=0.60, target_rrr=2.0)
+    assert p_60.net_monthly_profit == 8000.0
+    assert p_60.monthly_return_pct == 8.0
+    assert p_60.annual_return_pct == 96.0
+
+    # 70% Win Rate (7 Wins, 3 Losses): 7 * 2000 - 3 * 1000 = +₹11,000 (+11%/month)
+    p_70 = GTFRiskManager.project_growth(capital, RiskTier.BEGINNER, win_rate=0.70, target_rrr=2.0)
+    assert p_70.net_monthly_profit == 11000.0
+    assert p_70.monthly_return_pct == 11.0
+
+    # Model 2: Pro Phase (2% RPT = ₹2,000 Risk, 2:1 RRR = ₹4,000 Target)
+    # 50% Win Rate: 5 * 4000 - 5 * 2000 = +₹10,000 (+10%/month)
+    p_pro_50 = GTFRiskManager.project_growth(capital, RiskTier.PRO, win_rate=0.50, target_rrr=2.0)
+    assert p_pro_50.net_monthly_profit == 10000.0
+    assert p_pro_50.monthly_return_pct == 10.0
+
+    # Model 3: Expanding to 3:1 RRR (2% RPT = ₹2,000 Risk, 3:1 RRR = ₹6,000 Target)
+    # 50% Win Rate: 5 * 6000 - 5 * 2000 = +₹20,000 (+20%/month)
+    p_pro_3to1 = GTFRiskManager.project_growth(capital, RiskTier.PRO, win_rate=0.50, target_rrr=3.0)
+    assert p_pro_3to1.net_monthly_profit == 20000.0
+    assert p_pro_3to1.monthly_return_pct == 20.0
+
+
+def test_episode_10_smaller_timeframe_overpowering_higher_timeframe():
+    """
+    Episode 10 Concept 10: Smaller Timeframe Beating Higher Timeframe.
+    When a smaller timeframe zone breaches and closes decisively beyond an opposing HTF zone,
+    it becomes an extraordinary institutional origin.
+    """
+    engine = DemandSupplyEngine()
+    # HTF Weekly Supply Zone: PL = 200.0, DL = 210.0
+    htf_supply = engine.scan_for_zones(
+        np.array([180.0, 205.0, 200.0]),
+        np.array([185.0, 210.0, 201.0]),
+        np.array([179.0, 198.0, 180.0]),
+        np.array([205.0, 200.0, 182.0]),
+    )[0]
+    htf_supply.proximal_line = 200.0
+    htf_supply.distal_line = 210.0
+
+    # Smaller Timeframe (Daily) Demand Zone formed at PL 215.0, DL 205.0
+    # Decisively breached and closed beyond HTF Supply's Distal Line (210.0)!
+    ltf_demand = engine.scan_for_zones(
+        np.array([200.0, 212.0, 215.0]),
+        np.array([202.0, 218.0, 230.0]),
+        np.array([198.0, 205.0, 214.0]),
+        np.array([211.0, 215.0, 229.0]),
+    )[0]
+    ltf_demand.proximal_line = 215.0
+    ltf_demand.distal_line = 205.0
+    ltf_demand.has_clean_closing = True
+
+    is_overpowering = DemandSupplyEngine.detect_htf_overpowering_zone(ltf_demand, htf_supply)
+    assert is_overpowering is True
+    assert ltf_demand.is_htf_overpowering_origin is True

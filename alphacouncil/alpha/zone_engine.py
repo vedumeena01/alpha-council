@@ -224,6 +224,9 @@ class IdentifiedZone:
     reaction_parent_idx: Optional[int] = None
     recommended_entry_type: EntryType = EntryType.SET_AND_FORGET
 
+    # Advanced Price Action Nuance (Episode 10)
+    is_htf_overpowering_origin: bool = False  # True if smaller TF zone overpowered opposing HTF structure
+
 
 class DemandSupplyEngine:
     """
@@ -1095,6 +1098,32 @@ class DemandSupplyEngine:
             intraday_advisory=style_msg,
         )
 
+    # =========================================================================
+    # EPISODE 10: ADVANCED STRUCTURAL PRICE ACTION (HTF OVERPOWERING ORIGINS)
+    # =========================================================================
+
+    @staticmethod
+    def detect_htf_overpowering_zone(
+        ltf_zone: IdentifiedZone,
+        opposing_htf_zone: IdentifiedZone,
+    ) -> bool:
+        """
+        Episode 10 Concept 10: Smaller Timeframe Beating Higher Timeframe.
+        When a smaller timeframe zone (Daily/125m) breaches and closes decisively beyond
+        an opposing higher timeframe zone (Weekly/Monthly), that smaller timeframe zone
+        becomes extraordinarily powerful as an institutional origin.
+        """
+        if ltf_zone.is_demand and not opposing_htf_zone.is_demand:
+            # Demand breaches opposing HTF Supply's Distal Line on the upside
+            if ltf_zone.proximal_line > opposing_htf_zone.distal_line and ltf_zone.has_clean_closing:
+                ltf_zone.is_htf_overpowering_origin = True
+                return True
+        elif not ltf_zone.is_demand and opposing_htf_zone.is_demand:
+            # Supply breaches opposing HTF Demand's Distal Line on the downside
+            if ltf_zone.proximal_line < opposing_htf_zone.distal_line and ltf_zone.has_clean_closing:
+                ltf_zone.is_htf_overpowering_origin = True
+                return True
+        return False
 
     def classify_candle(
         self,

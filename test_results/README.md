@@ -17,18 +17,18 @@
 | **07** | Multiple Time Frame Analysis (MTFA, 50 SMA Clock, Boundary Rule) | 5 | **100%** (5/5) | 0.23s | 50 SMA Clock Method (7th Candle Rule), 5 Curve Sections, Curve vs. Trend Matrix, The Boundary Rule, ATH Shorting Prohibition | [`EPISODE_07_TEST_RESULTS.md`](EPISODE_07_TEST_RESULTS.md) |
 | **08** | Trade Score, Mahabharata Alignment & Dynamic Target | 5 | **100%** (5/5) | 0.38s | Trade Score (Max 7/7), 4 Characters (Krishna, Bhishma, Arjuna, Duryodhana), Opposing ITF Target Rule, Best Setup Gold Standard | [`EPISODE_08_TEST_RESULTS.md`](EPISODE_08_TEST_RESULTS.md) |
 | **09** | Trading Style, Authentic Zones & The Rejection Mindset | 5 | **100%** (5/5) | 0.25s | Entry Types (Set & Forget vs. Type 2 In-Zone), Zone Authenticity & Retest Vulnerability, Rupee-Risk Equality, Mandatory 100-Trade Rule, Rejection Mindset Audit | [`EPISODE_09_TEST_RESULTS.md`](EPISODE_09_TEST_RESULTS.md) |
-| **Total** | **All Episodes (Cumulative)** | **39** | **100%** (39/39) | **0.35s** | **Full GTF Price Action Core (`zone_engine.py`)** | - |
+| **10** | Risk Management, Position Sizing & Anti-Tamper Discipline | 5 | **100%** (5/5) | 0.28s | Exact Position Sizing ($Qty = \lfloor RPT / |Entry - SL| \rfloor$), Monetary Risk Invariance, Anti-Tamper Guards (Widening, Averaging, Chasing), 10 Trades/Month Cap, 40-Mistake Elimination, Excel Growth Model, HTF Overpowering | [`EPISODE_10_TEST_RESULTS.md`](EPISODE_10_TEST_RESULTS.md) |
+| **Total** | **All Episodes (Cumulative)** | **44** | **100%** (44/44) | **0.42s** | **Full GTF Price Action & Risk Architecture (`zone_engine.py` + `gtf_risk.py`)** | - |
 
 ---
 
 ## 🔬 System Health & Test Coverage Progress
 
 ```text
-Module: alphacouncil/alpha/zone_engine.py
-Statements: 758
-Missed: 120
-Test Coverage: 84.2%
-Total Suite Tests: 58 (100% Passed)
+Modules: alphacouncil/alpha/zone_engine.py + alphacouncil/risk/gtf_risk.py
+Zone Engine Statements: 785
+GTF Risk Statements: 110 (Coverage: 95%)
+Total Suite Tests: 63 (100% Passed)
 Linter Status: Ruff 0 errors, 0 warnings
 CI Status: GitHub Actions 100% Green (Python 3.11 & 3.12)
 ```
@@ -45,3 +45,4 @@ CI Status: GitHub Actions 100% Green (Python 3.11 & 3.12)
 - [`EPISODE_07_TEST_RESULTS.md`](EPISODE_07_TEST_RESULTS.md) - Multiple Time Frame Analysis (MTFA), 50 SMA clock method, 5 curve tiers & boundary rule.
 - [`EPISODE_08_TEST_RESULTS.md`](EPISODE_08_TEST_RESULTS.md) - Trade Score (7/7), Mahabharata Alignment, Dynamic Opposing ITF Target & Best Setup Gold Standard.
 - [`EPISODE_09_TEST_RESULTS.md`](EPISODE_09_TEST_RESULTS.md) - Trading Style, Authentic Zones, Rupee-Risk Equality, 100-Trade Directive & Rejection Mindset.
+- [`EPISODE_10_TEST_RESULTS.md`](EPISODE_10_TEST_RESULTS.md) - Risk Management, Position Sizing, Anti-Tamper Guards, 10 Trades/Month Cap & Excel Growth Models.

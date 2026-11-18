@@ -17,5 +17,6 @@
 | **07** | **Multiple Time Frame Analysis (MTFA, 50 SMA Clock, Curve)** | ✅ **Codified & Trained** | [`training/EPISODE_07_MULTIPLE_TIMEFRAME_ANALYSIS.md`](EPISODE_07_MULTIPLE_TIMEFRAME_ANALYSIS.md) |
 | **08** | **Trade Score (7/7), Mahabharata Alignment & Dynamic Target** | ✅ **Codified & Trained** | [`training/EPISODE_08_TRADE_SCORE_AND_BEST_SETUP.md`](EPISODE_08_TRADE_SCORE_AND_BEST_SETUP.md) |
 | **09** | **Trading Style, Authentic Zones & Emotional Mastery** | ✅ **Codified & Trained** | [`training/EPISODE_09_TRADING_STYLE_EMOTIONS_AND_AUTHENTICITY.md`](EPISODE_09_TRADING_STYLE_EMOTIONS_AND_AUTHENTICITY.md) |
-| **10** | *Upcoming (Risk Management & Capital Protection)...* | ⏳ Pending | - |
+| **10** | **Risk Management, Capital Protection & Sizing Formula** | ✅ **Codified & Trained** | [`training/EPISODE_10_RISK_MANAGEMENT_AND_CAPITAL_PROTECTION.md`](EPISODE_10_RISK_MANAGEMENT_AND_CAPITAL_PROTECTION.md) |
+| **11** | *Upcoming...* | ⏳ Pending | - |
 | **...**| *Episodes 09 - 20* | ⏳ Pending | - |
