@@ -4,7 +4,7 @@ Codifies Section 4A of RFC v5.0 with zero unit mismatch.
 """
 
 from dataclasses import dataclass
-from typing import List
+from typing import List, Optional
 import numpy as np
 
 
@@ -81,13 +81,35 @@ class PositionSizingEngine:
         atr14: float,
         realized_annual_vol: float,
         current_equity: float,
-        historical_closed_trades_count: int = 250,
-        rolling_bss: float = 0.15,
-        estimated_win_prob: float = 0.58,
+        historical_closed_trades_count: int = 0,
+        rolling_bss: Optional[float] = None,
+        estimated_win_prob: Optional[float] = None,
     ) -> SizingCalculation:
         """
         Computes final share quantity Q according to RFC v5.0 rules.
+        Defaults to COLD_START (vol-targeting only) unless sufficient calibrated empirical history exists.
         """
+        # 0. Numerical Sanity Check: Fail-Closed on NaN / Inf / Non-positive
+        numeric_inputs = [entry_price, stop_price, target_price, atr14, realized_annual_vol, current_equity]
+        if not all(np.isfinite(x) for x in numeric_inputs) or atr14 <= 0.0 or current_equity <= 0.0 or entry_price <= 0.0:
+            return SizingCalculation(
+                symbol=symbol,
+                entry_price=entry_price if np.isfinite(entry_price) else 0.0,
+                stop_price=stop_price if np.isfinite(stop_price) else 0.0,
+                stop_distance=0.0,
+                atr14=atr14 if np.isfinite(atr14) else 0.0,
+                is_noise_trap_skipped=False,
+                tau_vol=0.0,
+                brier_skill_score=rolling_bss if (rolling_bss is not None and np.isfinite(rolling_bss)) else 0.0,
+                kelly_risk_fraction=0.0,
+                tau_effective=0.0,
+                shares_quantity=0,
+                proposed_notional=0.0,
+                is_aborted=True,
+                regime_mode="ABORTED",
+                rationale="Invalid or non-finite numerical inputs (NaN/Inf or <=0 detected). Fail-closed.",
+            )
+
         stop_distance = max(0.01, entry_price - stop_price)
 
         # 1. Invalidation Rule (No Artificial Stop Expansion)
@@ -101,27 +123,65 @@ class PositionSizingEngine:
                 atr14=round(atr14, 2),
                 is_noise_trap_skipped=True,
                 tau_vol=0.0,
-                brier_skill_score=rolling_bss,
+                brier_skill_score=rolling_bss or 0.0,
                 kelly_risk_fraction=0.0,
                 tau_effective=0.0,
                 shares_quantity=0,
                 proposed_notional=0.0,
                 is_aborted=True,
                 regime_mode="NOISE_TRAP_SKIPPED",
-                rationale=f"Stop distance (₹{stop_distance:.2f}) < 1.0 * ATR14 (₹{atr14:.2f}). Skipped noise trap.",
+                rationale=f"Stop distance (₹{stop_distance:.2f}) < {self.min_atr_multiple:.1f} * ATR14 (₹{atr14:.2f}). Skipped noise trap.",
             )
 
         # 2. Volatility-Targeted Base Sizing
         vol_scalar = self.target_annual_vol / max(0.05, realized_annual_vol)
         tau_vol = self.base_risk_fraction * vol_scalar
 
-        # 3. Payoff Ratio & Kelly Calculation
-        payoff_b = max(0.1, (target_price - entry_price) / stop_distance)
-        p = float(np.clip(estimated_win_prob, 0.05, 0.95))
-        edge_expectation = (p * payoff_b) - (1.0 - p)
+        # 3. Regime Mode & Effective Risk Selection
+        f_star_risk = 0.0
+        # Cold start check: Requires at least 200 closed trades AND valid BSS AND valid win prob
+        if historical_closed_trades_count < 200 or rolling_bss is None or estimated_win_prob is None:
+            regime = "COLD_START"
+            tau_eff = min(tau_vol, 0.010)  # Capped at 1.0% in cold start
+            msg = f"Cold start (trades={historical_closed_trades_count}<200 or uncalibrated). Governed strictly by Vol-Targeting (Risk={tau_eff*100:.2f}%)."
+        elif rolling_bss <= 0.0:
+            regime = "DEFENSIVE"
+            tau_eff = min(0.5 * tau_vol, 0.010)  # Defensive risk strictly <= cold-start cap (max 1.0%)
+            msg = f"BSS <= 0 ({rolling_bss:.2f}). Probability model uncalibrated. Defensive sizing (Risk={tau_eff*100:.2f}%)."
+        else:
+            # Calibrated Kelly Calculation
+            payoff_b = max(0.1, (target_price - entry_price) / stop_distance)
+            p = float(np.clip(estimated_win_prob, 0.05, 0.95))
+            edge_expectation = (p * payoff_b) - (1.0 - p)
 
-        # Theoretical Edge Check: Abort if expected value is non-positive
-        if edge_expectation <= 0.0:
+            if edge_expectation <= 0.0:
+                return SizingCalculation(
+                    symbol=symbol,
+                    entry_price=entry_price,
+                    stop_price=stop_price,
+                    stop_distance=round(stop_distance, 2),
+                    atr14=round(atr14, 2),
+                    is_noise_trap_skipped=False,
+                    tau_vol=round(tau_vol, 4),
+                    brier_skill_score=round(rolling_bss, 4),
+                    kelly_risk_fraction=0.0,
+                    tau_effective=0.0,
+                    shares_quantity=0,
+                    proposed_notional=0.0,
+                    is_aborted=True,
+                    regime_mode="ABORTED",
+                    rationale=f"Negative expectancy (Edge={edge_expectation:.3f} <= 0). Trade aborted.",
+                )
+
+            raw_kelly = edge_expectation / payoff_b
+            f_star_risk = 0.25 * raw_kelly  # Fractional 1/4 Kelly
+            regime = "CALIBRATED_KELLY"
+            tau_eff = min(tau_vol, f_star_risk)
+            msg = f"Calibrated BSS ({rolling_bss:.2f} > 0). Effective Risk min(vol={tau_vol*100:.2f}%, kelly={f_star_risk*100:.2f}%)."
+
+        # Hard Risk Ceiling (One-way valve: can only reduce risk, never boost from below)
+        tau_eff = min(tau_eff, self.max_risk_ceiling)
+        if tau_eff <= 0.0:
             return SizingCalculation(
                 symbol=symbol,
                 entry_price=entry_price,
@@ -130,37 +190,17 @@ class PositionSizingEngine:
                 atr14=round(atr14, 2),
                 is_noise_trap_skipped=False,
                 tau_vol=round(tau_vol, 4),
-                brier_skill_score=round(rolling_bss, 4),
-                kelly_risk_fraction=0.0,
+                brier_skill_score=round(rolling_bss or 0.0, 4),
+                kelly_risk_fraction=round(f_star_risk, 4),
                 tau_effective=0.0,
                 shares_quantity=0,
                 proposed_notional=0.0,
                 is_aborted=True,
                 regime_mode="ABORTED",
-                rationale=f"Negative expectancy (Edge={edge_expectation:.3f} <= 0). Trade aborted.",
+                rationale="Effective risk calculated non-positive. Trade aborted.",
             )
 
-        raw_kelly = edge_expectation / payoff_b
-        f_star_risk = 0.25 * raw_kelly  # Fractional 1/4 Kelly
-
-        # 4. Regime Mode & Effective Risk Selection
-        if historical_closed_trades_count < 200:
-            regime = "COLD_START"
-            tau_eff = min(tau_vol, 0.010)
-            msg = f"Cold start (<200 trades). Sizing governed by Vol-Targeting (Risk={tau_eff*100:.2f}%)."
-        elif rolling_bss <= 0.0:
-            regime = "DEFENSIVE"
-            tau_eff = 0.5 * tau_vol
-            msg = f"BSS <= 0 ({rolling_bss:.2f}). Probability model uncalibrated. Defensive sizing (Risk={tau_eff*100:.2f}%)."
-        else:
-            regime = "CALIBRATED_KELLY"
-            tau_eff = min(tau_vol, f_star_risk)
-            msg = f"Calibrated BSS ({rolling_bss:.2f} > 0). Effective Risk min(vol={tau_vol*100:.2f}%, kelly={f_star_risk*100:.2f}%)."
-
-        # Hard Risk Ceiling
-        tau_eff = float(np.clip(tau_eff, 0.001, self.max_risk_ceiling))
-
-        # 5. Quantity Calculation & Notional Capping
+        # 4. Quantity Calculation & Notional Capping
         raw_quantity = int(np.floor((current_equity * tau_eff) / stop_distance))
         proposed_notional = raw_quantity * entry_price
         max_notional_cap = current_equity * self.max_notional_pct
@@ -176,7 +216,7 @@ class PositionSizingEngine:
             atr14=round(atr14, 2),
             is_noise_trap_skipped=False,
             tau_vol=round(tau_vol, 4),
-            brier_skill_score=round(rolling_bss, 4),
+            brier_skill_score=round(rolling_bss or 0.0, 4),
             kelly_risk_fraction=round(f_star_risk, 4),
             tau_effective=round(tau_eff, 4),
             shares_quantity=final_shares,

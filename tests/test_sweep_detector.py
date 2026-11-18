@@ -32,9 +32,8 @@ def test_sweep_detector_gap_down_invalidation():
     opens = np.array([100.0, 98.0, 97.0, 99.0, 100.0, 94.0])
 
     sig = detector.evaluate_bar("RELIANCE", opens, highs, lows, closes, vols)
-    assert sig is not None
-    assert sig.signal == 0
-    assert "Invalidated: Session opened below swing low" in sig.reason
+    # Gap-down news crash returns None to avoid truthy falsy bug
+    assert sig is None
 
 
 def test_sweep_detector_valid_bullish_sweep():

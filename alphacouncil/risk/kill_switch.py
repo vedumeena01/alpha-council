@@ -48,6 +48,10 @@ class IntradayKillSwitch:
             self.monthly_hwm = max(self.monthly_hwm, starting_equity)
         self.is_session_halted = False
 
+    def reset_monthly_session(self, starting_equity: float):
+        """Called at calendar month boundary to establish new monthly HWM baseline."""
+        self.monthly_hwm = starting_equity
+
     def update_valuation(self, mid_market_equity: float) -> DrawdownStatus:
         """
         Evaluates current valuation against intraday and monthly HWM.

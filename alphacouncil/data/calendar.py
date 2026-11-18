@@ -6,6 +6,7 @@ retrospective announcement leakage and enforce the 24-hour pre-earnings liquidat
 
 from dataclasses import dataclass
 from typing import Dict, List, Optional
+import datetime
 
 
 @dataclass
@@ -44,14 +45,19 @@ class PointInTimeCalendar:
         self, symbol: str, current_date: str, days_ahead: int = 1
     ) -> bool:
         """
-        Returns True if a scheduled earnings release falls within `days_ahead` trading sessions.
+        Returns True if a scheduled earnings release falls within `days_ahead` calendar days.
         Used to enforce the 100% position liquidation rule 24 hours prior to earnings.
         """
         symbol_events = self.events.get(symbol, [])
-        for evt in symbol_events:
-            # Simple string ISO date comparison for demo
-            if evt.earnings_announcement_date >= current_date:
-                # If date is within 1-2 days ahead, trigger liquidation/block
+        try:
+            curr_d = datetime.date.fromisoformat(current_date[:10])
+            for evt in symbol_events:
+                earn_d = datetime.date.fromisoformat(evt.earnings_announcement_date[:10])
+                diff_days = (earn_d - curr_d).days
+                if 0 <= diff_days <= days_ahead:
+                    return True
+        except Exception:
+            for evt in symbol_events:
                 if evt.earnings_announcement_date == current_date:
                     return True
         return False

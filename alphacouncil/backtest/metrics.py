@@ -76,14 +76,14 @@ class QuantMetricsCalculator:
         skew = float(np.mean(z ** 3))
         kurt = float(np.mean(z ** 4))  # Pearson kurtosis (Normal = 3)
 
-        # Expected maximum Sharpe under Null Hypothesis of zero skill across N_trials
-        # Euler-Mascheroni constant gamma = 0.5772156649
+        # Expected maximum annualized Sharpe under Null Hypothesis of zero skill across N_trials
+        # Bailey & López de Prado (2014) / AFML Chapter 14
         gamma_em = 0.5772156649
         if n_trials > 1:
             log_n = np.log(n_trials)
-            sr_star_daily = np.sqrt(2.0 * log_n) + (gamma_em / np.sqrt(2.0 * log_n))
-            # Scale down to daily benchmark level
-            sr_star = (sr_star_daily / np.sqrt(252.0)) * 0.5
+            sr_star_ann = np.sqrt(2.0 * log_n) + (gamma_em / np.sqrt(2.0 * log_n))
+            # Convert annualized expected max to daily scale
+            sr_star = sr_star_ann / np.sqrt(252.0)
         else:
             sr_star = benchmark_sr / np.sqrt(252.0)
 
@@ -93,7 +93,7 @@ class QuantMetricsCalculator:
         if var_sr <= 1e-8:
             return 0.50
 
-        # DSR Z-score
+        # DSR Z-score: Probability that true Sharpe exceeds expected maximum from multiple testing
         z_stat = (daily_sr - sr_star) / np.sqrt(var_sr)
         dsr_prob = QuantMetricsCalculator._norm_cdf(z_stat)
 
@@ -104,8 +104,12 @@ class QuantMetricsCalculator:
         daily_equity_curve: List[float],
         trade_pnls: List[float],
         n_trials_logged: int = 150,
+        risk_free_rate: float = 0.0,
     ) -> PerformanceMetrics:
-        """Computes comprehensive institutional metrics."""
+        """
+        Computes comprehensive institutional metrics.
+        risk_free_rate: Annualized risk-free benchmark (default 0.0 for pure excess returns).
+        """
         eq = np.array(daily_equity_curve)
         n_days = len(eq)
         if n_days < 2:
@@ -121,8 +125,11 @@ class QuantMetricsCalculator:
         daily_vol = float(np.std(daily_returns, ddof=1)) if len(daily_returns) > 1 else 0.0
         ann_vol = daily_vol * np.sqrt(252.0)
 
-        daily_mean = float(np.mean(daily_returns))
-        sharpe = (daily_mean / (daily_vol + 1e-8)) * np.sqrt(252.0)
+        # Excess return over risk-free rate
+        rf_daily = (1.0 + risk_free_rate) ** (1.0 / 252.0) - 1.0
+        excess_daily_returns = daily_returns - rf_daily
+        daily_excess_mean = float(np.mean(excess_daily_returns))
+        sharpe = (daily_excess_mean / (daily_vol + 1e-8)) * np.sqrt(252.0)
 
         # Downside volatility for Sortino
         neg_returns = daily_returns[daily_returns < 0.0]

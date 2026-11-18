@@ -10,7 +10,7 @@ readme = "README.md"
 authors = [
     { name = "Vedprakash Meena", email = "vedumeena01@users.noreply.github.com" }
 ]
-license = { text = "MIT" }
+license = { text = "Apache-2.0" }
 requires-python = ">=3.10"
 dependencies = [
     "numpy>=2.0.0",

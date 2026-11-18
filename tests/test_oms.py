@@ -60,10 +60,43 @@ def test_oms_cancel_entry_and_orphaned_stops():
     )
 
     assert entry_ord.status == OrderStatus.SUBMITTED
-    assert stop_ord.status == OrderStatus.ACCEPTED
+    # Cash equity: Stop is contingent (PENDING_PARENT) until entry fill occurs
+    assert stop_ord.status == OrderStatus.PENDING_PARENT
 
     # Cancel entry order before fill -> linked stop must be canceled as well
     res = oms.cancel_entry_and_orphaned_stops(entry_ord.order_id)
     assert res is True
     assert entry_ord.status == OrderStatus.CANCELED
     assert stop_ord.status == OrderStatus.CANCELED
+
+
+def test_oms_deterministic_idempotency_replay():
+    oms = IdempotentOMS()
+
+    # Place order on bar_date 2025-01-15
+    e1, s1 = oms.create_bracket_entry(
+        symbol="INFY",
+        quantity=200,
+        entry_price=1800.0,
+        stop_price=1760.0,
+        target_price=1880.0,
+        bar_date="2025-01-15",
+        strategy_id="H1_SWEEP",
+    )
+
+    # Re-transmit identical order intent (e.g. on network timeout or retry)
+    e2, s2 = oms.create_bracket_entry(
+        symbol="INFY",
+        quantity=200,
+        entry_price=1800.0,
+        stop_price=1760.0,
+        target_price=1880.0,
+        bar_date="2025-01-15",
+        strategy_id="H1_SWEEP",
+    )
+
+    # Must return exact same order instances without duplicate creation!
+    assert e1.order_id == e2.order_id
+    assert e1.client_order_id == e2.client_order_id
+    assert s1.order_id == s2.order_id
+    assert len(oms.orders) == 3  # Entry + Stop + Target (no duplicates!)

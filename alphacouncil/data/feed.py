@@ -83,22 +83,7 @@ class MarketDataFeed:
             p_low = min(p_open, center - self.rng.uniform(0.2, 0.7) * intraday_rng)
             p_close = self.rng.uniform(p_low, p_high)
 
-            # Occasionally inject an intentional textbook Liquidity Sweep for testing
-            if i > 25 and (i % 25 == 0):
-                prior_swing_low = min(lows[i - 20 : i])
-                # Ensure realistic stop distance: D_stop >= 1.2 * ATR
-                estimated_atr = max(15.0, center * 0.018)
-                p_open = prior_swing_low + 0.5 * estimated_atr
-                p_low = prior_swing_low - 0.8 * estimated_atr  # Clear sweep below prior swing low
-                p_close = prior_swing_low + 0.7 * estimated_atr  # Sharp rejection closing above
-                p_high = max(p_open, p_close) + 0.4 * estimated_atr
-                volumes[i] = base_adv * 2.5  # Institutional volume confirmation (2.5x ADV)
-
-                # Subsequent 3-5 days generate positive mean drift (Hypothesis H1 fulfillment)
-                for fwd in range(1, 6):
-                    if i + fwd < n_bars:
-                        prices[i + fwd] = prices[i + fwd - 1] * (1.0 + self.rng.uniform(0.006, 0.015))
-
+            # Unbiased stochastic price bars (No planted artificial drift)
             highs.append(p_high)
             lows.append(p_low)
             closes.append(p_close)

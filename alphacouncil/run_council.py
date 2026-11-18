@@ -103,8 +103,7 @@ def run_interactive_pitch_demo():
         atr14=curr_bar.atr14,
         realized_annual_vol=ann_vol,
         current_equity=DEFAULT_CONFIG.initial_equity,
-        rolling_bss=0.18,
-        estimated_win_prob=meta_out.predicted_win_prob,
+        historical_closed_trades_count=0,  # Explicit Cold-Start: governed by Vol-Targeting
     )
 
     # Run Pre-Trade Risk Engine
@@ -114,6 +113,7 @@ def run_interactive_pitch_demo():
         proposed_quantity=int(sizing_res.shares_quantity * meta_out.alpha_scale),
         entry_price=entry_p,
         current_equity=DEFAULT_CONFIG.initial_equity,
+        current_time=-1.0,
     )
 
     # Run Friction Model
@@ -157,11 +157,11 @@ def run_interactive_pitch_demo():
 
     # 7. Final Pitch Memo Summary
     dashboard.console.print(
-        "[bold green]✔ AlphaCouncil Live Demonstration Completed Successfully.[/bold green]\n"
-        "[white]Empirical Proof Summary:\n"
-        " • Primary Sweep Core ($H_1$) generates positive standalone return.\n"
-        " • Meta-Labeling ($H_2$) downscales false positives, elevating Sharpe Ratio.\n"
-        " • NautilusTrader fail-closed risk gate guarantees crash safety under Indian microstructure.[/white]\n"
+        "[bold green]✔ AlphaCouncil Live Research Pipeline Completed.[/bold green]\n"
+        "[white]Architectural Verification Summary:\n"
+        " • Execution Engine: Synchronous fail-closed gates enforce strict position & circuit bounds.\n"
+        " • Friction Model: Accurately deducts statutory Oct 1 2024 SEBI tariffs + Almgren-Chriss impact.\n"
+        " • Status: Research prototype verified on stochastic simulation; production edge requires live NSE tick data calibration.[/white]\n"
     )
 
 

@@ -3,9 +3,9 @@
 # ⚡ AlphaCouncil (α-Council)
 ### *Autonomous Multi-Agent Quantitative Trading System for Indian Equities (NSE/BSE)*
 
-[![Build & Tests](https://img.shields.io/badge/pytest-16%2F16%20passing-brightgreen?style=for-the-badge&logo=pytest&logoColor=white)](https://github.com/vedumeena01/alpha-council/actions)
+[![Build & Tests](https://img.shields.io/badge/pytest-19%2F19%20passing-brightgreen?style=for-the-badge&logo=pytest&logoColor=white)](https://github.com/vedumeena01/alpha-council/actions)
 [![Code Quality](https://img.shields.io/badge/ruff-0%20errors-000000?style=for-the-badge&logo=ruff&logoColor=white)](https://github.com/astral-sh/ruff)
-[![Python Version](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12%20%7C%203.14-blue?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
+[![Python Version](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12%20%7C%203.13-blue?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
 [![Market](https://img.shields.io/badge/Exchange-NSE%20%2F%20BSE-FF6F00?style=for-the-badge&logo=googlefinance&logoColor=white)](https://www.nseindia.com)
 [![Regulatory Compliance](https://img.shields.io/badge/SEBI-Oct%202024%20Tariff%20Compliant-red?style=for-the-badge)](https://www.sebi.gov.in)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blueviolet?style=for-the-badge)](LICENSE)
@@ -212,38 +212,23 @@ AlphaCouncil guarantees exact statutory transaction deduction down to the paise:
 
 ---
 
-## 📊 Empirical Backtest & Risk Benchmarks
+## 🔬 System Status & Research Validation
 
-*Simulated 3-Year Out-Of-Sample (OOS) Purged K-Fold Cross-Validation on Nifty 100 Equities:*
+> [!IMPORTANT]
+> **Research Prototype Status:**
+> AlphaCouncil is an institutional quantitative research prototype and testing harness. All algorithms are tested under unbiased synthetic stochastic simulations (Geometric Brownian Motion with zero planted drift) and strict statutory transaction friction. Live empirical performance and alpha verification on tick-level NSE historical data is currently under active calibration.
 
-```
-                              CUMULATIVE RETURN TRAJECTORY (OOS)
-  180% ┼─────────────────────────────────────────────────────────────────────────╭─── AlphaCouncil
-  160% ┼───────────────────────────────────────────────────────────────────╭─────╯   (Sharpe: 2.14)
-  140% ┼───────────────────────────────────────────────────────────╭───────╯
-  120% ┼───────────────────────────────────────────────────╭───────╯
-  100% ┼───────────────────────────────────────────╭───────╯
-   80% ┼───────────────────────────────────╭───────╯
-   60% ┼───────────────────────────╭───────╯           ╭─────────── Nifty 50 Benchmark
-   40% ┼───────────────────╭───────╯             ╭─────╯           (Sharpe: 0.92)
-   20% ┼───────────╭───────╯               ╭─────╯
-    0% ┼───╭───────╯───────────────────────╯─────────────────────────────────────
-       2023-01         2023-07         2024-01         2024-07         2025-01
-```
+### Quantitative Safety & Architecture Verification Matrix
 
-### Performance & Gatekeeping Metrics
-
-| Metric | Buy & Hold Nifty 50 | Retail Indicator Bot | **AlphaCouncil System** | Gate / Requirement |
-| :--- | :---: | :---: | :---: | :---: |
-| **Annualized Return (CAGR)** | 14.8% | 8.2% | **31.4%** | > 25.0% |
-| **Annualized Volatility ($\sigma$)** | 16.1% | 24.5% | **14.7%** | < Benchmark |
-| **Sharpe Ratio ($R_f = 6.5\%$)** | 0.92 | 0.33 | **2.14** | > 1.80 |
-| **Sortino Ratio** | 1.28 | 0.41 | **3.42** | > 2.50 |
-| **Calmar Ratio** | 0.67 | 0.26 | **3.81** | > 2.50 |
-| **Maximum Drawdown (Peak-to-Trough)** | -22.1% | -31.6% | **-8.24%** | < 12.00% (Hard Gate) |
-| **Profit Factor** | 1.34 | 1.08 | **1.89** | > 1.50 |
-| **Deflated Sharpe Ratio (DSR $p$-val)** | N/A | 0.482 (Overfitted) | **< 0.001 (Valid)** | $p < 0.05$ ($N_{\text{trials}}=150$) |
-| **Brier Skill Score (Calibration)** | N/A | -0.12 (Miscalibrated)| **+0.184 (Calibrated)** | BSS > 0.05 |
+| Architecture Plane | Implemented Mechanism | Empirical Verification Status |
+| :--- | :--- | :--- |
+| **Alpha Discovery ($H_1$)** | Structural Liquidity Sweep Detector | Lookahead-free completed bar $t$ evaluation; execution on $t+1$ Open. News gap-downs invalidated. |
+| **Meta-Labeling ($H_2$)** | Marcos López de Prado Triple Barrier | Decouples direction from sizing. Dynamic OU half-life vertical barrier with continuous AR(1) solution. |
+| **Pre-Trade Risk Gate** | NautilusTrader Fail-Closed Architecture | Synchronous rate limiter, 20% single-stock notional cap, fail-closed on equity resolution. |
+| **Position Sizing** | Volatility Targeting + Fractional Kelly | Cold-start protection (<200 trades) bypasses Kelly; BSS calibration required before Kelly sizing. |
+| **Capital Preservation** | Peak-HWM Intraday Halt & Monthly Freeze | 2.0% intraday HWM halt, 6.0% monthly committee freeze. Exits always execute even when entries are halted. |
+| **NSE Microstructure** | SEBI Oct 1 2024 Statutory Tariff Engine | Direct deduction of STT, ₹20 Brokerage cap, NSE charges, SEBI fees, Stamp duty, GST, and Almgren-Chriss slippage. |
+| **Execution Safety** | Idempotent OMS & Broker-Side GTT Sync | Deterministic client order IDs; contingent broker-side GTT stops activated only upon entry fill. |
 
 ---
 
@@ -278,7 +263,7 @@ alpha-council/
 │   │   └── demo.py              # Live Terminal Dashboard Launcher (`python -m alphacouncil.cli.demo`)
 │   ├── run_council.py           # Master End-to-End Pipeline & Interactive Pitch Runner
 │   └── config.py                # Global Parameter & Statutory Fee Manifest
-├── tests/                       # Unit & Integration Quantitative Test Suite (16/16 Passed)
+├── tests/                       # Unit & Integration Quantitative Test Suite (19/19 Passed)
 │   ├── test_ablation.py         # 7-Model Ablation Suite Integrity Tests
 │   ├── test_alpha_models.py     # Triple Barrier & FinBERT Sentiment Tests
 │   ├── test_friction_model.py   # Oct 1 2024 SEBI Statutory Fee & Slippage Tests
@@ -286,9 +271,11 @@ alpha-council/
 │   ├── test_risk_engine.py      # Pre-Trade Fail-Closed & Kill Switch Halt Tests
 │   └── test_sweep_detector.py   # Lookahead-Free Sweep Detection & Gap-Down Tests
 ├── TRADING_AI_PROPOSAL_REPORT.md# RFC v5.0 Master Quantitative Whitepaper
-├── PITCH_DECK.md                # 9-Slide Institutional Investor & Prop Desk Memo
-├── CODE_REVIEW_REPORT.md        # Senior Quant Code Review Report (Score: 97/100)
-├── CONSOLIDATED_CODEBASE.md     # Single-Document Reference for Code Reviewers
+├── PITCH_DECK.md                # 9-Slide Architecture & Strategy Overview
+├── CODE_REVIEW_REPORT.md        # Internal Quantitative Audit & Code Review
+├── SYSTEM_CONS_AND_LIMITATIONS.md# Exhaustive Cons, Failure Modes & Defense Guide
+├── docs/
+│   └── CONSOLIDATED_CODEBASE.md # Single-Document Reference for Code Reviewers
 ├── pyproject.toml               # Modern Build System & Dependency Manifest
 └── README.md                    # Institutional Project Documentation
 ```
@@ -313,7 +300,7 @@ pip install -e .
 pip install pytest ruff rich numpy
 ```
 
-### 2. Run Test Suite (16/16 Deterministic Checks)
+### 2. Run Test Suite (19/19 Deterministic Checks)
 
 ```bash
 pytest -v
@@ -321,24 +308,27 @@ pytest -v
 
 Expected output:
 ```text
-tests/test_ablation.py::test_ablation_suite_full_execution PASSED        [  6%]
-tests/test_alpha_models.py::test_triple_barrier_stop_loss_hit PASSED     [ 12%]
-tests/test_alpha_models.py::test_triple_barrier_take_profit_hit PASSED   [ 18%]
-tests/test_alpha_models.py::test_finbert_sentiment_and_anonymization PASSED [ 25%]
-tests/test_friction_model.py::test_statutory_friction_exact_calculation PASSED [ 31%]
-tests/test_oms.py::test_oms_bracket_entry_and_partial_fill_sync PASSED   [ 37%]
-tests/test_oms.py::test_oms_cancel_entry_and_orphaned_stops PASSED       [ 43%]
-tests/test_risk_engine.py::test_pre_trade_risk_fail_closed_on_zero_equity PASSED [ 50%]
-tests/test_risk_engine.py::test_pre_trade_risk_single_stock_notional_cap PASSED [ 56%]
-tests/test_risk_engine.py::test_sizing_invalidation_noise_trap_skipped PASSED [ 62%]
-tests/test_risk_engine.py::test_sizing_cold_start_and_defensive_modes PASSED [ 68%]
-tests/test_risk_engine.py::test_circuit_proximity_long_ingress_blocked PASSED [ 75%]
-tests/test_risk_engine.py::test_intraday_kill_switch_halt_on_2_percent PASSED [ 81%]
-tests/test_sweep_detector.py::test_sweep_detector_requires_minimum_bars PASSED [ 87%]
-tests/test_sweep_detector.py::test_sweep_detector_gap_down_invalidation PASSED [ 93%]
+tests/test_ablation.py::test_ablation_suite_full_execution PASSED        [  5%]
+tests/test_alpha_models.py::test_triple_barrier_stop_loss_hit PASSED     [ 10%]
+tests/test_alpha_models.py::test_triple_barrier_take_profit_hit PASSED   [ 15%]
+tests/test_alpha_models.py::test_finbert_sentiment_and_anonymization PASSED [ 21%]
+tests/test_friction_model.py::test_statutory_friction_exact_calculation PASSED [ 26%]
+tests/test_oms.py::test_oms_bracket_entry_and_partial_fill_sync PASSED   [ 31%]
+tests/test_oms.py::test_oms_cancel_entry_and_orphaned_stops PASSED       [ 36%]
+tests/test_oms.py::test_oms_deterministic_idempotency_replay PASSED      [ 42%]
+tests/test_risk_engine.py::test_pre_trade_risk_fail_closed_on_zero_equity PASSED [ 47%]
+tests/test_risk_engine.py::test_pre_trade_risk_single_stock_notional_cap PASSED [ 52%]
+tests/test_risk_engine.py::test_sizing_invalidation_noise_trap_skipped PASSED [ 57%]
+tests/test_risk_engine.py::test_sizing_cold_start_and_defensive_modes PASSED [ 63%]
+tests/test_risk_engine.py::test_sizing_nan_fail_closed PASSED            [ 68%]
+tests/test_risk_engine.py::test_pre_trade_reduce_only_bypasses_limits PASSED [ 73%]
+tests/test_risk_engine.py::test_circuit_proximity_long_ingress_blocked PASSED [ 78%]
+tests/test_risk_engine.py::test_intraday_kill_switch_halt_on_2_percent PASSED [ 84%]
+tests/test_sweep_detector.py::test_sweep_detector_requires_minimum_bars PASSED [ 89%]
+tests/test_sweep_detector.py::test_sweep_detector_gap_down_invalidation PASSED [ 94%]
 tests/test_sweep_detector.py::test_sweep_detector_valid_bullish_sweep PASSED [100%]
 
-============================= 16 passed in 0.59s ==============================
+============================= 19 passed in 0.36s ==============================
 ```
 
 ### 3. Launch Interactive Terminal Demo
@@ -349,14 +339,18 @@ python -m alphacouncil.cli.demo
 
 ---
 
-## 💼 Institutional Pitch & Capital Allocation
+## 💼 Quantitative Whitepaper & Engineering Reports
 
-For venture partners, hedge fund allocators, and prop trading hiring committees:
+For quants, allocators, and hiring committees:
 
 - 📄 **Quantitative Whitepaper & Engineering RFC:** [TRADING_AI_PROPOSAL_REPORT.md](TRADING_AI_PROPOSAL_REPORT.md)
   - Complete 8-section mathematical proof addressing lookahead leakage, multi-hypothesis testing ($N_{\text{trials}}=150$), and synchronous execution safety.
-- 📑 **Institutional Pitch Deck:** [PITCH_DECK.md](PITCH_DECK.md)
-  - 9-slide executive memo covering Market Opportunity, Alpha Architecture, Unit Economics, Capital Deployment Schedule, and Regulatory Moat.
+- 🥊 **System Cons, Failure Modes & Defense Guide:** [SYSTEM_CONS_AND_LIMITATIONS.md](SYSTEM_CONS_AND_LIMITATIONS.md)
+  - Exhaustive institutional due-diligence covering mathematical limits, microstructure latency, and edge cases.
+- 📑 **Strategy Presentation Deck:** [PITCH_DECK.md](PITCH_DECK.md)
+  - Executive memo covering Architecture, Unit Economics, Risk Protocol, and Microstructure.
+- 🏛️ **Internal Architecture Audit Report:** [CODE_REVIEW_REPORT.md](CODE_REVIEW_REPORT.md)
+  - Autonomous quantitative code verification report.
 
 ---
 

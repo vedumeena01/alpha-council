@@ -119,12 +119,13 @@ class BacktestEngine:
 
             # Check Kill Switch
             dd_status = self.kill_switch.update_valuation(current_portfolio_value)
-            if dd_status.is_strategy_frozen:
-                equity_curve.append(current_portfolio_value)
-                continue
+            is_entry_halted = dd_status.is_strategy_frozen or dd_status.is_session_halted
 
             # 2. Execute Pending Orders from Day t-1 at Day t Open (Zero Lookahead)
-            if not dd_status.is_session_halted:
+            # If session is halted or strategy frozen, pending entry orders are cancelled
+            if is_entry_halted:
+                pending_orders = []
+            else:
                 for order in pending_orders:
                     sym = order["symbol"]
                     bar = universe_data[sym][day]
@@ -144,9 +145,9 @@ class BacktestEngine:
                             "annual_vol": order["annual_vol"],
                             "adv20": bar.adv20,
                         }
-            pending_orders = []
+                pending_orders = []
 
-            # 3. Evaluate Active Positions on Day t
+            # 3. Evaluate Active Positions on Day t (Always evaluated even if entries are frozen)
             symbols_to_close = []
             for sym, pos in list(active_positions.items()):
                 bar = universe_data[sym][day]
@@ -225,7 +226,7 @@ class BacktestEngine:
                 del active_positions[sym]
 
             # 4. Generate Signal Candidates at Day t Close for Day t+1 Execution
-            if not dd_status.is_session_halted:
+            if not is_entry_halted:
                 for sym in symbols:
                     if sym in active_positions:
                         continue  # Single position per symbol
@@ -282,7 +283,21 @@ class BacktestEngine:
                             d_stop = max(0.1, bar_t.close - stop_p)
                             target_p = round(bar_t.close + (2.0 * d_stop), 2)
                             recent_closes = np.array([b.close for b in bars[-20:]])
-                            ann_vol = float(np.std(np.diff(np.log(recent_closes))) * np.sqrt(252.0))
+
+                            # Volatility targeting vs flat risk
+                            if self.use_vol_sizing:
+                                ann_vol = float(np.std(np.diff(np.log(recent_closes))) * np.sqrt(252.0))
+                            else:
+                                ann_vol = self.config.risk.target_annual_volatility  # Flat risk baseline
+
+                            # Honest calibration: Cold start until 200 empirical closed trades exist
+                            trades_count = len(completed_trades)
+                            if self.use_kelly_cap and trades_count >= 200:
+                                empirical_bss = 0.15
+                                est_p = meta_out.predicted_win_prob
+                            else:
+                                empirical_bss = None
+                                est_p = None
 
                             sizing_res = self.sizing.compute_size(
                                 symbol=sym,
@@ -292,17 +307,19 @@ class BacktestEngine:
                                 atr14=bar_t.atr14,
                                 realized_annual_vol=ann_vol,
                                 current_equity=current_portfolio_value,
-                                rolling_bss=0.15 if self.use_kelly_cap else 0.0,
-                                estimated_win_prob=meta_out.predicted_win_prob,
+                                historical_closed_trades_count=trades_count,
+                                rolling_bss=empirical_bss,
+                                estimated_win_prob=est_p,
                             )
 
                             if not sizing_res.is_aborted and sizing_res.shares_quantity > 0:
-                                # Pre-trade validation
+                                # Pre-trade validation with simulation clock (bypass wall-clock rate limiter)
                                 val = self.pre_trade.validate_order(
                                     symbol=sym,
                                     proposed_quantity=int(sizing_res.shares_quantity * meta_out.alpha_scale),
                                     entry_price=bar_t.close,
                                     current_equity=current_portfolio_value,
+                                    current_time=-1.0,  # Negative current_time bypasses wall-clock limiter in backtest
                                 )
                                 if val.is_approved and val.adjusted_quantity > 0:
                                     pending_orders.append({

@@ -40,24 +40,50 @@ class PreTradeRiskEngine:
         current_equity: float,
         current_position_shares: int = 0,
         is_reduce_only: bool = False,
+        current_time: Optional[float] = None,
     ) -> RiskValidationResult:
         """
         Validates proposed trade against hard pre-trade parameters.
+        Supports injected current_time for deterministic backtesting.
         """
-        now = time.time()
-
-        # 1. Rate-Limiting & Anti-Runaway Loop Check
-        self.order_timestamps = [t for t in self.order_timestamps if now - t < 1.0]
-        if len(self.order_timestamps) >= self.max_orders_per_sec:
+        # 1. Critical Invariant: Reduce-Only (Risk Exits & Liquidations) must NEVER be blocked
+        # by rate-limiting, cash availability, or concentration limits.
+        if is_reduce_only:
+            if proposed_quantity <= 0:
+                return RiskValidationResult(
+                    is_approved=False,
+                    adjusted_quantity=0,
+                    reason="INVALID_PARAMETERS: Exit quantity must be positive",
+                    rejection_code="ERR_INVALID_PARAMS",
+                )
+            if proposed_quantity > abs(current_position_shares):
+                return RiskValidationResult(
+                    is_approved=False,
+                    adjusted_quantity=0,
+                    reason="REDUCE_ONLY_VIOLATION: Order increases exposure instead of reducing",
+                    rejection_code="ERR_REDUCE_ONLY",
+                )
             return RiskValidationResult(
-                is_approved=False,
-                adjusted_quantity=0,
-                reason="RATE_LIMIT_EXCEEDED: Maximum 10 order actions per second reached",
-                rejection_code="ERR_RATE_LIMIT",
+                is_approved=True,
+                adjusted_quantity=proposed_quantity,
+                reason="REDUCE_ONLY_PASSED: Liquidation / risk exit approved unconditionally",
             )
-        self.order_timestamps.append(now)
 
-        # 2. Basic Tick / Step Size Sanity
+        # 2. Rate-Limiting & Anti-Runaway Loop Check (with time injection)
+        now = time.time() if current_time is None else current_time
+        # In backtests, if current_time is negative, rate limiter is bypassed
+        if now >= 0:
+            self.order_timestamps = [t for t in self.order_timestamps if now - t < 1.0]
+            if len(self.order_timestamps) >= self.max_orders_per_sec:
+                return RiskValidationResult(
+                    is_approved=False,
+                    adjusted_quantity=0,
+                    reason="RATE_LIMIT_EXCEEDED: Maximum 10 order actions per second reached",
+                    rejection_code="ERR_RATE_LIMIT",
+                )
+            self.order_timestamps.append(now)
+
+        # 3. Basic Tick / Step Size Sanity
         if proposed_quantity <= 0 or entry_price <= 0.0:
             return RiskValidationResult(
                 is_approved=False,
@@ -66,7 +92,7 @@ class PreTradeRiskEngine:
                 rejection_code="ERR_INVALID_PARAMS",
             )
 
-        # 3. Fail-Closed Cash / Equity Check
+        # 4. Fail-Closed Cash / Equity Check
         if current_equity <= 0.0:
             return RiskValidationResult(
                 is_approved=False,
@@ -75,26 +101,20 @@ class PreTradeRiskEngine:
                 rejection_code="ERR_ACCOUNT_UNRESOLVED",
             )
 
-        # 4. Reduce-Only Verification
-        if is_reduce_only and proposed_quantity > abs(current_position_shares):
-            return RiskValidationResult(
-                is_approved=False,
-                adjusted_quantity=0,
-                reason="REDUCE_ONLY_VIOLATION: Order increases exposure instead of reducing",
-                rejection_code="ERR_REDUCE_ONLY",
-            )
-
-        # 5. Single-Stock Concentration Cap (Max 20% Notional)
+        # 5. Single-Stock Concentration Cap (Existing Position + Proposed Order <= 20% Notional)
+        existing_notional = max(0, current_position_shares) * entry_price
         proposed_notional = proposed_quantity * entry_price
+        total_proposed_notional = existing_notional + proposed_notional
         max_notional_allowed = current_equity * self.max_single_stock_pct
 
-        if proposed_notional > max_notional_allowed:
-            capped_qty = int(max_notional_allowed // entry_price)
+        if total_proposed_notional > max_notional_allowed:
+            remaining_capacity = max(0.0, max_notional_allowed - existing_notional)
+            capped_qty = int(remaining_capacity // entry_price)
             if capped_qty <= 0:
                 return RiskValidationResult(
                     is_approved=False,
                     adjusted_quantity=0,
-                    reason=f"CONCENTRATION_EXCEEDED: Single stock notional exceeds 20% cap (₹{max_notional_allowed:,.2f})",
+                    reason=f"CONCENTRATION_EXCEEDED: Position already at or exceeds 20% cap (Max: ₹{max_notional_allowed:,.2f})",
                     rejection_code="ERR_CONCENTRATION",
                 )
             return RiskValidationResult(

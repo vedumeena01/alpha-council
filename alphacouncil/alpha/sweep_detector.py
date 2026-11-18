@@ -67,26 +67,22 @@ class LiquiditySweepDetector:
         # Filter 1: Overnight Gap-Down Invalidation
         # If open is already below prior swing low, move is news-driven overnight gap, not stop run
         if curr_open < prior_swing_low:
-            return SweepSignal(
-                symbol=symbol,
-                bar_index=n - 1,
-                signal=0,
-                prior_swing_low=prior_swing_low,
-                trigger_bar_close=curr_close,
-                structural_stop=round(curr_low * 0.9995, 2),
-                volume_ratio=round(vol_ratio, 2),
-                reason="Invalidated: Session opened below swing low (News Gap-down)",
-            )
+            return None
+
+        # Filter 2: Volume Sanity (Require non-zero historical volume)
+        if vol_sma <= 0.0 or curr_vol <= 0.0:
+            return None
 
         # Condition: Sell-Side Liquidity Swept -> Bullish Institutional Reversal
         is_sweep = (curr_low < prior_swing_low) and (curr_close > prior_swing_low)
         is_vol_confirmed = curr_vol >= (self.volume_factor * vol_sma)
 
         if is_sweep and is_vol_confirmed:
+            actual_bar_idx = (n - 1) if bar_idx == -1 else bar_idx
             structural_stop = round(curr_low * 0.9995, 2)  # Low_t - 0.05%
             return SweepSignal(
                 symbol=symbol,
-                bar_index=n - 1,
+                bar_index=actual_bar_idx,
                 signal=1,
                 prior_swing_low=round(prior_swing_low, 2),
                 trigger_bar_close=round(curr_close, 2),

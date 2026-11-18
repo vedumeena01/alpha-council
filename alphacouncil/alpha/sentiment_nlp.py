@@ -1,7 +1,9 @@
 """
-Point-in-Time FinBERT NLP Sentiment Featurizer & Contamination Audit Probe (Hypothesis H2).
-Frozen pre-2020 baseline ensures clean out-of-sample data on 2021-2026 filings.
-Incorporates synthetic anonymization mode from trading-agents-lab.
+Point-in-Time Financial Lexicon & Sentiment Featurizer (H2 Prototype Stub).
+In this zero-GPU testing harness, sentiment is extracted via a deterministic financial
+lexicon rule engine. Production environments integrate containerized ProsusAI/finbert
+with pre-2020 frozen weights to guarantee strictly clean out-of-sample inference.
+Includes the Binomial Contamination Audit Harness and Synthetic Anonymization from trading-agents-lab.
 """
 
 from dataclasses import dataclass
@@ -26,7 +28,7 @@ class ContaminationResult:
 
 class FinBertSentimentExtractor:
     """
-    Simulates stateless pre-2020 frozen transformer sentiment extraction.
+    Deterministic Financial Lexicon & Sentiment Featurizer (Prototype Stub).
     Outputs numerical feature S_NLP in [-1.0, 1.0] orthogonal to momentum.
     """
 

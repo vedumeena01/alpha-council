@@ -72,7 +72,7 @@ def test_sizing_cold_start_and_defensive_modes():
     assert res_cold.regime_mode == "COLD_START"
     assert res_cold.shares_quantity > 0
 
-    # Defensive mode (BSS <= 0)
+    # Defensive mode (BSS <= 0, trades >= 200, estimated_win_prob provided)
     res_def = engine.compute_size(
         symbol="RELIANCE",
         entry_price=1000.0,
@@ -83,9 +83,52 @@ def test_sizing_cold_start_and_defensive_modes():
         current_equity=10_000_000.0,
         historical_closed_trades_count=250,
         rolling_bss=-0.05,  # Uncalibrated
+        estimated_win_prob=0.55,
     )
     assert res_def.regime_mode == "DEFENSIVE"
     assert res_def.tau_effective == 0.005  # Halved from 1% to 0.5%
+
+
+def test_sizing_nan_fail_closed():
+    engine = PositionSizingEngine()
+    # NaN ATR must fail closed, not skip noise trap and size up!
+    res_nan = engine.compute_size(
+        symbol="RELIANCE",
+        entry_price=1000.0,
+        stop_price=980.0,
+        target_price=1040.0,
+        atr14=float("nan"),
+        realized_annual_vol=0.15,
+        current_equity=10_000_000.0,
+    )
+    assert res_nan.is_aborted
+    assert res_nan.shares_quantity == 0
+    assert "Fail-closed" in res_nan.rationale
+
+
+def test_pre_trade_reduce_only_bypasses_limits():
+    engine = PreTradeRiskEngine(max_single_stock_pct=0.20, max_orders_per_sec=2)
+    # Fill rate limiter with 2 orders
+    engine.validate_order("TCS", 10, 1000.0, 1_000_000.0)
+    engine.validate_order("TCS", 10, 1000.0, 1_000_000.0)
+
+    # 3rd entry order blocked by rate limiter
+    entry_val = engine.validate_order("TCS", 10, 1000.0, 1_000_000.0)
+    assert not entry_val.is_approved
+    assert entry_val.rejection_code == "ERR_RATE_LIMIT"
+
+    # Reduce-only exit order MUST NEVER be blocked by rate limiter or concentration!
+    exit_val = engine.validate_order(
+        symbol="TCS",
+        proposed_quantity=50,
+        entry_price=1000.0,
+        current_equity=1_000_000.0,
+        current_position_shares=50,
+        is_reduce_only=True,
+    )
+    assert exit_val.is_approved
+    assert exit_val.adjusted_quantity == 50
+    assert "REDUCE_ONLY_PASSED" in exit_val.reason
 
 
 def test_circuit_proximity_long_ingress_blocked():
