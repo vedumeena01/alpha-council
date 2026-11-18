@@ -13,7 +13,13 @@ Verifies:
 """
 
 import numpy as np
-from alphacouncil.alpha.zone_engine import DemandSupplyEngine, CandleType, ZoneType
+from alphacouncil.alpha.zone_engine import (
+    DemandSupplyEngine,
+    CandleType,
+    ZoneType,
+    MarkingMode,
+    TimeframeTier,
+)
 
 
 # =====================================================================
@@ -379,3 +385,183 @@ def test_execution_orders_entry_sl_target_calculations():
     assert z_supply.target_price == 122.50
     assert z_supply.reward_per_share == 22.00
     assert z_supply.risk_reward_ratio == 2.0
+
+
+# =====================================================================
+# EPISODE 5 TESTS: TRADING PSYCHOLOGY, WICK-TO-WICK & ANTI-NEWS ENGINE
+# =====================================================================
+
+def test_episode_05_zone_strength_base_candle_count():
+    """
+    Episode 5: Zone Strength comparison:
+    Setup A (1 base candle) has quick victory -> HIGH_STRENGTH (Score 1.0)
+    Setup B (4 base candles) has prolonged struggle -> MODERATE_STRENGTH (Score 0.6)
+    """
+    engine = DemandSupplyEngine()
+
+    # Setup A: 1 base candle (DBR)
+    opens_a = np.array([120.0, 105.0, 107.0])
+    highs_a = np.array([121.0, 109.0, 125.0])
+    lows_a = np.array([104.0, 101.0, 106.0])
+    closes_a = np.array([105.0, 107.0, 124.0])
+
+    z_a = engine.scan_for_zones(opens_a, highs_a, lows_a, closes_a)[0]
+    assert z_a.base_candles_count == 1
+    assert z_a.strength_rating == "HIGH_STRENGTH"
+    assert z_a.strength_score == 1.00
+
+    # Setup B: 4 base candles (DBR)
+    # Leg-in (idx 0), Base 1-4 (idx 1..4), Leg-out (idx 5)
+    opens_b = np.array([130.0, 105.0, 106.0, 105.5, 106.5, 108.0])
+    highs_b = np.array([131.0, 108.0, 107.5, 108.0, 108.5, 125.0])
+    lows_b = np.array([104.0, 102.0, 103.0, 102.5, 103.0, 107.0])
+    closes_b = np.array([105.0, 106.0, 105.5, 106.5, 107.0, 124.0])
+
+    z_b = engine.scan_for_zones(opens_b, highs_b, lows_b, closes_b)[0]
+    assert z_b.base_candles_count == 4
+    assert z_b.strength_rating == "MODERATE_STRENGTH"
+    assert z_b.strength_score == 0.60
+
+
+def test_episode_05_wick_to_wick_marking():
+    """
+    Episode 5: Wick-to-Wick Marking vs Body-to-Wick Marking:
+    - Demand:
+      Body-to-Wick: PL = max body (107.0)
+      Wick-to-Wick: PL = max wick (109.0)
+    - Supply:
+      Body-to-Wick: PL = min body (113.0)
+      Wick-to-Wick: PL = min wick (111.0)
+    """
+    engine = DemandSupplyEngine()
+
+    # Demand: Base candle Open 105, High 109, Low 101, Close 107
+    opens_d = np.array([120.0, 105.0, 107.0])
+    highs_d = np.array([121.0, 109.0, 125.0])
+    lows_d = np.array([104.0, 101.0, 106.0])
+    closes_d = np.array([105.0, 107.0, 124.0])
+
+    z_body = engine.scan_for_zones(
+        opens_d, highs_d, lows_d, closes_d, marking_mode=MarkingMode.BODY_TO_WICK
+    )[0]
+    assert z_body.proximal_line == 107.0  # Max body
+    assert z_body.distal_line == 101.0   # Min wick
+
+    z_wick = engine.scan_for_zones(
+        opens_d, highs_d, lows_d, closes_d, marking_mode=MarkingMode.WICK_TO_WICK
+    )[0]
+    assert z_wick.proximal_line == 109.0  # Highest wick!
+    assert z_wick.distal_line == 101.0   # Lowest wick
+    assert z_wick.marking_mode == MarkingMode.WICK_TO_WICK
+
+    # Supply: Base candle Open 114, High 118, Low 111, Close 113
+    opens_s = np.array([100.0, 114.0, 113.0])
+    highs_s = np.array([115.0, 118.0, 114.0])
+    lows_s = np.array([99.0, 111.0, 98.0])
+    closes_s = np.array([114.0, 113.0, 100.0])
+
+    z_s_body = engine.scan_for_zones(
+        opens_s, highs_s, lows_s, closes_s, marking_mode=MarkingMode.BODY_TO_WICK
+    )[0]
+    assert z_s_body.proximal_line == 113.0  # Lowest body
+    assert z_s_body.distal_line == 118.0   # Highest wick
+
+    z_s_wick = engine.scan_for_zones(
+        opens_s, highs_s, lows_s, closes_s, marking_mode=MarkingMode.WICK_TO_WICK
+    )[0]
+    assert z_s_wick.proximal_line == 111.0  # Lowest wick!
+    assert z_s_wick.distal_line == 118.0   # Highest wick
+
+
+def test_episode_05_direct_reversal_missing_base_candles():
+    """
+    Episode 5: Direct Reversals (0 Base Candles):
+    Explosive Leg-in immediately followed by explosive Leg-out without basing bar.
+    """
+    engine = DemandSupplyEngine()
+
+    # V-Reversal Demand: Red drop (Open 120, Close 100) -> Immediate Green rally (Open 100, Close 122)
+    opens = np.array([120.0, 100.0])
+    highs = np.array([121.0, 125.0])
+    lows = np.array([98.0, 96.0])
+    closes = np.array([100.0, 122.0])
+
+    zones = engine.scan_for_zones(opens, highs, lows, closes, allow_direct_reversals=True)
+    assert len(zones) == 1
+    z = zones[0]
+
+    assert z.is_direct_reversal is True
+    assert z.base_candles_count == 0
+    assert z.strength_rating == "DIRECT_REVERSAL"
+    assert z.is_demand is True
+    assert z.proximal_line == 100.0  # Interface boundary max(100.0, 100.0)
+    assert z.distal_line == 96.0     # min(98.0, 96.0) lowest extreme wick
+
+
+def test_episode_05_timeframe_hierarchy_dominance():
+    """
+    Episode 5: Timeframe Hierarchy:
+    Monthly (4.0x) >> Weekly (3.0x) >> Daily (2.0x) >> Intraday (1.0x).
+    """
+    engine = DemandSupplyEngine()
+    opens = np.array([120.0, 105.0, 107.0])
+    highs = np.array([121.0, 109.0, 125.0])
+    lows = np.array([104.0, 101.0, 106.0])
+    closes = np.array([105.0, 107.0, 124.0])
+
+    z_monthly = engine.scan_for_zones(
+        opens, highs, lows, closes, timeframe=TimeframeTier.MONTHLY
+    )[0]
+    z_daily = engine.scan_for_zones(
+        opens, highs, lows, closes, timeframe=TimeframeTier.DAILY
+    )[0]
+    z_intraday = engine.scan_for_zones(
+        opens, highs, lows, closes, timeframe=TimeframeTier.INTRADAY
+    )[0]
+
+    assert z_monthly.timeframe_weight == 4.0
+    assert z_daily.timeframe_weight == 2.0
+    assert z_intraday.timeframe_weight == 1.0
+    assert z_monthly.timeframe_weight > z_daily.timeframe_weight > z_intraday.timeframe_weight
+
+
+def test_episode_05_psychology_news_trap_evaluation():
+    """
+    Episode 5 Trading Psychology: "Human can lie, but chart can't."
+    - Axis Bank / Nestle Maggi ban case study: Panic news at fresh Demand Zone -> Buy with institutions!
+    - HDFC Merger case study: Euphoria news at fresh Supply Zone -> Distribute / Short with institutions!
+    """
+    engine = DemandSupplyEngine()
+    opens = np.array([120.0, 105.0, 107.0])
+    highs = np.array([121.0, 109.0, 125.0])
+    lows = np.array([104.0, 101.0, 106.0])
+    closes = np.array([105.0, 107.0, 124.0])
+
+    z_demand = engine.scan_for_zones(opens, highs, lows, closes)[0]
+
+    # Scenario 1: Media reports accounting scandal / earnings disaster (-0.85 sentiment)
+    # Price falls into fresh Demand Zone -> RETAIL_PANIC_LIQUIDITY_TRAP
+    trap_d = engine.evaluate_psychology_news_trap(z_demand, news_sentiment_score=-0.85)
+    assert trap_d.is_news_trap is True
+    assert trap_d.trap_type == "RETAIL_PANIC_LIQUIDITY_TRAP"
+    assert trap_d.recommendation == "ACCUMULATE_WITH_INSTITUTIONS"
+    assert "Human can lie, but chart can't" in trap_d.rationale
+
+    # Scenario 2: Media reports historic mega-merger / upgrade (+0.90 sentiment)
+    # Price rises into fresh Supply Zone -> RETAIL_EUPHORIA_LIQUIDITY_TRAP
+    opens_s = np.array([100.0, 114.0, 113.0])
+    highs_s = np.array([115.0, 118.0, 114.0])
+    lows_s = np.array([99.0, 111.0, 98.0])
+    closes_s = np.array([114.0, 113.0, 100.0])
+
+    z_supply = engine.scan_for_zones(opens_s, highs_s, lows_s, closes_s)[0]
+    trap_s = engine.evaluate_psychology_news_trap(z_supply, news_sentiment_score=+0.90)
+    assert trap_s.is_news_trap is True
+    assert trap_s.trap_type == "RETAIL_EUPHORIA_LIQUIDITY_TRAP"
+    assert trap_s.recommendation == "DISTRIBUTE_OR_SHORT_WITH_INSTITUTIONS"
+
+    # Scenario 3: Neutral sentiment
+    trap_neutral = engine.evaluate_psychology_news_trap(z_demand, news_sentiment_score=0.05)
+    assert trap_neutral.is_news_trap is False
+    assert trap_neutral.recommendation == "TRADE_STANDARD_PRICE_ACTION"
+

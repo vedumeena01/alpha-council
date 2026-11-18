@@ -12,5 +12,6 @@
 | **02** | **Demand & Supply Imbalance (50% Candle Rule)** | ✅ **Codified & Trained** | [`alphacouncil/alpha/zone_engine.py`](../alphacouncil/alpha/zone_engine.py) |
 | **03** | **Zone Marking (Proximal/Distal Lines & Freshness)** | ✅ **Codified & Trained** | [`training/EPISODE_03_ZONE_MARKING_RULES.md`](EPISODE_03_ZONE_MARKING_RULES.md) |
 | **04** | **Entry, Stoploss, Target & Exceptional Marking** | ✅ **Codified & Trained** | [`training/EPISODE_04_ENTRY_STOPLOSS_TARGET_AND_EXCEPTIONAL_MARKING.md`](EPISODE_04_ENTRY_STOPLOSS_TARGET_AND_EXCEPTIONAL_MARKING.md) |
-| **05** | *Upcoming...* | ⏳ Pending | - |
-| **...**| *Episodes 06 - 20* | ⏳ Pending | - |
+| **05** | **Trading Psychology, Wick-to-Wick & Anti-News Engine** | ✅ **Codified & Trained** | [`training/EPISODE_05_TRADING_PSYCHOLOGY_AND_ADVANCED_ZONE_MAPPING.md`](EPISODE_05_TRADING_PSYCHOLOGY_AND_ADVANCED_ZONE_MAPPING.md) |
+| **06** | *Upcoming...* | ⏳ Pending | - |
+| **...**| *Episodes 07 - 20* | ⏳ Pending | - |

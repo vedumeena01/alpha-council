@@ -12,7 +12,8 @@
 | **02** | Why Does Stock Price Go Up and Down? | 1 | **100%** (1/1) | 0.15s | 50% Body-to-Range Rule, Green/Red Exciting vs. Base Candle Classification | [`EPISODE_02_TEST_RESULTS.md`](EPISODE_02_TEST_RESULTS.md) |
 | **03** | Demand & Supply Zone Marking & Freshness | 4 | **100%** (4/4) | 0.14s | Proximal/Distal Line Placement, 4 Patterns (DBR, RBR, RBD, DBD), Fresh vs. Tested, CMP Navigation | [`EPISODE_03_TEST_RESULTS.md`](EPISODE_03_TEST_RESULTS.md) |
 | **04** | Entry, Stoploss, Target & Exceptional Marking | 6 | **100%** (6/6) | 0.14s | Proximal Invariance, Reversal 3-Wick Rule, Continuous Leg-in Exclusion, Speeding Bus SL Buffer, 2:1 Target | [`EPISODE_04_TEST_RESULTS.md`](EPISODE_04_TEST_RESULTS.md) |
-| **Total** | **All Episodes (Cumulative)** | **13** | **100%** (13/13) | **0.17s** | **Full GTF Price Action Core (`zone_engine.py`)** | - |
+| **05** | Trading Psychology, Wick-to-Wick & Anti-News Engine | 5 | **100%** (5/5) | 0.14s | Base Candle Count Scorer (1-3 vs 4-5+), Wick-to-Wick Marking, Direct Reversals (0 Base), Timeframe Hierarchy (Monthly 4.0x), News Trap Contrarian Filter | [`EPISODE_05_TEST_RESULTS.md`](EPISODE_05_TEST_RESULTS.md) |
+| **Total** | **All Episodes (Cumulative)** | **18** | **100%** (18/18) | **0.39s** | **Full GTF Price Action Core (`zone_engine.py`)** | - |
 
 ---
 
@@ -20,9 +21,9 @@
 
 ```text
 Module: alphacouncil/alpha/zone_engine.py
-Statements: 187
-Missed: 11
-Test Coverage: 94.1%
+Statements: 254
+Missed: 16
+Test Coverage: 93.7%
 Linter Status: Ruff 0 errors, 0 warnings
 CI Status: GitHub Actions 100% Green (Python 3.11 & 3.12)
 ```
@@ -34,3 +35,4 @@ CI Status: GitHub Actions 100% Green (Python 3.11 & 3.12)
 - [`EPISODE_02_TEST_RESULTS.md`](EPISODE_02_TEST_RESULTS.md) - 50% candle classification.
 - [`EPISODE_03_TEST_RESULTS.md`](EPISODE_03_TEST_RESULTS.md) - Zone marking & freshness.
 - [`EPISODE_04_TEST_RESULTS.md`](EPISODE_04_TEST_RESULTS.md) - Exceptional marking & trade execution.
+- [`EPISODE_05_TEST_RESULTS.md`](EPISODE_05_TEST_RESULTS.md) - Trading psychology, wick-to-wick, direct reversals & news traps.

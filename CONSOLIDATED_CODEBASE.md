@@ -344,7 +344,10 @@ Demand & Supply Core Engine (Trading in the Zone / GTF Methodology).
 Codifies institutional order-matching mechanics, Exciting vs Base candle classification,
 structural zone detection (DBR, RBR, RBD, DBD), exact Zone Marking (Proximal & Distal lines),
 Normal vs. Exceptional marking (reversal vs. continuous wick rules),
-Entry, Stop-Loss (with speeding bus volatility buffers), and Target (2:1 RRR) execution levels.
+Wick-to-Wick aggressive zone mapping, Direct Reversals (missing base candles),
+Zone strength scoring (1-3 base vs. 4-5+ base candles), Timeframe Hierarchy,
+Entry, Stop-Loss (with speeding bus volatility buffers), Target (2:1 RRR),
+and Trading Psychology Anti-News Liquidity Trap filtering ("Human can lie, but chart can't").
 """
 
 from dataclasses import dataclass
@@ -366,6 +369,20 @@ class ZoneType(str, Enum):
     SUPPLY_DBD = "SUPPLY_DBD"  # Drop - Base - Drop (Continuation Supply)
 
 
+class MarkingMode(str, Enum):
+    BODY_TO_WICK = "BODY_TO_WICK"  # Standard GTF Marking (PL on Base Body, DL on Wick)
+    WICK_TO_WICK = "WICK_TO_WICK"  # Aggressive GTF Marking (PL on Base Wick, DL on Wick)
+
+
+class TimeframeTier(str, Enum):
+    MONTHLY = "MONTHLY"    # Highest institutional dominance (Weight 4.0)
+    WEEKLY = "WEEKLY"      # Intermediate institutional swing (Weight 3.0)
+    DAILY = "DAILY"        # Standard positional baseline (Weight 2.0)
+    M125 = "125M"          # Exact NSE session partition 3 bars/day (Weight 1.5)
+    M75 = "75M"            # Exact NSE session partition 5 bars/day (Weight 1.25)
+    INTRADAY = "INTRADAY"  # 5m-60m noise vulnerable (Weight 1.0)
+
+
 @dataclass
 class CandleFeature:
     index: int
@@ -380,6 +397,16 @@ class CandleFeature:
 
 
 @dataclass
+class PsychologyNewsTrapAssessment:
+    is_news_trap: bool
+    trap_type: str
+    recommendation: str
+    rationale: str
+    retail_sentiment_bias: str
+    institutional_action: str
+
+
+@dataclass
 class IdentifiedZone:
     zone_type: ZoneType
     is_demand: bool
@@ -389,8 +416,8 @@ class IdentifiedZone:
     base_candles_count: int
     first_leg_out_idx: int
 
-    # Exact Zone Marking (Episodes 3 & 4 Formulas)
-    proximal_line: float            # Entry Reference (Invariant - Never changes)
+    # Exact Zone Marking (Episodes 3, 4 & 5 Formulas)
+    proximal_line: float            # Entry Reference (Invariant under body-to-wick)
     distal_line: float              # Active Distal Reference used for execution
     distal_line_normal: float = 0.0 # Normal DL (Base candle extreme wick only)
     distal_line_exceptional: float = 0.0  # Exceptional DL (Evaluates leg wicks based on reversal/continuous rules)
@@ -412,13 +439,30 @@ class IdentifiedZone:
     reward_per_share: float = 0.0   # abs(target_price - entry_price)
     risk_reward_ratio: float = 2.0
 
+    # Advanced Structural Attributes (Episode 5)
+    marking_mode: MarkingMode = MarkingMode.BODY_TO_WICK
+    timeframe: TimeframeTier = TimeframeTier.DAILY
+    strength_rating: str = "HIGH_STRENGTH"  # HIGH_STRENGTH, MODERATE_STRENGTH, DIRECT_REVERSAL
+    strength_score: float = 1.0             # 1.0 (1-2 base), 0.85 (3 base), 0.60 (4-5 base)
+    is_direct_reversal: bool = False        # True if 0 base candles (V-reversal)
+    timeframe_weight: float = 2.0           # Dominance factor (Monthly 4.0, Daily 2.0, etc.)
+
 
 class DemandSupplyEngine:
     """
     Core Price Action Engine trained on Institutional Order Flow,
     Demand-Supply Imbalances, Normal vs. Exceptional Zone Marking,
-    and Mechanical Trade Execution (Entry, Stop-Loss, Target).
+    Wick-to-Wick Mapping, Timeframe Hierarchy, and Trading Psychology Anti-News Traps.
     """
+
+    TIMEFRAME_WEIGHTS: Dict[TimeframeTier, float] = {
+        TimeframeTier.MONTHLY: 4.0,
+        TimeframeTier.WEEKLY: 3.0,
+        TimeframeTier.DAILY: 2.0,
+        TimeframeTier.M125: 1.5,
+        TimeframeTier.M75: 1.25,
+        TimeframeTier.INTRADAY: 1.0,
+    }
 
     def __init__(
         self,
@@ -428,6 +472,8 @@ class DemandSupplyEngine:
         buffer_ratio: float = 0.02,
         min_buffer: float = 0.05,
         target_rrr: float = 2.0,
+        default_marking_mode: MarkingMode = MarkingMode.BODY_TO_WICK,
+        default_timeframe: TimeframeTier = TimeframeTier.DAILY,
     ):
         self.min_range_atr_ratio = min_range_atr_ratio
         self.max_base_candles = max_base_candles
@@ -435,6 +481,8 @@ class DemandSupplyEngine:
         self.buffer_ratio = buffer_ratio
         self.min_buffer = min_buffer
         self.target_rrr = target_rrr
+        self.default_marking_mode = default_marking_mode
+        self.default_timeframe = default_timeframe
 
     @staticmethod
     def get_nse_session_partitions() -> Dict[str, int]:
@@ -460,6 +508,54 @@ class DemandSupplyEngine:
         elif abs(open_p - high_p) <= tolerance and close_p < open_p:
             return True, "OPEN_EQUALS_HIGH_PURE_SELLING"
         return False, "STANDARD_CANDLE"
+
+    @classmethod
+    def evaluate_psychology_news_trap(
+        cls, zone: IdentifiedZone, news_sentiment_score: float
+    ) -> PsychologyNewsTrapAssessment:
+        """
+        Episode 5: "Human can lie, but chart can't."
+        Evaluates institutional liquidity traps created by retail news reactions.
+        - Extreme negative news + Fresh Demand Zone -> RETAIL_PANIC_LIQUIDITY_TRAP
+          Institutions exploit retail panic dumping as counterparty entry liquidity.
+        - Extreme positive news + Fresh Supply Zone -> RETAIL_EUPHORIA_LIQUIDITY_TRAP
+          Institutions exploit retail FOMO buying as counterparty exit liquidity.
+        """
+        if zone.is_demand and zone.is_fresh and news_sentiment_score <= -0.40:
+            return PsychologyNewsTrapAssessment(
+                is_news_trap=True,
+                trap_type="RETAIL_PANIC_LIQUIDITY_TRAP",
+                recommendation="ACCUMULATE_WITH_INSTITUTIONS",
+                rationale=(
+                    "Human can lie, but chart can't. Severe negative news / earnings shock "
+                    "plunged price into a fresh institutional Demand Zone. Retail panic selling "
+                    "provides bulk entry liquidity for smart money accumulation."
+                ),
+                retail_sentiment_bias="EXTREME_FEAR_PANIC_SELLING",
+                institutional_action="SMART_MONEY_ACCUMULATION",
+            )
+        elif not zone.is_demand and zone.is_fresh and news_sentiment_score >= 0.40:
+            return PsychologyNewsTrapAssessment(
+                is_news_trap=True,
+                trap_type="RETAIL_EUPHORIA_LIQUIDITY_TRAP",
+                recommendation="DISTRIBUTE_OR_SHORT_WITH_INSTITUTIONS",
+                rationale=(
+                    "Human can lie, but chart can't. Euphoric news / merger hype / upgrades "
+                    "drove price into a fresh institutional Supply Zone. Retail FOMO buying "
+                    "provides exit liquidity for institutions to offload long inventory."
+                ),
+                retail_sentiment_bias="EXTREME_GREED_FOMO_BUYING",
+                institutional_action="SMART_MONEY_DISTRIBUTION",
+            )
+        else:
+            return PsychologyNewsTrapAssessment(
+                is_news_trap=False,
+                trap_type="NONE",
+                recommendation="TRADE_STANDARD_PRICE_ACTION",
+                rationale="No severe news sentiment divergence detected against structural zone.",
+                retail_sentiment_bias="NEUTRAL_OR_ALIGNED",
+                institutional_action="STANDARD_EXECUTION",
+            )
 
     def classify_candle(
         self,
@@ -512,20 +608,29 @@ class DemandSupplyEngine:
         closes: np.ndarray,
         atr14: Optional[np.ndarray] = None,
         use_exceptional: Optional[bool] = None,
+        marking_mode: Optional[MarkingMode] = None,
+        timeframe: Optional[TimeframeTier] = None,
+        allow_direct_reversals: bool = True,
     ) -> List[IdentifiedZone]:
         """
         Scans series of candles to identify institutional Demand and Supply zones:
         Leg-in (Arrival) -> Base Candles (Pending Orders) -> Leg-out (Departure).
-        Computes Proximal Line, Distal Line (Normal & Exceptional),
-        Entry, Stop-Loss with volatility buffer, and Target (2:1 RRR).
+        Supports:
+        - Normal (Body-to-Wick) and Wick-to-Wick Marking
+        - Direct Reversals (0 Base Candles)
+        - Base candle count strength evaluation (1-3 vs 4-5+)
+        - Timeframe hierarchy weights
         """
         n = len(closes)
-        if n < 3:
+        if n < 2:
             return []
 
         use_exceptional_eff = (
             self.use_exceptional_marking if use_exceptional is None else use_exceptional
         )
+        mode_eff = self.default_marking_mode if marking_mode is None else marking_mode
+        tf_eff = self.default_timeframe if timeframe is None else timeframe
+        tf_weight = self.TIMEFRAME_WEIGHTS.get(tf_eff, 1.0)
 
         # 1. Classify all candles
         classified: List[CandleFeature] = []
@@ -539,13 +644,107 @@ class DemandSupplyEngine:
 
         # 2. Pattern recognition for zones
         i = 1
-        while i < n - 1:
+        while i < n:
             leg_in = classified[i - 1]
             if leg_in.candle_type == CandleType.BASE:
                 i += 1
                 continue
 
-            # Check if current is BASE
+            # Check for Direct Reversal (0 Base Candles, Episode 5)
+            if allow_direct_reversals and classified[i].candle_type != CandleType.BASE:
+                leg_out = classified[i]
+                is_direct = False
+                z_type = None
+                is_demand = False
+
+                if leg_in.candle_type == CandleType.RED_EXCITING and leg_out.candle_type == CandleType.GREEN_EXCITING:
+                    # Direct V-Reversal Demand
+                    is_direct = True
+                    z_type = ZoneType.DEMAND_DBR
+                    is_demand = True
+                elif leg_in.candle_type == CandleType.GREEN_EXCITING and leg_out.candle_type == CandleType.RED_EXCITING:
+                    # Direct Inverted V-Reversal Supply
+                    is_direct = True
+                    z_type = ZoneType.SUPPLY_RBD
+                    is_demand = False
+
+                if is_direct:
+                    first_leg_out_idx = i
+                    dep_velocity = abs(leg_out.close - leg_out.open)
+
+                    if is_demand:
+                        # Reversal interface body boundary
+                        proximal = max(leg_in.close, leg_out.open)
+                        distal = min(leg_in.low, leg_out.low)
+                        zone_width = round(proximal - distal, 2)
+                        buffer = round(max(self.min_buffer, zone_width * self.buffer_ratio), 2)
+                        entry_p = round(proximal + buffer, 2)
+                        sl_p = round(distal - buffer, 2)
+                        risk_ps = round(entry_p - sl_p, 2)
+                        target_p = round(entry_p + (self.target_rrr * risk_ps), 2)
+                        reward_ps = round(target_p - entry_p, 2)
+                    else:
+                        proximal = min(leg_in.close, leg_out.open)
+                        distal = max(leg_in.high, leg_out.high)
+                        zone_width = round(distal - proximal, 2)
+                        buffer = round(max(self.min_buffer, zone_width * self.buffer_ratio), 2)
+                        entry_p = round(proximal - buffer, 2)
+                        sl_p = round(distal + buffer, 2)
+                        risk_ps = round(sl_p - entry_p, 2)
+                        target_p = round(entry_p - (self.target_rrr * risk_ps), 2)
+                        reward_ps = round(entry_p - target_p, 2)
+
+                    # Freshness
+                    is_fresh = True
+                    tested_at = None
+                    for k in range(first_leg_out_idx + 1, n):
+                        if is_demand and lows[k] <= proximal:
+                            is_fresh = False
+                            tested_at = k
+                            break
+                        elif not is_demand and highs[k] >= proximal:
+                            is_fresh = False
+                            tested_at = k
+                            break
+
+                    zones.append(
+                        IdentifiedZone(
+                            zone_type=z_type,
+                            is_demand=is_demand,
+                            is_reversal=True,
+                            base_start_idx=i - 1,
+                            base_end_idx=i - 1,
+                            base_candles_count=0,
+                            first_leg_out_idx=first_leg_out_idx,
+                            proximal_line=round(proximal, 2),
+                            distal_line=round(distal, 2),
+                            distal_line_normal=round(distal, 2),
+                            distal_line_exceptional=round(distal, 2),
+                            zone_width=zone_width,
+                            departure_strength=1,
+                            departure_velocity=round(dep_velocity, 2),
+                            is_fresh=is_fresh,
+                            tested_at_idx=tested_at,
+                            is_high_quality=True,
+                            is_exceptional=use_exceptional_eff,
+                            entry_price=entry_p,
+                            stop_loss=sl_p,
+                            risk_per_share=risk_ps,
+                            target_price=target_p,
+                            reward_per_share=reward_ps,
+                            risk_reward_ratio=round(self.target_rrr, 2),
+                            marking_mode=mode_eff,
+                            timeframe=tf_eff,
+                            strength_rating="DIRECT_REVERSAL",
+                            strength_score=0.90,
+                            is_direct_reversal=True,
+                            timeframe_weight=tf_weight,
+                        )
+                    )
+                    i += 1
+                    continue
+
+            # Standard Basing (1+ Base Candles)
             if classified[i].candle_type == CandleType.BASE:
                 base_start = i
                 while i < n and classified[i].candle_type == CandleType.BASE:
@@ -570,7 +769,24 @@ class DemandSupplyEngine:
                         dep_idx += 1
 
                     dep_velocity = abs(departure_p_end - departure_p_start)
-                    is_hq = (1 <= base_count <= self.max_base_candles) and (departure_strength >= 1)
+
+                    # Episode 5 Base Candle Strength Rating:
+                    if 1 <= base_count <= 2:
+                        strength_rating = "HIGH_STRENGTH"
+                        strength_score = 1.00
+                        is_hq = True
+                    elif base_count == 3:
+                        strength_rating = "HIGH_STRENGTH"
+                        strength_score = 0.85
+                        is_hq = True
+                    elif 4 <= base_count <= 5:
+                        strength_rating = "MODERATE_STRENGTH"
+                        strength_score = 0.60
+                        is_hq = departure_strength >= 1
+                    else:
+                        strength_rating = "LOW_STRENGTH"
+                        strength_score = 0.30
+                        is_hq = False
 
                     # Determine zone type
                     z_type = None
@@ -595,21 +811,22 @@ class DemandSupplyEngine:
                         is_reversal = False
 
                     if z_type:
-                        # 3. Exact Zone Marking (Episode 3 & 4 Formulas)
                         base_candles = classified[base_start : base_end + 1]
 
                         if is_demand:
-                            # Demand Proximal: Highest Body of all base candles (NEVER CHANGES)
-                            proximal = max(max(b.open, b.close) for b in base_candles)
-                            # Demand Distal Normal: Lowest Wick of all base candles
+                            # Proximal Line:
+                            if mode_eff == MarkingMode.WICK_TO_WICK:
+                                proximal = max(b.high for b in base_candles)
+                            else:
+                                proximal = max(max(b.open, b.close) for b in base_candles)
+
+                            # Distal Normal:
                             distal_normal = min(b.low for b in base_candles)
 
-                            # Demand Distal Exceptional:
+                            # Distal Exceptional:
                             if is_reversal:
-                                # DBR: Lowest wick among [Leg-in, Base, Leg-out]
                                 distal_exceptional = min(leg_in.low, distal_normal, leg_out.low)
                             else:
-                                # RBR: Lowest wick between [Base, Leg-out] (Leg-in strictly ignored!)
                                 distal_exceptional = min(distal_normal, leg_out.low)
 
                             active_distal = (
@@ -617,8 +834,6 @@ class DemandSupplyEngine:
                             )
                             zone_width = round(proximal - active_distal, 2)
 
-                            # Execution Levels (Demand / Long):
-                            # Entry slightly above PL, SL slightly below DL (speeding bus buffer)
                             buffer = round(max(self.min_buffer, zone_width * self.buffer_ratio), 2)
                             entry_p = round(proximal + buffer, 2)
                             sl_p = round(active_distal - buffer, 2)
@@ -627,17 +842,19 @@ class DemandSupplyEngine:
                             reward_ps = round(target_p - entry_p, 2)
 
                         else:
-                            # Supply Proximal: Lowest Body of all base candles (NEVER CHANGES)
-                            proximal = min(min(b.open, b.close) for b in base_candles)
-                            # Supply Distal Normal: Highest Wick of all base candles
+                            # Supply Proximal:
+                            if mode_eff == MarkingMode.WICK_TO_WICK:
+                                proximal = min(b.low for b in base_candles)
+                            else:
+                                proximal = min(min(b.open, b.close) for b in base_candles)
+
+                            # Distal Normal:
                             distal_normal = max(b.high for b in base_candles)
 
-                            # Supply Distal Exceptional:
+                            # Distal Exceptional:
                             if is_reversal:
-                                # RBD: Highest wick among [Leg-in, Base, Leg-out]
                                 distal_exceptional = max(leg_in.high, distal_normal, leg_out.high)
                             else:
-                                # DBD: Highest wick between [Base, Leg-out] (Leg-in strictly ignored!)
                                 distal_exceptional = max(distal_normal, leg_out.high)
 
                             active_distal = (
@@ -645,8 +862,6 @@ class DemandSupplyEngine:
                             )
                             zone_width = round(active_distal - proximal, 2)
 
-                            # Execution Levels (Supply / Short):
-                            # Entry slightly below PL, SL slightly above DL (speeding bus buffer)
                             buffer = round(max(self.min_buffer, zone_width * self.buffer_ratio), 2)
                             entry_p = round(proximal - buffer, 2)
                             sl_p = round(active_distal + buffer, 2)
@@ -654,24 +869,19 @@ class DemandSupplyEngine:
                             target_p = round(entry_p - (self.target_rrr * risk_ps), 2)
                             reward_ps = round(entry_p - target_p, 2)
 
-                        # 4. Freshness vs Tested Evaluation
-                        # Monitored immediately after the first leg-out candle
+                        # Freshness Evaluation
                         is_fresh = True
                         tested_at = None
 
                         for k in range(first_leg_out_idx + 1, n):
-                            if is_demand:
-                                # In Demand: If low touches or pierces Proximal line
-                                if lows[k] <= proximal:
-                                    is_fresh = False
-                                    tested_at = k
-                                    break
-                            else:
-                                # In Supply: If high touches or pierces Proximal line
-                                if highs[k] >= proximal:
-                                    is_fresh = False
-                                    tested_at = k
-                                    break
+                            if is_demand and lows[k] <= proximal:
+                                is_fresh = False
+                                tested_at = k
+                                break
+                            elif not is_demand and highs[k] >= proximal:
+                                is_fresh = False
+                                tested_at = k
+                                break
 
                         zones.append(
                             IdentifiedZone(
@@ -699,6 +909,12 @@ class DemandSupplyEngine:
                                 target_price=target_p,
                                 reward_per_share=reward_ps,
                                 risk_reward_ratio=round(self.target_rrr, 2),
+                                marking_mode=mode_eff,
+                                timeframe=tf_eff,
+                                strength_rating=strength_rating,
+                                strength_score=strength_score,
+                                is_direct_reversal=False,
+                                timeframe_weight=tf_weight,
                             )
                         )
             else:
@@ -715,14 +931,22 @@ class DemandSupplyEngine:
         closes: np.ndarray,
         only_fresh: bool = True,
         use_exceptional: Optional[bool] = None,
+        marking_mode: Optional[MarkingMode] = None,
+        timeframe: Optional[TimeframeTier] = None,
     ) -> Tuple[List[IdentifiedZone], List[IdentifiedZone]]:
         """
-        Navigates relative to Current Market Price (CMP) as taught in Episode 3 & 4:
+        Navigates relative to Current Market Price (CMP) as taught in Episodes 3, 4 & 5:
         1. Demand Zones: Look Left & Down (Proximal Line < CMP).
         2. Supply Zones: Look Left & Up (Proximal Line > CMP).
         """
         all_zones = self.scan_for_zones(
-            opens, highs, lows, closes, use_exceptional=use_exceptional
+            opens,
+            highs,
+            lows,
+            closes,
+            use_exceptional=use_exceptional,
+            marking_mode=marking_mode,
+            timeframe=timeframe,
         )
 
         demand_zones: List[IdentifiedZone] = []
