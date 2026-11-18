@@ -48,6 +48,12 @@ from alphacouncil.alpha.sector_engine import (
     HeavyweightStatusReport,
     PortfolioSectorAllocationReport,
 )
+from alphacouncil.alpha.pattern_engine import (
+    CandlestickPatternTruthEngine,
+    ConventionalPatternType,
+    PatternZoneInteraction,
+    PatternEvaluationReport,
+)
 from alphacouncil.risk.gtf_risk import (
     RiskTier,
     ExecutionErrorType,
@@ -3133,3 +3139,240 @@ def test_episode_16_portfolio_construction_12_to_15_stocks_and_sector_allocation
     report_conc = SectorAnalysisEngine.audit_portfolio_construction(over_conc_portfolio)
     assert report_conc.is_allocation_valid is False
     assert any("Sector Over-concentration: NIFTY_BANK holds 5 stocks" in r for r in report_conc.rejection_reasons)
+
+
+# =====================================================================
+# EPISODE 17 TESTS: CANDLESTICK PATTERNS AND THEIR TRUTH
+# =====================================================================
+
+def test_episode_17_50_50_coin_toss_whipsaw_trap_in_isolation():
+    """
+    Episode 17: The 50/50 Coin-Toss Reality & The Whipsaw Trap.
+    Conventional candlestick patterns formed in mid-air have zero statistical edge.
+    Standalone execution is strictly prohibited.
+    """
+    report = CandlestickPatternTruthEngine.evaluate_pattern_zone_interaction(
+        pattern=ConventionalPatternType.BULLISH_ENGULFING,
+        is_bullish=True,
+        is_bearish=False,
+        cmp=500.0,
+        nearby_demand_zone_boundaries=None,  # No zone nearby (mid-air)
+        nearby_supply_zone_boundaries=None,
+    )
+
+    assert isinstance(report, PatternEvaluationReport)
+    assert report.zone_interaction == PatternZoneInteraction.MID_AIR_COIN_TOSS
+    assert report.standalone_accuracy_pct == 50.0
+    assert report.effective_accuracy_pct == 50.0
+    assert report.is_tradeable_standalone is False
+    assert report.post_entry_confidence_bonus == 0
+    assert "The Whipsaw Trap" in report.advisory_message
+
+    # Test top-down auditor blocks pattern trading in mid-air isolation
+    engine = DemandSupplyEngine()
+    demand_opens = np.array([100.0, 110.0, 112.0])
+    demand_highs = np.array([102.0, 115.0, 125.0])
+    demand_lows = np.array([98.0, 108.0, 111.0])
+    demand_closes = np.array([109.0, 112.0, 124.0])
+    stock_demand = engine.scan_for_zones(demand_opens, demand_highs, demand_lows, demand_closes)[0]
+
+    audit_report = DemandSupplyEngine.audit_comprehensive_top_down_setup(
+        execution_zone=stock_demand,
+        cmp=120.0,
+        itf_trend=TrendDirection.UPTREND,
+        curve_position=CurvePosition.LOW_ON_CURVE,
+        is_pattern_in_mid_air_isolation=True,
+    )
+    assert audit_report.is_approved is False
+    assert any("The Whipsaw Trap Detected" in r for r in audit_report.rejection_reasons)
+    assert "REJECTED BY INSTITUTIONAL DISCIPLINE" in audit_report.audit_verdict_summary
+
+
+def test_episode_17_institutional_absorption_law_bearish_engulfing_inside_demand_zone():
+    """
+    Episode 17: The Institutional Absorption Law (PNB Housing & Bank of Baroda Case Studies).
+    A textbook Bearish Engulfing pattern formed inside a Demand Zone FAILS.
+    Resting institutional buy orders absorb selling volume, creating a Bear Trap and rocket reversal.
+    """
+    # Demand Zone [480 - 500], CMP = 495 (inside demand zone)
+    report = CandlestickPatternTruthEngine.evaluate_pattern_zone_interaction(
+        pattern=ConventionalPatternType.BEARISH_ENGULFING,
+        is_bullish=False,
+        is_bearish=True,
+        cmp=495.0,
+        nearby_demand_zone_boundaries=(500.0, 480.0),
+        nearby_supply_zone_boundaries=None,
+    )
+
+    assert report.zone_interaction == PatternZoneInteraction.ABSORBED_BY_DEMAND
+    assert report.effective_accuracy_pct == 15.0  # Only 15% success for retail short sellers (85% fail!)
+    assert report.post_entry_confidence_bonus == 0
+    assert "Institutional Absorption Trap" in report.advisory_message
+    assert "Bear Trap" in report.advisory_message
+
+    # Test DemandSupplyEngine bonus evaluator also blocks shorting
+    engine = DemandSupplyEngine()
+    demand_opens = np.array([100.0, 110.0, 112.0])
+    demand_highs = np.array([102.0, 115.0, 125.0])
+    demand_lows = np.array([98.0, 108.0, 111.0])
+    demand_closes = np.array([109.0, 112.0, 124.0])
+    stock_demand = engine.scan_for_zones(demand_opens, demand_highs, demand_lows, demand_closes)[0]
+    stock_demand.is_demand = True
+
+    has_bonus, bonus_pts, msg = DemandSupplyEngine.evaluate_candlestick_pattern_confidence_bonus(
+        zone=stock_demand,
+        pattern_name="BEARISH_ENGULFING",
+        is_bullish_pattern=False,
+        is_bearish_pattern=True,
+        is_in_mid_air=False,
+    )
+    assert has_bonus is False
+    assert bonus_pts == 0
+    assert "Institutional Absorption Trap" in msg
+
+
+def test_episode_17_institutional_rejection_law_bullish_engulfing_inside_supply_zone():
+    """
+    Episode 17: The Institutional Rejection Law.
+    A textbook Bullish Engulfing or Bullish Harami formed inside a Supply Zone FAILS.
+    Resting institutional sell orders reject buying volume, creating a Bull Trap.
+    """
+    # Supply Zone [1000 - 1050], CMP = 1010 (inside supply zone)
+    report = CandlestickPatternTruthEngine.evaluate_pattern_zone_interaction(
+        pattern=ConventionalPatternType.BULLISH_ENGULFING,
+        is_bullish=True,
+        is_bearish=False,
+        cmp=1010.0,
+        nearby_demand_zone_boundaries=None,
+        nearby_supply_zone_boundaries=(1000.0, 1050.0),
+    )
+
+    assert report.zone_interaction == PatternZoneInteraction.REJECTED_BY_SUPPLY
+    assert report.effective_accuracy_pct == 15.0  # Only 15% success for retail buyers (85% fail!)
+    assert report.post_entry_confidence_bonus == 0
+    assert "Institutional Rejection Trap" in report.advisory_message
+    assert "Bull Trap" in report.advisory_message
+
+
+def test_episode_17_post_entry_confidence_booster_plus_one_bonus_at_demand_zone():
+    """
+    Episode 17: Candlestick Patterns as an Extra Trade Score (+1 Post-Entry Confidence Booster).
+    When a planned limit order executes at a Demand Zone and the entry candle subsequently
+    closes as a Hammer or Bullish Engulfing, award +1 Post-Entry Confidence Bonus.
+    """
+    engine = DemandSupplyEngine()
+    demand_opens = np.array([100.0, 110.0, 112.0])
+    demand_highs = np.array([102.0, 115.0, 125.0])
+    demand_lows = np.array([98.0, 108.0, 111.0])
+    demand_closes = np.array([109.0, 112.0, 124.0])
+    stock_demand = engine.scan_for_zones(demand_opens, demand_highs, demand_lows, demand_closes)[0]
+    stock_demand.is_demand = True
+
+    # Pattern evaluator confirms CONFLUENT_DEMAND_BOOST
+    report = CandlestickPatternTruthEngine.evaluate_pattern_zone_interaction(
+        pattern=ConventionalPatternType.HAMMER,
+        is_bullish=True,
+        is_bearish=False,
+        cmp=100.0,
+        nearby_demand_zone_boundaries=(102.0, 95.0),
+    )
+    assert report.zone_interaction == PatternZoneInteraction.CONFLUENT_DEMAND_BOOST
+    assert report.post_entry_confidence_bonus == 1
+    assert report.effective_accuracy_pct == 85.0
+    assert "Post-Entry Confidence Booster (+1 Bonus)" in report.advisory_message
+
+    # DemandSupplyEngine awards +1 bonus
+    has_bonus, bonus_pts, msg = DemandSupplyEngine.evaluate_candlestick_pattern_confidence_bonus(
+        zone=stock_demand,
+        pattern_name="HAMMER",
+        is_bullish_pattern=True,
+        is_bearish_pattern=False,
+        is_in_mid_air=False,
+    )
+    assert has_bonus is True
+    assert bonus_pts == 1
+    assert "Post-Entry Confidence Booster (+1 Bonus)" in msg
+
+    # Top-down auditor incorporates +1 bonus into total score
+    audit_report = DemandSupplyEngine.audit_comprehensive_top_down_setup(
+        execution_zone=stock_demand,
+        cmp=120.0,
+        itf_trend=TrendDirection.UPTREND,
+        curve_position=CurvePosition.LOW_ON_CURVE,
+        candlestick_pattern="HAMMER",
+    )
+    assert audit_report.is_approved is True
+    assert any("Candlestick Pattern Post-Entry Confidence Booster (+1 Bonus)" in c for c in audit_report.audit_checks_passed)
+
+
+def test_episode_17_structural_equivalence_morning_star_is_dbr_and_evening_star_is_rbd():
+    """
+    Episode 17: Structural Equivalence of Formations.
+    - Morning Star == Drop-Base-Rally (DBR) Reversal Demand Zone.
+    - Evening Star == Rally-Base-Drop (RBD) Reversal Supply Zone.
+    - GTF executes at Proximal Line with tight risk vs. conventional retail buying high on candle 3 close.
+    """
+    morning_star_trans = CandlestickPatternTruthEngine.translate_pattern_to_gtf_structure(
+        ConventionalPatternType.MORNING_STAR
+    )
+    assert "Drop-Base-Rally (DBR) Reversal Demand Zone" in morning_star_trans
+    assert "Proximal Line" in morning_star_trans
+    assert "Closing Concept" in morning_star_trans
+
+    evening_star_trans = CandlestickPatternTruthEngine.translate_pattern_to_gtf_structure(
+        ConventionalPatternType.EVENING_STAR
+    )
+    assert "Rally-Base-Drop (RBD) Reversal Supply Zone" in evening_star_trans
+    assert "Proximal Line" in evening_star_trans
+
+    hammer_trans = CandlestickPatternTruthEngine.translate_pattern_to_gtf_structure(
+        ConventionalPatternType.HAMMER
+    )
+    assert "Single-candle institutional order absorption at Proximal Line" in hammer_trans
+
+
+def test_episode_17_master_quarterly_demand_inflection_case_study():
+    """
+    Episode 17 Master Multi-Pattern Case Study (Quarterly Demand Inflection).
+    Over a major Quarterly Demand Zone (Shri Krishna):
+    - Bearish Engulfing fails (absorbed by demand).
+    - Evening Star fails (short sellers stopped out).
+    - Morning Star succeeds (rallies to target).
+    The macro institutional zone governs the outcome, while surface shapes are merely symptoms.
+    """
+    quarterly_pl = 1000.0
+    quarterly_dl = 900.0
+
+    # 1. Bearish Engulfing forming over Quarterly Demand Line (CMP = 990.0) -> FAILS
+    eval_bear_engulf = CandlestickPatternTruthEngine.evaluate_pattern_zone_interaction(
+        pattern=ConventionalPatternType.BEARISH_ENGULFING,
+        is_bullish=False,
+        is_bearish=True,
+        cmp=990.0,
+        nearby_demand_zone_boundaries=(quarterly_pl, quarterly_dl),
+    )
+    assert eval_bear_engulf.zone_interaction == PatternZoneInteraction.ABSORBED_BY_DEMAND
+    assert eval_bear_engulf.effective_accuracy_pct == 15.0
+
+    # 2. Evening Star forming over Quarterly Demand Line (CMP = 995.0) -> FAILS
+    eval_evening = CandlestickPatternTruthEngine.evaluate_pattern_zone_interaction(
+        pattern=ConventionalPatternType.EVENING_STAR,
+        is_bullish=False,
+        is_bearish=True,
+        cmp=995.0,
+        nearby_demand_zone_boundaries=(quarterly_pl, quarterly_dl),
+    )
+    assert eval_evening.zone_interaction == PatternZoneInteraction.ABSORBED_BY_DEMAND
+    assert eval_evening.effective_accuracy_pct == 15.0
+
+    # 3. Morning Star forming on top of Quarterly Demand Line -> SUCCEEDS (85% Accuracy)
+    eval_morning = CandlestickPatternTruthEngine.evaluate_pattern_zone_interaction(
+        pattern=ConventionalPatternType.MORNING_STAR,
+        is_bullish=True,
+        is_bearish=False,
+        cmp=995.0,
+        nearby_demand_zone_boundaries=(quarterly_pl, quarterly_dl),
+    )
+    assert eval_morning.zone_interaction == PatternZoneInteraction.CONFLUENT_DEMAND_BOOST
+    assert eval_morning.effective_accuracy_pct == 85.0
+    assert eval_morning.post_entry_confidence_bonus == 1

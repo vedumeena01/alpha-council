@@ -134,6 +134,7 @@ class TradeScoreBreakdown:
     ema20_confluence_bonus: int = 0    # 0 or 1 point from Episode 13
     sector_support_bonus: int = 0      # 0 or 2 points from Episode 16 (The Supreme Add-on)
     sector_confluence_level: str = ""  # Level 1, Level 2, or Level 3 Rocket Move
+    candlestick_pattern_bonus: int = 0 # 0 or 1 point from Episode 17 (Post-Entry Confidence Booster)
 
 
 class EntryType(str, Enum):
@@ -2519,6 +2520,8 @@ class DemandSupplyEngine:
         is_parent_sector_in_demand: bool = False,
         is_nifty_in_demand: bool = False,
         is_sector_in_free_fall: bool = False,
+        candlestick_pattern: Optional[str] = None,
+        is_pattern_in_mid_air_isolation: bool = False,
     ) -> MasterRevisionAuditReport:
         """
         Episode 15 Master Revision Class: The 14-Point Comprehensive Top-Down Institutional Auditor.
@@ -2651,6 +2654,20 @@ class DemandSupplyEngine:
                 audit_checks_passed.append(
                     f"Sector Support Verified (+2 Extra Trade Score Points awarded{confluence_text}): "
                     f"Parent sector is in Demand Zone."
+                )
+
+        # Episode 17: Candlestick Patterns & The Whipsaw Trap
+        if is_pattern_in_mid_air_isolation:
+            rejection_reasons.append(
+                "The Whipsaw Trap Detected: Attempted to trade a conventional candlestick pattern in mid-air "
+                "isolation without institutional zone support. Statistical accuracy is 50/50 (coin toss); execution is prohibited."
+            )
+        elif candlestick_pattern:
+            if execution_zone.is_demand:
+                total_score = min(10.0, total_score + 1.0)
+                audit_checks_passed.append(
+                    f"Candlestick Pattern Post-Entry Confidence Booster (+1 Bonus): {candlestick_pattern} "
+                    f"confirmed at Demand Zone, visually verifying institutional absorption."
                 )
 
         if base_score < 6.0 and not is_parent_sector_in_demand:
@@ -2796,3 +2813,60 @@ class DemandSupplyEngine:
             )
 
         return False, 0, "No sector support detected; baseline trade score intact."
+
+    @staticmethod
+    def evaluate_candlestick_pattern_confidence_bonus(
+        zone: IdentifiedZone,
+        pattern_name: str,
+        is_bullish_pattern: bool,
+        is_bearish_pattern: bool,
+        is_in_mid_air: bool = False,
+    ) -> Tuple[bool, int, str]:
+        """
+        Episode 17 GTF Rule: Candlestick Patterns as an Extra Trade Score (+1 Point).
+        - Standalone Use: NEVER trade patterns on their own (Score: 0 / Whipsaw Trap).
+        - Post-Entry Confidence Booster: When a planned limit order executes at an
+          institutional Demand Zone and the candle subsequently closes as a Hammer,
+          Bullish Engulfing, or Morning Star, award +1 Post-Entry Confidence Bonus.
+        - Institutional Absorption: A bearish pattern at a Demand Zone fails (Absorption Law).
+        """
+        if is_in_mid_air:
+            return (
+                False,
+                0,
+                f"The Whipsaw Trap: {pattern_name} formed in mid-air chart space. 50/50 coin toss; trading prohibited.",
+            )
+
+        if zone.is_demand:
+            if is_bearish_pattern:
+                return (
+                    False,
+                    0,
+                    f"Institutional Absorption Trap: Bearish pattern {pattern_name} inside Demand Zone will be absorbed "
+                    f"by resting institutional buy orders. Shorting will fail (Bear Trap).",
+                )
+            if is_bullish_pattern:
+                return (
+                    True,
+                    1,
+                    f"Post-Entry Confidence Booster (+1 Bonus): {pattern_name} confirmed at Demand Zone. "
+                    f"Visual proof of institutional absorption at proximal line.",
+                )
+
+        if not zone.is_demand:
+            if is_bullish_pattern:
+                return (
+                    False,
+                    0,
+                    f"Institutional Rejection Trap: Bullish pattern {pattern_name} inside Supply Zone will be rejected "
+                    f"by resting institutional sell orders. Buying will fail (Bull Trap).",
+                )
+            if is_bearish_pattern:
+                return (
+                    True,
+                    1,
+                    f"Post-Entry Confidence Booster (+1 Bonus): {pattern_name} confirmed at Supply Zone. "
+                    f"Visual proof of institutional rejection at proximal line.",
+                )
+
+        return False, 0, "No candlestick pattern confluence detected."

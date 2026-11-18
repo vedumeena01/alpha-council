@@ -24,5 +24,6 @@
 | **14** | **Trading Against the Trend (Confirmation Entry & Macro Risk Compression)** | ✅ **Codified & Trained** | [`training/EPISODE_14_TRADING_AGAINST_THE_TREND.md`](EPISODE_14_TRADING_AGAINST_THE_TREND.md) |
 | **15** | **Revision Class & Master Top-Down Audit Engine (The 1% Club)** | ✅ **Codified & Trained** | [`training/EPISODE_15_REVISION_CLASS_AND_MASTER_TOP_DOWN_AUDIT.md`](EPISODE_15_REVISION_CLASS_AND_MASTER_TOP_DOWN_AUDIT.md) |
 | **16** | **Sectoral Analysis (+2 Sector Score, Heavyweight Concentration & Rotation)** | ✅ **Codified & Trained** | [`training/EPISODE_16_SECTORAL_ANALYSIS.md`](EPISODE_16_SECTORAL_ANALYSIS.md) |
-| **17** | **Upcoming...** | ⏳ Pending | - |
-| **...**| *Episodes 18 - 20* | ⏳ Pending | - |
+| **17** | **Candlestick Patterns & their Truth (50/50 Coin Toss, Absorption Law & +1 Confidence Booster)** | ✅ **Codified & Trained** | [`training/EPISODE_17_CANDLESTICK_PATTERNS_AND_THEIR_TRUTH.md`](EPISODE_17_CANDLESTICK_PATTERNS_AND_THEIR_TRUTH.md) |
+| **18** | **Upcoming...** | ⏳ Pending | - |
+| **...**| *Episodes 19 - 20* | ⏳ Pending | - |

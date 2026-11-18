@@ -1,5 +1,11 @@
-"""Alpha generation, structural sweep detection, NLP sentiment featurization, and Sectoral Analysis."""
+"""Alpha generation, structural sweep detection, NLP sentiment featurization, Sectoral Analysis, and Candlestick Pattern Truth Engine."""
 
+from alphacouncil.alpha.pattern_engine import (
+    CandlestickPatternTruthEngine,
+    ConventionalPatternType,
+    PatternEvaluationReport,
+    PatternZoneInteraction,
+)
 from alphacouncil.alpha.sector_engine import (
     HeavyweightStatusReport,
     NSE_SECTOR_WEIGHTINGS,
@@ -22,4 +28,8 @@ __all__ = [
     "PortfolioSectorAllocationReport",
     "NSE_SECTOR_WEIGHTINGS",
     "STOCK_TO_SECTOR_LOOKUP",
+    "CandlestickPatternTruthEngine",
+    "ConventionalPatternType",
+    "PatternZoneInteraction",
+    "PatternEvaluationReport",
 ]
