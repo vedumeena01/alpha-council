@@ -1,29 +1,24 @@
 # 🏛️ AlphaCouncil: Complete Consolidated Codebase
-> **Comprehensive Single-Document Code Reference for Quant Reviewers & Allocators.**
-> *Repository:* [github.com/vedumeena01/alpha-council](https://github.com/vedumeena01/alpha-council)
-> *Interactive Web IDE:* Open https://github.dev/vedumeena01/alpha-council or press . on GitHub.
-
----
-
 ## Table of Contents
 - [1. Configuration & Statutory Parameters (alphacouncil/config.py)](#1-configuration--statutory-parameters)
 - [2. Market Data Feed & Synthetic Generator (alphacouncil/data/feed.py)](#2-market-data-feed--synthetic-generator)
 - [3. Point-in-Time Corporate Calendar & LODR 29 (alphacouncil/data/calendar.py)](#3-point-in-time-corporate-calendar--lodr-29)
-- [4. Deterministic Liquidity Sweep Detector (H1) (alphacouncil/alpha/sweep_detector.py)](#4-deterministic-liquidity-sweep-detector-h1)
-- [5. López de Prado Triple Barrier & OU Half-Life (alphacouncil/alpha/triple_barrier.py)](#5-lópez-de-prado-triple-barrier--ou-half-life)
-- [6. FinBERT Sentiment & Binomial Audit (H2) (alphacouncil/alpha/sentiment_nlp.py)](#6-finbert-sentiment--binomial-audit-h2)
-- [7. Pre-Trade Risk Engine & Concentration Limits (alphacouncil/risk/pre_trade.py)](#7-pre-trade-risk-engine--concentration-limits)
-- [8. Position Sizing & Kelly Calibration (alphacouncil/risk/sizing.py)](#8-position-sizing--kelly-calibration)
-- [9. López de Prado Meta-Labeler Downscaler (alphacouncil/risk/meta_labeler.py)](#9-lópez-de-prado-meta-labeler-downscaler)
-- [10. Intraday Kill-Switch & Monthly Session Halt (alphacouncil/risk/kill_switch.py)](#10-intraday-kill-switch--monthly-session-halt)
-- [11. Direction-Aware Circuit Band Guard (alphacouncil/risk/circuits.py)](#11-direction-aware-circuit-band-guard)
-- [12. Statutory Indian Market Friction Model (SEBI Oct 2024) (alphacouncil/execution/friction.py)](#12-statutory-indian-market-friction-model-sebi-oct-2024)
-- [13. Idempotent OMS & Broker GTT Bracket Sync (alphacouncil/execution/oms.py)](#13-idempotent-oms--broker-gtt-bracket-sync)
-- [14. Purged Walk-Forward Backtesting Engine (alphacouncil/backtest/engine.py)](#14-purged-walk-forward-backtesting-engine)
-- [15. Deflated Sharpe Ratio (DSR) & Quant Metrics (alphacouncil/backtest/metrics.py)](#15-deflated-sharpe-ratio-dsr--quant-metrics)
-- [16. 7-Model Orthogonal Ablation Suite (alphacouncil/backtest/ablation.py)](#16-7-model-orthogonal-ablation-suite)
-- [17. Interactive Bloomberg Dashboard UI (alphacouncil/ui/dashboard.py)](#17-interactive-bloomberg-dashboard-ui)
-- [18. Master Research Demo Runner (alphacouncil/run_council.py)](#18-master-research-demo-runner)
+- [4. Demand & Supply Zone Core Engine (GTF Model) (alphacouncil/alpha/zone_engine.py)](#4-demand--supply-zone-core-engine-gtf-model)
+- [5. Deterministic Liquidity Sweep Detector (H1) (alphacouncil/alpha/sweep_detector.py)](#5-deterministic-liquidity-sweep-detector-h1)
+- [6. López de Prado Triple Barrier & OU Half-Life (alphacouncil/alpha/triple_barrier.py)](#6-lópez-de-prado-triple-barrier--ou-half-life)
+- [7. FinBERT Sentiment & Binomial Audit (H2) (alphacouncil/alpha/sentiment_nlp.py)](#7-finbert-sentiment--binomial-audit-h2)
+- [8. Pre-Trade Risk Engine & Concentration Limits (alphacouncil/risk/pre_trade.py)](#8-pre-trade-risk-engine--concentration-limits)
+- [9. Position Sizing & Kelly Calibration (alphacouncil/risk/sizing.py)](#9-position-sizing--kelly-calibration)
+- [10. López de Prado Meta-Labeler Downscaler (alphacouncil/risk/meta_labeler.py)](#10-lópez-de-prado-meta-labeler-downscaler)
+- [11. Intraday Kill-Switch & Monthly Session Halt (alphacouncil/risk/kill_switch.py)](#11-intraday-kill-switch--monthly-session-halt)
+- [12. Direction-Aware Circuit Band Guard (alphacouncil/risk/circuits.py)](#12-direction-aware-circuit-band-guard)
+- [13. Statutory Indian Market Friction Model (SEBI Oct 2024) (alphacouncil/execution/friction.py)](#13-statutory-indian-market-friction-model-sebi-oct-2024)
+- [14. Idempotent OMS & Broker GTT Bracket Sync (alphacouncil/execution/oms.py)](#14-idempotent-oms--broker-gtt-bracket-sync)
+- [15. Purged Walk-Forward Backtesting Engine (alphacouncil/backtest/engine.py)](#15-purged-walk-forward-backtesting-engine)
+- [16. Deflated Sharpe Ratio (DSR) & Quant Metrics (alphacouncil/backtest/metrics.py)](#16-deflated-sharpe-ratio-dsr--quant-metrics)
+- [17. 7-Model Orthogonal Ablation Suite (alphacouncil/backtest/ablation.py)](#17-7-model-orthogonal-ablation-suite)
+- [18. Interactive Bloomberg Dashboard UI (alphacouncil/ui/dashboard.py)](#18-interactive-bloomberg-dashboard-ui)
+- [19. Master Research Demo Runner (alphacouncil/run_council.py)](#19-master-research-demo-runner)
 
 ---
 
@@ -340,7 +335,308 @@ class PointInTimeCalendar:
 
 ---
 
-### 4. Deterministic Liquidity Sweep Detector (H1)
+### 4. Demand & Supply Zone Core Engine (GTF Model)
+**File:** [alphacouncil/alpha/zone_engine.py](alphacouncil/alpha/zone_engine.py)
+
+`python
+"""
+Demand & Supply Core Engine (Trading in the Zone / GTF Methodology).
+Codifies institutional order-matching mechanics, Exciting vs Base candle classification,
+structural zone detection (DBR, RBR, RBD, DBD), exact Zone Marking (Proximal & Distal lines),
+and Freshness vs. Tested evaluation.
+"""
+
+from dataclasses import dataclass
+from enum import Enum
+from typing import List, Optional, Tuple
+import numpy as np
+
+
+class CandleType(str, Enum):
+    GREEN_EXCITING = "GREEN_EXCITING"  # Demand > Supply (Body >= 50% of Range)
+    RED_EXCITING = "RED_EXCITING"      # Supply > Demand (Body >= 50% of Range)
+    BASE = "BASE"                      # Equilibrium / Tug-of-War (Body < 50% of Range)
+
+
+class ZoneType(str, Enum):
+    DEMAND_DBR = "DEMAND_DBR"  # Drop - Base - Rally (Reversal Demand)
+    DEMAND_RBR = "DEMAND_RBR"  # Rally - Base - Rally (Continuation Demand)
+    SUPPLY_RBD = "SUPPLY_RBD"  # Rally - Base - Drop (Reversal Supply)
+    SUPPLY_DBD = "SUPPLY_DBD"  # Drop - Base - Drop (Continuation Supply)
+
+
+@dataclass
+class CandleFeature:
+    index: int
+    open: float
+    high: float
+    low: float
+    close: float
+    range: float
+    body: float
+    body_ratio: float
+    candle_type: CandleType
+
+
+@dataclass
+class IdentifiedZone:
+    zone_type: ZoneType
+    is_demand: bool
+    is_reversal: bool
+    base_start_idx: int
+    base_end_idx: int
+    base_candles_count: int
+    first_leg_out_idx: int
+    
+    # Exact Zone Marking (Episode 3 Formulas)
+    proximal_line: float       # Entry Reference
+    distal_line: float         # Stop-Loss Reference
+    zone_width: float          # Inherent risk per share (Proximal - Distal)
+    
+    departure_strength: int    # Consecutive exciting candles leaving the zone
+    departure_velocity: float  # Total price expansion in leg-out
+    
+    is_fresh: bool             # True if price has NEVER touched proximal line since leg-out
+    tested_at_idx: Optional[int] = None
+    is_high_quality: bool = True
+
+
+class DemandSupplyEngine:
+    """
+    Core Price Action Engine trained on Institutional Order Flow and Demand-Supply Imbalances.
+    """
+
+    def __init__(self, min_range_atr_ratio: float = 0.25, max_base_candles: int = 6):
+        self.min_range_atr_ratio = min_range_atr_ratio
+        self.max_base_candles = max_base_candles
+
+    def classify_candle(
+        self,
+        index: int,
+        open_p: float,
+        high_p: float,
+        low_p: float,
+        close_p: float,
+        atr14: float = 0.0,
+    ) -> CandleFeature:
+        """
+        Classifies a single candlestick using GTF 50% body-to-range rule.
+        """
+        total_range = high_p - low_p
+        if total_range <= 1e-6:
+            return CandleFeature(
+                index, open_p, high_p, low_p, close_p, 0.0, 0.0, 0.0, CandleType.BASE
+            )
+
+        body = abs(close_p - open_p)
+        body_ratio = body / total_range
+
+        # Filter out micro-range candles that have no meaningful price discovery
+        is_meaningful = True
+        if atr14 > 0 and total_range < (self.min_range_atr_ratio * atr14):
+            is_meaningful = False
+
+        if body_ratio >= 0.50 and is_meaningful:
+            c_type = CandleType.GREEN_EXCITING if close_p > open_p else CandleType.RED_EXCITING
+        else:
+            c_type = CandleType.BASE
+
+        return CandleFeature(
+            index=index,
+            open=open_p,
+            high=high_p,
+            low=low_p,
+            close=close_p,
+            range=round(total_range, 2),
+            body=round(body, 2),
+            body_ratio=round(body_ratio, 3),
+            candle_type=c_type,
+        )
+
+    def scan_for_zones(
+        self,
+        opens: np.ndarray,
+        highs: np.ndarray,
+        lows: np.ndarray,
+        closes: np.ndarray,
+        atr14: Optional[np.ndarray] = None,
+    ) -> List[IdentifiedZone]:
+        """
+        Scans series of candles to identify institutional Demand and Supply zones:
+        Leg-in (Arrival) -> Base Candles (Pending Orders) -> Leg-out (Departure).
+        Computes Proximal Line, Distal Line, and verifies Freshness.
+        """
+        n = len(closes)
+        if n < 3:
+            return []
+
+        # 1. Classify all candles
+        classified: List[CandleFeature] = []
+        for i in range(n):
+            a = float(atr14[i]) if atr14 is not None and i < len(atr14) else 0.0
+            classified.append(
+                self.classify_candle(i, opens[i], highs[i], lows[i], closes[i], a)
+            )
+
+        zones: List[IdentifiedZone] = []
+
+        # 2. Pattern recognition for zones
+        i = 1
+        while i < n - 1:
+            leg_in = classified[i - 1]
+            if leg_in.candle_type == CandleType.BASE:
+                i += 1
+                continue
+
+            # Check if current is BASE
+            if classified[i].candle_type == CandleType.BASE:
+                base_start = i
+                while i < n and classified[i].candle_type == CandleType.BASE:
+                    i += 1
+                base_end = i - 1
+                base_count = base_end - base_start + 1
+
+                # Check leg-out candle(s)
+                if i < n and classified[i].candle_type != CandleType.BASE:
+                    leg_out = classified[i]
+                    first_leg_out_idx = i
+
+                    # Count consecutive exciting candles in leg-out
+                    departure_strength = 0
+                    dep_idx = i
+                    departure_p_start = leg_out.open
+                    departure_p_end = leg_out.close
+
+                    while dep_idx < n and classified[dep_idx].candle_type == leg_out.candle_type:
+                        departure_strength += 1
+                        departure_p_end = classified[dep_idx].close
+                        dep_idx += 1
+
+                    dep_velocity = abs(departure_p_end - departure_p_start)
+                    is_hq = (1 <= base_count <= self.max_base_candles) and (departure_strength >= 1)
+
+                    # Determine zone type
+                    z_type = None
+                    is_demand = False
+                    is_reversal = False
+
+                    if leg_in.candle_type == CandleType.RED_EXCITING and leg_out.candle_type == CandleType.GREEN_EXCITING:
+                        z_type = ZoneType.DEMAND_DBR
+                        is_demand = True
+                        is_reversal = True
+                    elif leg_in.candle_type == CandleType.GREEN_EXCITING and leg_out.candle_type == CandleType.GREEN_EXCITING:
+                        z_type = ZoneType.DEMAND_RBR
+                        is_demand = True
+                        is_reversal = False
+                    elif leg_in.candle_type == CandleType.GREEN_EXCITING and leg_out.candle_type == CandleType.RED_EXCITING:
+                        z_type = ZoneType.SUPPLY_RBD
+                        is_demand = False
+                        is_reversal = True
+                    elif leg_in.candle_type == CandleType.RED_EXCITING and leg_out.candle_type == CandleType.RED_EXCITING:
+                        z_type = ZoneType.SUPPLY_DBD
+                        is_demand = False
+                        is_reversal = False
+
+                    if z_type:
+                        # 3. Exact Zone Marking (Episode 3 Formulas)
+                        base_candles = classified[base_start : base_end + 1]
+
+                        if is_demand:
+                            # Demand: Proximal = Highest Body of all base candles
+                            proximal = max(max(b.open, b.close) for b in base_candles)
+                            # Demand: Distal = Lowest Wick of all base candles
+                            distal = min(b.low for b in base_candles)
+                            zone_width = round(proximal - distal, 2)
+                        else:
+                            # Supply: Proximal = Lowest Body of all base candles
+                            proximal = min(min(b.open, b.close) for b in base_candles)
+                            # Supply: Distal = Highest Wick of all base candles
+                            distal = max(b.high for b in base_candles)
+                            zone_width = round(distal - proximal, 2)
+
+                        # 4. Freshness vs Tested Evaluation
+                        # Monitored immediately after the first leg-out candle
+                        is_fresh = True
+                        tested_at = None
+
+                        for k in range(first_leg_out_idx + 1, n):
+                            if is_demand:
+                                # In Demand: If low touches or pierces Proximal line
+                                if lows[k] <= proximal:
+                                    is_fresh = False
+                                    tested_at = k
+                                    break
+                            else:
+                                # In Supply: If high touches or pierces Proximal line
+                                if highs[k] >= proximal:
+                                    is_fresh = False
+                                    tested_at = k
+                                    break
+
+                        zones.append(
+                            IdentifiedZone(
+                                zone_type=z_type,
+                                is_demand=is_demand,
+                                is_reversal=is_reversal,
+                                base_start_idx=base_start,
+                                base_end_idx=base_end,
+                                base_candles_count=base_count,
+                                first_leg_out_idx=first_leg_out_idx,
+                                proximal_line=round(proximal, 2),
+                                distal_line=round(distal, 2),
+                                zone_width=zone_width,
+                                departure_strength=departure_strength,
+                                departure_velocity=round(dep_velocity, 2),
+                                is_fresh=is_fresh,
+                                tested_at_idx=tested_at,
+                                is_high_quality=is_hq,
+                            )
+                        )
+            else:
+                i += 1
+
+        return zones
+
+    def find_active_trade_zones(
+        self,
+        cmp: float,
+        opens: np.ndarray,
+        highs: np.ndarray,
+        lows: np.ndarray,
+        closes: np.ndarray,
+        only_fresh: bool = True,
+    ) -> Tuple[List[IdentifiedZone], List[IdentifiedZone]]:
+        """
+        Navigates relative to Current Market Price (CMP) as taught in Episode 3:
+        1. Demand Zones: Look Left & Down (Proximal Line < CMP).
+        2. Supply Zones: Look Left & Up (Proximal Line > CMP).
+        """
+        all_zones = self.scan_for_zones(opens, highs, lows, closes)
+
+        demand_zones: List[IdentifiedZone] = []
+        supply_zones: List[IdentifiedZone] = []
+
+        for z in all_zones:
+            if only_fresh and not z.is_fresh:
+                continue
+
+            if z.is_demand and z.proximal_line < cmp:
+                demand_zones.append(z)
+            elif not z.is_demand and z.proximal_line > cmp:
+                supply_zones.append(z)
+
+        # Sort Demand descending by proximal line (closest discounted zone below CMP first)
+        demand_zones.sort(key=lambda x: x.proximal_line, reverse=True)
+
+        # Sort Supply ascending by proximal line (closest premium zone above CMP first)
+        supply_zones.sort(key=lambda x: x.proximal_line)
+
+        return demand_zones, supply_zones
+`
+
+---
+
+### 5. Deterministic Liquidity Sweep Detector (H1)
 **File:** [alphacouncil/alpha/sweep_detector.py](alphacouncil/alpha/sweep_detector.py)
 
 `python
@@ -468,7 +764,7 @@ class LiquiditySweepDetector:
 
 ---
 
-### 5. López de Prado Triple Barrier & OU Half-Life
+### 6. López de Prado Triple Barrier & OU Half-Life
 **File:** [alphacouncil/alpha/triple_barrier.py](alphacouncil/alpha/triple_barrier.py)
 
 `python
@@ -600,7 +896,7 @@ class TripleBarrierLabeler:
 
 ---
 
-### 6. FinBERT Sentiment & Binomial Audit (H2)
+### 7. FinBERT Sentiment & Binomial Audit (H2)
 **File:** [alphacouncil/alpha/sentiment_nlp.py](alphacouncil/alpha/sentiment_nlp.py)
 
 `python
@@ -729,7 +1025,7 @@ class FinBertSentimentExtractor:
 
 ---
 
-### 7. Pre-Trade Risk Engine & Concentration Limits
+### 8. Pre-Trade Risk Engine & Concentration Limits
 **File:** [alphacouncil/risk/pre_trade.py](alphacouncil/risk/pre_trade.py)
 
 `python
@@ -867,7 +1163,7 @@ class PreTradeRiskEngine:
 
 ---
 
-### 8. Position Sizing & Kelly Calibration
+### 9. Position Sizing & Kelly Calibration
 **File:** [alphacouncil/risk/sizing.py](alphacouncil/risk/sizing.py)
 
 `python
@@ -1102,7 +1398,7 @@ class PositionSizingEngine:
 
 ---
 
-### 9. López de Prado Meta-Labeler Downscaler
+### 10. López de Prado Meta-Labeler Downscaler
 **File:** [alphacouncil/risk/meta_labeler.py](alphacouncil/risk/meta_labeler.py)
 
 `python
@@ -1216,7 +1512,7 @@ class LopezDePradoMetaLabeler:
 
 ---
 
-### 10. Intraday Kill-Switch & Monthly Session Halt
+### 11. Intraday Kill-Switch & Monthly Session Halt
 **File:** [alphacouncil/risk/kill_switch.py](alphacouncil/risk/kill_switch.py)
 
 `python
@@ -1352,7 +1648,7 @@ class IntradayKillSwitch:
 
 ---
 
-### 11. Direction-Aware Circuit Band Guard
+### 12. Direction-Aware Circuit Band Guard
 **File:** [alphacouncil/risk/circuits.py](alphacouncil/risk/circuits.py)
 
 `python
@@ -1485,7 +1781,7 @@ class MWPLBanTracker:
 
 ---
 
-### 12. Statutory Indian Market Friction Model (SEBI Oct 2024)
+### 13. Statutory Indian Market Friction Model (SEBI Oct 2024)
 **File:** [alphacouncil/execution/friction.py](alphacouncil/execution/friction.py)
 
 `python
@@ -1617,7 +1913,7 @@ class IndianMarketFrictionModel:
 
 ---
 
-### 13. Idempotent OMS & Broker GTT Bracket Sync
+### 14. Idempotent OMS & Broker GTT Bracket Sync
 **File:** [alphacouncil/execution/oms.py](alphacouncil/execution/oms.py)
 
 `python
@@ -1871,7 +2167,7 @@ class IdempotentOMS:
 
 ---
 
-### 14. Purged Walk-Forward Backtesting Engine
+### 15. Purged Walk-Forward Backtesting Engine
 **File:** [alphacouncil/backtest/engine.py](alphacouncil/backtest/engine.py)
 
 `python
@@ -2269,7 +2565,7 @@ class BacktestEngine:
 
 ---
 
-### 15. Deflated Sharpe Ratio (DSR) & Quant Metrics
+### 16. Deflated Sharpe Ratio (DSR) & Quant Metrics
 **File:** [alphacouncil/backtest/metrics.py](alphacouncil/backtest/metrics.py)
 
 `python
@@ -2499,7 +2795,7 @@ class QuantMetricsCalculator:
 
 ---
 
-### 16. 7-Model Orthogonal Ablation Suite
+### 17. 7-Model Orthogonal Ablation Suite
 **File:** [alphacouncil/backtest/ablation.py](alphacouncil/backtest/ablation.py)
 
 `python
@@ -2641,7 +2937,7 @@ class AblationSuiteRunner:
 
 ---
 
-### 17. Interactive Bloomberg Dashboard UI
+### 18. Interactive Bloomberg Dashboard UI
 **File:** [alphacouncil/ui/dashboard.py](alphacouncil/ui/dashboard.py)
 
 `python
@@ -2806,7 +3102,7 @@ class AlphaCouncilDashboard:
 
 ---
 
-### 18. Master Research Demo Runner
+### 19. Master Research Demo Runner
 **File:** [alphacouncil/run_council.py](alphacouncil/run_council.py)
 
 `python
