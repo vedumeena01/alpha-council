@@ -35,6 +35,9 @@ from alphacouncil.alpha.zone_engine import (
     RejectionAudit,
     ConfirmationEntryType,
     ConfirmationTradePlan,
+    MacroSupplyWallStatus,
+    OriginQuality,
+    MasterRevisionAuditReport,
 )
 from alphacouncil.risk.gtf_risk import (
     RiskTier,
@@ -2634,3 +2637,261 @@ def test_episode_14_wit_125m_confirmation_entry():
     assert plan_wit.compressed_risk_per_share == 16.0
     assert plan_wit.risk_compression_ratio == 5.0  # 80 / 16 = 5.0x
     assert plan_wit.realized_target_rrr == 4.0      # 64 / 16 = 4.0:1
+
+
+# =====================================================================
+# EPISODE 15 TESTS: REVISION CLASS, MASTER CASE STUDY & 14-POINT AUDITOR
+# =====================================================================
+
+def test_episode_15_half_yearly_macro_supply_wall_collision_and_macro_trap():
+    """
+    Episode 15 Master Case Study: The Half-Yearly Supply Wall (The Macro Trap).
+    When price enters or approaches an unbreached Half-Yearly or Yearly supply zone,
+    massive multi-month selling pressure is unleashed. Aggressive lower-timeframe
+    (Daily/125m) longs are strictly prohibited and flagged as the Macro Trap.
+    """
+    engine = DemandSupplyEngine()
+    demand_opens = np.array([100.0, 110.0, 112.0])
+    demand_highs = np.array([102.0, 115.0, 125.0])
+    demand_lows = np.array([98.0, 108.0, 111.0])
+    demand_closes = np.array([109.0, 112.0, 124.0])
+
+    supply_opens = np.array([1000.0, 1080.0, 1070.0])
+    supply_highs = np.array([1010.0, 1100.0, 1075.0])
+    supply_lows = np.array([990.0, 1050.0, 950.0])
+    supply_closes = np.array([1080.0, 1070.0, 960.0])
+
+    daily_demand = engine.scan_for_zones(demand_opens, demand_highs, demand_lows, demand_closes)[0]
+    daily_demand.timeframe = TimeframeTier.DAILY
+    daily_demand.proximal_line = 1040.0
+    daily_demand.distal_line = 1020.0
+    daily_demand.entry_price = 1041.0
+    daily_demand.stop_loss = 1018.0
+
+    half_yearly_supply = engine.scan_for_zones(supply_opens, supply_highs, supply_lows, supply_closes)[0]
+    half_yearly_supply.timeframe = TimeframeTier.HALF_YEARLY
+    half_yearly_supply.is_demand = False
+    half_yearly_supply.proximal_line = 1050.0
+    half_yearly_supply.distal_line = 1120.0
+    half_yearly_supply.is_fresh = True
+
+    # 1. Price colliding directly inside the Half-Yearly wall (CMP = 1060.0)
+    status_collide, zone_collide, msg_collide = DemandSupplyEngine.detect_macro_supply_wall(
+        cmp=1060.0, macro_supply_zones=[half_yearly_supply]
+    )
+    assert status_collide == MacroSupplyWallStatus.COLLIDING_WITH_WALL
+    assert zone_collide is half_yearly_supply
+    assert "Macro Wall Collision Detected" in msg_collide
+
+    # 2. Imminent collision within 2% (CMP = 1040.0 vs PL 1050.0 -> 0.95% distance)
+    status_near, _, _ = DemandSupplyEngine.detect_macro_supply_wall(
+        cmp=1040.0, macro_supply_zones=[half_yearly_supply], proximity_pct=2.0
+    )
+    assert status_near == MacroSupplyWallStatus.COLLIDING_WITH_WALL
+
+    # 3. Macro Trap Execution Block: Attempting blind limit entry (Set and Forget) while colliding
+    audit_report = DemandSupplyEngine.audit_comprehensive_top_down_setup(
+        execution_zone=daily_demand,
+        cmp=1060.0,
+        macro_supply_zones=[half_yearly_supply],
+        attempted_entry_type=EntryType.SET_AND_FORGET,
+        is_at_cycle_turning_point=False,
+    )
+    assert audit_report.is_approved is False
+    assert any("The Macro Trap Detected" in r for r in audit_report.rejection_reasons)
+    assert audit_report.trading_stance == TradingStance.CONSERVATIVE
+    assert audit_report.recommended_entry_type == EntryType.CONFIRMATION_IN_ZONE
+
+
+def test_episode_15_pristine_origin_vs_shallow_distributive_basing():
+    """
+    Episode 15: Pristine Origin vs. Shallow Distributive Basing.
+    - Pristine Origin Base: 1-3 clean base candles at structural cycle turning point with EMA support.
+    - Shallow Distributive Base: Mid-air consolidation (>=4 base candles or stair-step).
+    - Garbage Area: Overlapping wicks / >6 base candles.
+    """
+    engine = DemandSupplyEngine()
+    opens = np.array([100.0, 110.0, 112.0])
+    highs = np.array([102.0, 115.0, 125.0])
+    lows = np.array([98.0, 108.0, 111.0])
+    closes = np.array([109.0, 112.0, 124.0])
+
+    base_zone = engine.scan_for_zones(opens, highs, lows, closes)[0]
+    base_zone.base_candles_count = 2
+
+    # 1. Pristine origin with EMA support at cycle turning point
+    quality_origin, msg_origin = DemandSupplyEngine.classify_origin_vs_distribution(
+        zone=base_zone,
+        is_at_cycle_turning_point=True,
+        has_ema_support=True,
+    )
+    assert quality_origin == OriginQuality.PRISTINE_ORIGIN
+    assert "Pristine Origin Base" in msg_origin
+    assert "dynamic EMA support" in msg_origin
+
+    # 2. Shallow distributive base (stair-stepping in mid-air)
+    quality_shallow, msg_shallow = DemandSupplyEngine.classify_origin_vs_distribution(
+        zone=base_zone,
+        is_at_cycle_turning_point=False,
+        is_distributive_stair_step=True,
+    )
+    assert quality_shallow == OriginQuality.SHALLOW_DISTRIBUTIVE
+    assert "Shallow / Distributive Basing" in msg_shallow
+
+    # 3. Garbage consolidation (>6 base candles)
+    garbage_zone = engine.scan_for_zones(opens, highs, lows, closes)[0]
+    garbage_zone.base_candles_count = 7
+    quality_garbage, msg_garbage = DemandSupplyEngine.classify_origin_vs_distribution(
+        zone=garbage_zone,
+        is_at_cycle_turning_point=False,
+    )
+    assert quality_garbage == OriginQuality.GARBAGE_CONSOLIDATION
+    assert "Garbage Area Consolidation" in msg_garbage
+
+
+def test_episode_15_pristine_origin_macro_target_expansion_8_to_10_rrr():
+    """
+    Episode 15: Target Expectation in Multi-Timeframe Trades.
+    Executing from a pristine origin base at the bottom of a major cycle targets
+    opposing higher-timeframe supply, unlocking extraordinary 8:1 to 10:1+ RRR.
+    """
+    engine = DemandSupplyEngine()
+    demand_opens = np.array([500.0, 480.0, 482.0, 520.0])
+    demand_highs = np.array([505.0, 485.0, 484.0, 530.0])
+    demand_lows = np.array([475.0, 478.0, 480.0, 515.0])
+    demand_closes = np.array([479.0, 483.0, 525.0, 528.0])
+
+    pristine_weekly_demand = engine.scan_for_zones(demand_opens, demand_highs, demand_lows, demand_closes)[0]
+    pristine_weekly_demand.timeframe = TimeframeTier.WEEKLY
+    pristine_weekly_demand.proximal_line = 500.0
+    pristine_weekly_demand.distal_line = 480.0  # Risk = 20.0
+    pristine_weekly_demand.entry_price = 501.0
+    pristine_weekly_demand.stop_loss = 478.0   # Risk = 23.0
+    pristine_weekly_demand.base_candles_count = 2
+    pristine_weekly_demand.departure_strength = 2
+    pristine_weekly_demand.is_fresh = True
+
+    report = DemandSupplyEngine.audit_comprehensive_top_down_setup(
+        execution_zone=pristine_weekly_demand,
+        cmp=505.0,
+        itf_trend=TrendDirection.UPTREND,
+        curve_position=CurvePosition.VERY_LOW_ON_CURVE,
+        is_at_cycle_turning_point=True,
+        has_ema_support=True,
+        capital=100000.0,
+        risk_per_trade_pct=1.0,
+    )
+
+    assert report.is_approved is True
+    assert report.origin_quality == OriginQuality.PRISTINE_ORIGIN
+    assert report.projected_rrr == 8.5  # Origin target expansion
+    assert report.trading_stance == TradingStance.AGGRESSIVE
+    assert report.trade_score == 8.0   # 7.0 base + 1.0 EMA bonus
+    assert report.calculated_position_size == 43  # floor(1000 / 23) = 43 shares
+
+
+def test_episode_15_14_point_master_revision_auditor_all_pass_1_percent_club():
+    """
+    Episode 15: The 14-Point Comprehensive Top-Down Auditor ("1% Club" Verification).
+    Tests a flawless institutional trade setup that passes all 14 gates without a single flaw.
+    """
+    engine = DemandSupplyEngine()
+    demand_opens = np.array([200.0, 210.0, 212.0])
+    demand_highs = np.array([202.0, 215.0, 225.0])
+    demand_lows = np.array([198.0, 208.0, 211.0])
+    demand_closes = np.array([209.0, 212.0, 224.0])
+
+    ltf_daily_demand = engine.scan_for_zones(demand_opens, demand_highs, demand_lows, demand_closes)[0]
+    ltf_daily_demand.timeframe = TimeframeTier.DAILY
+    ltf_daily_demand.proximal_line = 215.0
+    ltf_daily_demand.distal_line = 205.0
+    ltf_daily_demand.entry_price = 216.0
+    ltf_daily_demand.stop_loss = 203.0   # Risk = 13.0
+    ltf_daily_demand.base_candles_count = 2
+    ltf_daily_demand.departure_strength = 2
+    ltf_daily_demand.is_fresh = True
+    ltf_daily_demand.authenticity = ZoneAuthenticity.AUTHENTIC
+    ltf_daily_demand.has_proven_achievement = True
+
+    htf_monthly_demand = engine.scan_for_zones(demand_opens, demand_highs, demand_lows, demand_closes)[0]
+    htf_monthly_demand.timeframe = TimeframeTier.MONTHLY
+    htf_monthly_demand.is_demand = True
+
+    report = DemandSupplyEngine.audit_comprehensive_top_down_setup(
+        execution_zone=ltf_daily_demand,
+        cmp=220.0,
+        htf_zone=htf_monthly_demand,
+        itf_trend=TrendDirection.UPTREND,
+        curve_position=CurvePosition.LOW_ON_CURVE,
+        macro_supply_zones=[],  # No macro wall overhead
+        is_at_cycle_turning_point=True,
+        has_ema_support=True,
+        capital=200000.0,
+        risk_per_trade_pct=1.0,  # ₹2,000 monetary risk
+        prior_trades_count=100,
+    )
+
+    assert isinstance(report, MasterRevisionAuditReport)
+    assert report.is_approved is True
+    assert len(report.rejection_reasons) == 0
+    assert len(report.audit_checks_passed) >= 12
+    assert report.calculated_position_size == 153  # floor(2000 / 13) = 153 shares
+    assert report.trade_score == 8.0               # 7.0 base + 1.0 EMA bonus
+    assert "1% CLUB APPROVED" in report.audit_verdict_summary
+
+
+def test_episode_15_14_point_master_revision_auditor_multiple_rejections():
+    """
+    Episode 15: Multi-Gate Failure & Rejection Mindset Audit.
+    Ensures that flawed retail trade setups fail with exhaustive empirical reasons.
+    """
+    engine = DemandSupplyEngine()
+    demand_opens = np.array([200.0, 210.0, 212.0])
+    demand_highs = np.array([202.0, 215.0, 225.0])
+    demand_lows = np.array([198.0, 208.0, 211.0])
+    demand_closes = np.array([209.0, 212.0, 224.0])
+
+    supply_opens = np.array([1000.0, 1080.0, 1070.0])
+    supply_highs = np.array([1010.0, 1100.0, 1075.0])
+    supply_lows = np.array([990.0, 1050.0, 950.0])
+    supply_closes = np.array([1080.0, 1070.0, 960.0])
+
+    flawed_demand = engine.scan_for_zones(demand_opens, demand_highs, demand_lows, demand_closes)[0]
+    flawed_demand.timeframe = TimeframeTier.DAILY
+    flawed_demand.proximal_line = 1040.0
+    flawed_demand.distal_line = 1020.0
+    flawed_demand.entry_price = 1041.0
+    flawed_demand.stop_loss = 1018.0
+    flawed_demand.base_candles_count = 6      # > 5 (fail base count)
+    flawed_demand.is_fresh = False             # tested twice (fail freshness)
+    flawed_demand.tested_at_idx = 10
+    flawed_demand.authenticity = ZoneAuthenticity.NON_AUTHENTIC
+    flawed_demand.has_proven_achievement = False # fail closing
+
+    opposing_htf_supply = engine.scan_for_zones(supply_opens, supply_highs, supply_lows, supply_closes)[0]
+    opposing_htf_supply.timeframe = TimeframeTier.YEARLY
+    opposing_htf_supply.is_demand = False
+    opposing_htf_supply.proximal_line = 1050.0
+    opposing_htf_supply.distal_line = 1150.0
+
+    report = DemandSupplyEngine.audit_comprehensive_top_down_setup(
+        execution_zone=flawed_demand,
+        cmp=1055.0,  # inside Yearly supply wall!
+        htf_zone=opposing_htf_supply,  # Arjuna in front of Bhishma!
+        itf_trend=TrendDirection.DOWNTREND,
+        curve_position=CurvePosition.HIGH_ON_CURVE,  # buying high on curve!
+        macro_supply_zones=[opposing_htf_supply],
+        is_at_cycle_turning_point=False,
+        is_at_all_time_low=True,  # at ATL without supply breach!
+        consecutive_supply_breaches=0,
+    )
+
+    assert report.is_approved is False
+    assert len(report.rejection_reasons) >= 6
+    assert any("The Macro Trap Detected" in r for r in report.rejection_reasons)
+    assert any("Mahabharata Alignment: Fatal Trap" in r for r in report.rejection_reasons)
+    assert any("Curve Position: Long trade prohibited in HIGH_ON_CURVE" in r for r in report.rejection_reasons)
+    assert any("Closing & Authenticity: Non-authentic zone lacks proven closing" in r for r in report.rejection_reasons)
+    assert any("Base Candle Count" in r for r in report.rejection_reasons)
+    assert any("ATL Long Prohibition" in r for r in report.rejection_reasons)
+    assert "REJECTED BY INSTITUTIONAL DISCIPLINE" in report.audit_verdict_summary

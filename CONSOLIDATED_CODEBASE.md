@@ -524,6 +524,36 @@ class ConfirmationTradePlan:
     status_message: str
 
 
+class MacroSupplyWallStatus(str, Enum):
+    NO_WALL = "NO_WALL"
+    COLLIDING_WITH_WALL = "COLLIDING_WITH_WALL"
+    FALLING_AWAY_FROM_WALL = "FALLING_AWAY_FROM_WALL"
+
+
+class OriginQuality(str, Enum):
+    PRISTINE_ORIGIN = "PRISTINE_ORIGIN"          # Origin base at major cycle bottom/pivot with EMA support; 8:1 to 10:1+ RRR
+    SHALLOW_DISTRIBUTIVE = "SHALLOW_DISTRIBUTIVE" # Mid-air consolidation or distributive stair-step; vulnerable to macro wall
+    GARBAGE_CONSOLIDATION = "GARBAGE_CONSOLIDATION" # Extended directionless consolidation with overlapping wicks; rejected
+
+
+@dataclass
+class MasterRevisionAuditReport:
+    is_approved: bool
+    trading_stance: TradingStance
+    recommended_entry_type: EntryType
+    macro_wall_status: MacroSupplyWallStatus
+    origin_quality: OriginQuality
+    curve_position: CurvePosition
+    itf_trend: TrendDirection
+    trade_score: float
+    calculated_position_size: int
+    projected_rrr: float
+    audit_checks_passed: List[str]
+    rejection_reasons: List[str]
+    audit_verdict_summary: str
+    overpowering_htf_supply: Optional["IdentifiedZone"] = None
+
+
 @dataclass
 class CandleFeature:
     index: int
@@ -2691,6 +2721,354 @@ class DemandSupplyEngine:
             False,
             f"ATL Long Prohibition: Asset at All-Time Low with only {consecutive_supply_breaches} supply breach(es). "
             f"Long trades strictly forbidden. Requires >= 2 consecutive supply zones eliminated."
+        )
+
+    @staticmethod
+    def detect_macro_supply_wall(
+        cmp: float,
+        macro_supply_zones: Optional[List[IdentifiedZone]] = None,
+        proximity_pct: float = 2.0,
+    ) -> Tuple[MacroSupplyWallStatus, Optional[IdentifiedZone], str]:
+        """
+        Episode 15 Rule: The Half-Yearly / Yearly Supply Wall (The Macro Trap).
+        Detects whether price is colliding with or reacting off a macro (Half-Yearly,
+        Yearly, or unbreached Quarterly) supply zone.
+
+        Collision Reality:
+        When price hits a Half-Yearly or Yearly supply zone, massive multi-month
+        selling pressure is unleashed. Intermediate lower-timeframe (Daily/125m)
+        demand zones will be sliced through as price falls away from the wall.
+        """
+        if not macro_supply_zones:
+            return (
+                MacroSupplyWallStatus.NO_WALL,
+                None,
+                "Macro Supply Wall clear: No overhead Half-Yearly/Yearly/Quarterly supply zones detected.",
+            )
+
+        macro_tiers = {TimeframeTier.YEARLY, TimeframeTier.HALF_YEARLY, TimeframeTier.QUARTERLY}
+
+        for sz in macro_supply_zones:
+            if sz.is_demand:
+                continue
+            if sz.timeframe not in macro_tiers:
+                continue
+
+            pl = sz.proximal_line
+            dl = sz.distal_line
+
+            # Check if CMP is directly inside the macro supply zone
+            if pl <= cmp <= dl:
+                return (
+                    MacroSupplyWallStatus.COLLIDING_WITH_WALL,
+                    sz,
+                    f"Macro Wall Collision Detected! CMP {cmp:.1f} is directly inside {sz.timeframe.value} "
+                    f"Supply Zone [{pl:.1f} - {dl:.1f}]. Massive multi-month institutional selling pressure unleashed. "
+                    f"Aggressive LTF long setups are strictly prohibited (Macro Trap).",
+                )
+
+            # Check if price is within proximity_pct below proximal line
+            if cmp < pl and pl > 0:
+                dist_pct = ((pl - cmp) / pl) * 100.0
+                if dist_pct <= proximity_pct:
+                    return (
+                        MacroSupplyWallStatus.COLLIDING_WITH_WALL,
+                        sz,
+                        f"Macro Wall Collision Imminent! CMP {cmp:.1f} is within {dist_pct:.2f}% of "
+                        f"{sz.timeframe.value} Supply Zone [{pl:.1f} - {dl:.1f}]. High vulnerability to macro rejection.",
+                    )
+
+            # If zone was tested and CMP is falling away below proximal line
+            if not sz.is_fresh and cmp < pl:
+                if (pl - cmp) / pl <= 0.08:  # within 8% retreat
+                    return (
+                        MacroSupplyWallStatus.FALLING_AWAY_FROM_WALL,
+                        sz,
+                        f"Falling Away from Macro Wall: CMP {cmp:.1f} has rejected off {sz.timeframe.value} "
+                        f"Supply Zone [{pl:.1f} - {dl:.1f}]. Intermediate daily/125m demand zones will fail rapidly.",
+                    )
+
+        return (
+            MacroSupplyWallStatus.NO_WALL,
+            None,
+            "Macro Supply Wall clear: Price is not colliding with or falling away from macro supply.",
+        )
+
+    @staticmethod
+    def classify_origin_vs_distribution(
+        zone: IdentifiedZone,
+        is_at_cycle_turning_point: bool,
+        has_ema_support: bool = False,
+        is_distributive_stair_step: bool = False,
+    ) -> Tuple[OriginQuality, str]:
+        """
+        Episode 15 Rule: Pristine Origin vs. Shallow Distributive Basing.
+        - Pristine Origin Base: Located at the bottom/turning point of a major prior cycle,
+          1-3 clean base candles, dynamic EMA support, explosive departure.
+          Targets opposing macro supply for 8:1 to 10:1+ RRR.
+        - Shallow Distributive Base: Formed in mid-air chop or stair-stepping upward
+          during distribution; easily sliced through when price turns from overhead supply.
+        - Garbage Area: Directionless consolidation with overlapping wicks; rejected.
+        """
+        if getattr(zone, "is_garbage_area", False) or zone.base_candles_count > 6:
+            return (
+                OriginQuality.GARBAGE_CONSOLIDATION,
+                f"Garbage Area Consolidation: Base candle count ({zone.base_candles_count}) exceeds limits "
+                f"with overlapping wicks. Marking must never be forced inside garbage areas.",
+            )
+
+        if is_distributive_stair_step or (not is_at_cycle_turning_point and zone.base_candles_count >= 4):
+            return (
+                OriginQuality.SHALLOW_DISTRIBUTIVE,
+                "Shallow / Distributive Basing: Zone formed in mid-air consolidation or distributive stair-step. "
+                "Vulnerable to rapid breach if price encounters higher-timeframe resistance.",
+            )
+
+        if is_at_cycle_turning_point and zone.base_candles_count <= 3:
+            ema_str = " with dynamic EMA support" if has_ema_support else ""
+            return (
+                OriginQuality.PRISTINE_ORIGIN,
+                f"Pristine Origin Base: Located at structural cycle inflection point{ema_str} "
+                f"({zone.base_candles_count} base candles, explosive departure). "
+                f"Eligible for macro expansion targeting opposing supply (8:1 to 10:1+ RRR).",
+            )
+
+        return (
+            OriginQuality.SHALLOW_DISTRIBUTIVE,
+            f"Secondary Basing ({zone.base_candles_count} base candles): Tradeable only with confirmation and conservative stance.",
+        )
+
+    @classmethod
+    def audit_comprehensive_top_down_setup(
+        cls,
+        execution_zone: IdentifiedZone,
+        cmp: float,
+        htf_zone: Optional[IdentifiedZone] = None,
+        itf_trend: TrendDirection = TrendDirection.UPTREND,
+        curve_position: CurvePosition = CurvePosition.LOW_ON_CURVE,
+        macro_supply_zones: Optional[List[IdentifiedZone]] = None,
+        is_at_cycle_turning_point: bool = False,
+        has_ema_support: bool = False,
+        is_distributive_stair_step: bool = False,
+        is_at_all_time_low: bool = False,
+        consecutive_supply_breaches: int = 0,
+        capital: float = 100000.0,
+        risk_per_trade_pct: float = 1.0,
+        prior_trades_count: int = 100,
+        attempted_entry_type: EntryType = EntryType.SET_AND_FORGET,
+    ) -> MasterRevisionAuditReport:
+        """
+        Episode 15 Master Revision Class: The 14-Point Comprehensive Top-Down Institutional Auditor.
+        Synthesizes the complete curriculum (Episodes 1 to 14) into an empirical gatekeeper:
+        1. Macro Supply Wall Detection (Half-Yearly/Yearly/Quarterly Wall - Ep 15 & 11)
+        2. Origin vs. Distribution Classification (Pristine Origin vs Shallow Basing - Ep 15 & 6)
+        3. Curve Location Analysis (VLOC/LOC/EQB/HOC/VHOC/ATH - Ep 7)
+        4. Mahabharata Character Alignment (Arjuna + Krishna vs Bhishma Pitamah - Ep 8)
+        5. Trend Direction & Zone Violations (ITF 50 SMA Clock & Advanced Violations - Ep 7 & 13)
+        6. Candle Closing Concept & Authenticity (Proven Achievement & Virgin Origins - Ep 6 & 9)
+        7. Base Candle Scorer & LOTL Safety (1-3 Bases vs 4-5+ - Ep 5 & 6)
+        8. Trade Score & Dynamic EMA Confluence (7/7 Score + MA Bonus = 8/7 - Ep 8, 12, 13)
+        9. Execution Stance Determination (Aggressive vs Conservative - Ep 11)
+        10. Entry Type Strategy (Type 1 Limit vs Confirmation Entry - Ep 9 & 14)
+        11. All-Time Low (ATL) Long Prohibition Protocol (Ep 14)
+        12. Developmental 100-Trade Rule & Style Verification (WIT/MIT - Ep 9)
+        13. Mathematical Position Sizing & Rupee-Risk Invariance (Ep 10)
+        14. Rejection Mindset Audit & Multi-Timeframe Target Expectation (8:1 to 10:1+ for Origin - Ep 4, 8, 15)
+        """
+        audit_checks_passed: List[str] = []
+        rejection_reasons: List[str] = []
+
+        # 1. Macro Supply Wall Detection (Ep 15)
+        macro_wall_status, macro_wall_zone, macro_msg = cls.detect_macro_supply_wall(cmp, macro_supply_zones)
+        if execution_zone.is_demand:
+            if macro_wall_status in (MacroSupplyWallStatus.COLLIDING_WITH_WALL, MacroSupplyWallStatus.FALLING_AWAY_FROM_WALL):
+                if attempted_entry_type == EntryType.SET_AND_FORGET or not is_at_cycle_turning_point:
+                    rejection_reasons.append(
+                        "The Macro Trap Detected: Price is colliding with or falling away from a Half-Yearly/Yearly Supply Wall. "
+                        "Aggressive long entries into intermediate demand are strictly prohibited due to multi-month institutional selling pressure."
+                    )
+                else:
+                    audit_checks_passed.append(f"Macro Wall Alert: Handled with conservative stance: {macro_msg}")
+            else:
+                audit_checks_passed.append("Macro Supply Wall: Clear (No overhead Half-Yearly/Yearly collision).")
+        else:
+            audit_checks_passed.append("Macro Supply Wall: Not applicable for short setup.")
+
+        # 2. Origin Quality vs. Distribution (Ep 15 & 6)
+        origin_quality, origin_msg = cls.classify_origin_vs_distribution(
+            execution_zone, is_at_cycle_turning_point, has_ema_support, is_distributive_stair_step
+        )
+        if origin_quality == OriginQuality.GARBAGE_CONSOLIDATION:
+            rejection_reasons.append(
+                f"Origin Quality: Garbage Area detected. Base candle count ({execution_zone.base_candles_count}) "
+                f"or overlapping wicks make marking invalid."
+            )
+        elif origin_quality == OriginQuality.SHALLOW_DISTRIBUTIVE:
+            if macro_wall_status in (MacroSupplyWallStatus.COLLIDING_WITH_WALL, MacroSupplyWallStatus.FALLING_AWAY_FROM_WALL):
+                rejection_reasons.append("Origin Quality: Shallow distributive basing cannot withstand selling pressure from overhead macro supply wall.")
+            else:
+                audit_checks_passed.append("Origin Quality: Shallow / secondary base accepted with conservative stance.")
+        elif origin_quality == OriginQuality.PRISTINE_ORIGIN:
+            audit_checks_passed.append(f"Origin Quality: {origin_msg}")
+
+        # 3. Curve Position & Directional Bias (Ep 7)
+        if execution_zone.is_demand:
+            if curve_position in (CurvePosition.HIGH_ON_CURVE, CurvePosition.VERY_HIGH_ON_CURVE):
+                rejection_reasons.append(f"Curve Position: Long trade prohibited in {curve_position.value} (unfavorable location).")
+            else:
+                audit_checks_passed.append(f"Curve Position: Location favorable for buying ({curve_position.value}).")
+        else:
+            if curve_position in (CurvePosition.LOW_ON_CURVE, CurvePosition.VERY_LOW_ON_CURVE):
+                rejection_reasons.append(f"Curve Position: Short trade prohibited in {curve_position.value} (unfavorable location).")
+            elif curve_position == CurvePosition.ALL_TIME_HIGH:
+                rejection_reasons.append("Curve Position: Shorting at All-Time High is strictly prohibited.")
+            else:
+                audit_checks_passed.append(f"Curve Position: Location favorable for selling ({curve_position.value}).")
+
+        # 4. Mahabharata Character Alignment (Ep 8)
+        if htf_zone:
+            if execution_zone.is_demand and not htf_zone.is_demand:
+                rejection_reasons.append("Mahabharata Alignment: Fatal Trap! Arjuna (LTF Demand) entering directly into Bhishma Pitamah (HTF Supply).")
+            elif not execution_zone.is_demand and htf_zone.is_demand:
+                rejection_reasons.append("Mahabharata Alignment: Fatal Trap! Duryodhana (LTF Supply) shorting directly on top of Shri Krishna (HTF Demand).")
+            else:
+                audit_checks_passed.append("Mahabharata Alignment: Harmonious institutional alignment (Arjuna coincided with Shri Krishna).")
+        else:
+            audit_checks_passed.append("Mahabharata Alignment: Single-timeframe / standalone evaluation.")
+
+        # 5. Trend Alignment & Advanced Violations (Ep 7 & 13)
+        if execution_zone.is_demand:
+            if itf_trend == TrendDirection.DOWNTREND:
+                if attempted_entry_type == EntryType.SET_AND_FORGET and not is_at_cycle_turning_point:
+                    rejection_reasons.append("Trend Alignment: Blind limit buying (Type 1) against ITF Downtrend is prohibited; requires Confirmation Entry (Episode 14).")
+                else:
+                    audit_checks_passed.append("Trend Alignment: Counter-trend long permitted via confirmation entry / pristine origin.")
+            else:
+                audit_checks_passed.append(f"Trend Alignment: Favorable trend alignment ({itf_trend.value}).")
+        else:
+            if itf_trend == TrendDirection.UPTREND:
+                if attempted_entry_type == EntryType.SET_AND_FORGET:
+                    rejection_reasons.append("Trend Alignment: Blind shorting against ITF Uptrend is prohibited; requires confirmation.")
+                else:
+                    audit_checks_passed.append("Trend Alignment: Counter-trend short permitted via confirmation entry.")
+            else:
+                audit_checks_passed.append(f"Trend Alignment: Favorable trend alignment ({itf_trend.value}).")
+
+        # 6. Candle Closing Concept & Authenticity (Ep 6 & 9)
+        if execution_zone.authenticity == ZoneAuthenticity.NON_AUTHENTIC and not execution_zone.has_proven_achievement:
+            rejection_reasons.append("Closing & Authenticity: Non-authentic zone lacks proven closing achievement above previous structure.")
+        else:
+            audit_checks_passed.append("Closing & Authenticity: Proven zone structure and authentic origin verified.")
+
+        # 7. Base Candle Scorer (Ep 5)
+        if execution_zone.base_candles_count > 5:
+            rejection_reasons.append(f"Base Candle Count: {execution_zone.base_candles_count} base candles exceeds allowable limit of 5 (diluted institutional momentum).")
+        else:
+            audit_checks_passed.append(f"Base Candle Count: {execution_zone.base_candles_count} base candle(s) represents concentrated institutional orders.")
+
+        # 8. Trade Score & Dynamic EMA Confluence (Ep 8, 12, 13)
+        freshness_pts = 3.0 if execution_zone.is_fresh else (1.5 if execution_zone.tested_at_idx is not None else 0.0)
+        strength_pts = 2.0 if execution_zone.departure_strength >= 2 or execution_zone.is_gap_base_zone else 1.0
+        time_pts = 2.0 if execution_zone.base_candles_count <= 3 else (1.0 if execution_zone.base_candles_count <= 5 else 0.0)
+        base_score = freshness_pts + strength_pts + time_pts
+        ema_bonus = 1.0 if has_ema_support else 0.0
+        total_score = min(8.0, base_score + ema_bonus)
+
+        if base_score < 6.0:
+            rejection_reasons.append(f"Trade Score: Base score {base_score:.1f}/7.0 is below institutional minimum threshold of 6.0/7.0.")
+        else:
+            audit_checks_passed.append(f"Trade Score: Score {total_score:.1f}/7.0 meets 1% Club institutional standard.")
+
+        # 9. All-Time Low (ATL) Long Prohibition Protocol (Ep 14)
+        if is_at_all_time_low and execution_zone.is_demand:
+            if consecutive_supply_breaches < 2:
+                rejection_reasons.append(
+                    f"ATL Long Prohibition: Asset at All-Time Low with only {consecutive_supply_breaches} supply breach(es). "
+                    f"Longs strictly forbidden until >= 2 supply zones are breached on ITF."
+                )
+            else:
+                audit_checks_passed.append("ATL Protocol: Qualified bottom-out verified with >= 2 supply zone breaches.")
+        else:
+            audit_checks_passed.append("ATL Protocol: Normal market condition.")
+
+        # 10. 100-Trade Directive & Style Verification (Ep 9)
+        if prior_trades_count < 100 and execution_zone.timeframe in (TimeframeTier.INTRADAY, TimeframeTier.M75):
+            rejection_reasons.append(
+                f"100-Trade Directive: Completed {prior_trades_count}/100 positional trades. "
+                f"Intraday execution restricted until developmental milestone met."
+            )
+        else:
+            audit_checks_passed.append("100-Trade Directive: Trading style complies with professional developmental rule.")
+
+        # 11. Mathematical Position Sizing & Rupee-Risk Invariance (Ep 10)
+        risk_per_share = abs(execution_zone.entry_price - execution_zone.stop_loss)
+        if risk_per_share <= 0:
+            risk_per_share = abs(execution_zone.proximal_line - execution_zone.distal_line)
+
+        monetary_risk = capital * (risk_per_trade_pct / 100.0)
+        calculated_qty = int(monetary_risk // risk_per_share) if risk_per_share > 0 else 0
+
+        if calculated_qty <= 0:
+            rejection_reasons.append(f"Position Sizing: Risk per share ₹{risk_per_share:.2f} exceeds allowable monetary risk ₹{monetary_risk:.2f} (Quantity = 0).")
+        else:
+            audit_checks_passed.append(f"Position Sizing: {calculated_qty} shares planned at exact ₹{monetary_risk:.2f} risk.")
+
+        # 12. Target Expectation & RRR Expansion (Ep 4, 8, 15)
+        if origin_quality == OriginQuality.PRISTINE_ORIGIN:
+            projected_rrr = 8.5  # Origin setups target opposing macro supply, delivering 8:1 to 10:1+
+            audit_checks_passed.append("Target Expectation: Pristine origin expansion planned with 8.5:1 RRR targeting opposing macro supply.")
+        else:
+            projected_rrr = max(2.0, execution_zone.risk_reward_ratio)
+            audit_checks_passed.append(f"Target Expectation: Standard multi-timeframe target planned at {projected_rrr:.1f}:1 RRR.")
+
+        # 13. Execution Stance Determination (Ep 11)
+        if (
+            macro_wall_status in (MacroSupplyWallStatus.COLLIDING_WITH_WALL, MacroSupplyWallStatus.FALLING_AWAY_FROM_WALL)
+            or origin_quality == OriginQuality.SHALLOW_DISTRIBUTIVE
+            or itf_trend == TrendDirection.DOWNTREND
+        ):
+            trading_stance = TradingStance.CONSERVATIVE
+        elif total_score >= 7.0 and origin_quality == OriginQuality.PRISTINE_ORIGIN:
+            trading_stance = TradingStance.AGGRESSIVE
+        else:
+            trading_stance = TradingStance.CONSERVATIVE
+        audit_checks_passed.append(f"Execution Stance: Evaluated as {trading_stance.value} based on road conditions.")
+
+        # 14. Entry Type Strategy & Rejection Mindset Synthesis (Ep 9 & 14)
+        if macro_wall_status in (MacroSupplyWallStatus.COLLIDING_WITH_WALL, MacroSupplyWallStatus.FALLING_AWAY_FROM_WALL):
+            recommended_entry = EntryType.CONFIRMATION_IN_ZONE
+        elif trading_stance == TradingStance.AGGRESSIVE and total_score >= 7.0:
+            recommended_entry = EntryType.SET_AND_FORGET
+        else:
+            recommended_entry = EntryType.SET_AND_FORGET if total_score >= 6.5 else EntryType.CONFIRMATION_IN_ZONE
+
+        is_approved = len(rejection_reasons) == 0
+        if is_approved:
+            summary = (
+                f"1% CLUB APPROVED: Trade setup successfully passed all 14 institutional audit checks "
+                f"(Score: {total_score:.1f}, Stance: {trading_stance.value}, RRR: {projected_rrr:.1f}:1, Qty: {calculated_qty})."
+            )
+        else:
+            summary = (
+                f"REJECTED BY INSTITUTIONAL DISCIPLINE: Setup failed {len(rejection_reasons)} check(s): "
+                f"{'; '.join(rejection_reasons)}"
+            )
+
+        return MasterRevisionAuditReport(
+            is_approved=is_approved,
+            trading_stance=trading_stance,
+            recommended_entry_type=recommended_entry,
+            macro_wall_status=macro_wall_status,
+            origin_quality=origin_quality,
+            curve_position=curve_position,
+            itf_trend=itf_trend,
+            trade_score=total_score,
+            calculated_position_size=calculated_qty,
+            projected_rrr=projected_rrr,
+            audit_checks_passed=audit_checks_passed,
+            rejection_reasons=rejection_reasons,
+            audit_verdict_summary=summary,
+            overpowering_htf_supply=macro_wall_zone,
         )
 
 ```
@@ -5341,6 +5719,7 @@ if __name__ == "__main__":
 ---
 
 ---
+
 
 
 

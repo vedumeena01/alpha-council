@@ -22,5 +22,6 @@
 | **12** | **Moving Averages & Correlation (SMA, EMA, Retail Crossover Traps & Extra Score)** | ✅ **Codified & Trained** | [`training/EPISODE_12_MOVING_AVERAGES_AND_CORRELATION.md`](EPISODE_12_MOVING_AVERAGES_AND_CORRELATION.md) |
 | **13** | **Advanced Trend Analysis (Demand/Supply Violation & Algorithmic EMA 20 Footprint)** | ✅ **Codified & Trained** | [`training/EPISODE_13_ADVANCED_TREND_ANALYSIS.md`](EPISODE_13_ADVANCED_TREND_ANALYSIS.md) |
 | **14** | **Trading Against the Trend (Confirmation Entry & Macro Risk Compression)** | ✅ **Codified & Trained** | [`training/EPISODE_14_TRADING_AGAINST_THE_TREND.md`](EPISODE_14_TRADING_AGAINST_THE_TREND.md) |
-| **15** | *Upcoming...* | ⏳ Pending | - |
-| **...**| *Episodes 15 - 20* | ⏳ Pending | - |
+| **15** | **Revision Class & Master Top-Down Audit Engine (The 1% Club)** | ✅ **Codified & Trained** | [`training/EPISODE_15_REVISION_CLASS_AND_MASTER_TOP_DOWN_AUDIT.md`](EPISODE_15_REVISION_CLASS_AND_MASTER_TOP_DOWN_AUDIT.md) |
+| **16** | **Sector Analysis (Upcoming...)** | ⏳ Pending | - |
+| **...**| *Episodes 17 - 20* | ⏳ Pending | - |
