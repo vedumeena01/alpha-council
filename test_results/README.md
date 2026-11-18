@@ -18,7 +18,8 @@
 | **08** | Trade Score, Mahabharata Alignment & Dynamic Target | 5 | **100%** (5/5) | 0.38s | Trade Score (Max 7/7), 4 Characters (Krishna, Bhishma, Arjuna, Duryodhana), Opposing ITF Target Rule, Best Setup Gold Standard | [`EPISODE_08_TEST_RESULTS.md`](EPISODE_08_TEST_RESULTS.md) |
 | **09** | Trading Style, Authentic Zones & The Rejection Mindset | 5 | **100%** (5/5) | 0.25s | Entry Types (Set & Forget vs. Type 2 In-Zone), Zone Authenticity & Retest Vulnerability, Rupee-Risk Equality, Mandatory 100-Trade Rule, Rejection Mindset Audit | [`EPISODE_09_TEST_RESULTS.md`](EPISODE_09_TEST_RESULTS.md) |
 | **10** | Risk Management, Position Sizing & Anti-Tamper Discipline | 5 | **100%** (5/5) | 0.28s | Exact Position Sizing ($Qty = \lfloor RPT / |Entry - SL| \rfloor$), Monetary Risk Invariance, Anti-Tamper Guards (Widening, Averaging, Chasing), 10 Trades/Month Cap, 40-Mistake Elimination, Excel Growth Model, HTF Overpowering | [`EPISODE_10_TEST_RESULTS.md`](EPISODE_10_TEST_RESULTS.md) |
-| **Total** | **All Episodes (Cumulative)** | **44** | **100%** (44/44) | **0.42s** | **Full GTF Price Action & Risk Architecture (`zone_engine.py` + `gtf_risk.py`)** | - |
+| **11** | When to be Aggressive vs. Conservative (Execution Stances) | 5 | **100%** (5/5) | 0.28s | Aggressive vs. Conservative Stance Selector, The Matching Timeframe Principle, The Steamroller Effect, Proven Achievement Rule, Anchoring SL to Shri Krishna, TVS Motor Regime Inversion, Dynamic 20 EMA Interaction | [`EPISODE_11_TEST_RESULTS.md`](EPISODE_11_TEST_RESULTS.md) |
+| **Total** | **All Episodes (Cumulative)** | **49** | **100%** (49/49) | **0.53s** | **Full GTF Price Action, Risk & Dynamic Execution Architecture (`zone_engine.py` + `gtf_risk.py`)** | - |
 
 ---
 
@@ -26,9 +27,9 @@
 
 ```text
 Modules: alphacouncil/alpha/zone_engine.py + alphacouncil/risk/gtf_risk.py
-Zone Engine Statements: 785
-GTF Risk Statements: 110 (Coverage: 95%)
-Total Suite Tests: 63 (100% Passed)
+Zone Engine Statements: 838 (Coverage: 84%)
+GTF Risk Statements: 132 (Coverage: 95%)
+Total Suite Tests: 68 (100% Passed)
 Linter Status: Ruff 0 errors, 0 warnings
 CI Status: GitHub Actions 100% Green (Python 3.11 & 3.12)
 ```
@@ -46,3 +47,4 @@ CI Status: GitHub Actions 100% Green (Python 3.11 & 3.12)
 - [`EPISODE_08_TEST_RESULTS.md`](EPISODE_08_TEST_RESULTS.md) - Trade Score (7/7), Mahabharata Alignment, Dynamic Opposing ITF Target & Best Setup Gold Standard.
 - [`EPISODE_09_TEST_RESULTS.md`](EPISODE_09_TEST_RESULTS.md) - Trading Style, Authentic Zones, Rupee-Risk Equality, 100-Trade Directive & Rejection Mindset.
 - [`EPISODE_10_TEST_RESULTS.md`](EPISODE_10_TEST_RESULTS.md) - Risk Management, Position Sizing, Anti-Tamper Guards, 10 Trades/Month Cap & Excel Growth Models.
+- [`EPISODE_11_TEST_RESULTS.md`](EPISODE_11_TEST_RESULTS.md) - Aggressive vs. Conservative Execution Stances, The Steamroller Effect, The Matching Timeframe Principle, Macro Anchoring to Shri Krishna & Regime Inversion.

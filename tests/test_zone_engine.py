@@ -18,6 +18,7 @@ from alphacouncil.alpha.zone_engine import (
     CandleType,
     ZoneType,
     MarkingMode,
+    TradingStance,
     TimeframeTier,
     TradingStyle,
     TrendDirection,
@@ -1729,3 +1730,208 @@ def test_episode_10_smaller_timeframe_overpowering_higher_timeframe():
     is_overpowering = DemandSupplyEngine.detect_htf_overpowering_zone(ltf_demand, htf_supply)
     assert is_overpowering is True
     assert ltf_demand.is_htf_overpowering_origin is True
+
+
+# ==============================================================================
+# EPISODE 11 TESTS: AGGRESSIVE VS CONSERVATIVE EXECUTION STANCES
+# ==============================================================================
+
+
+def test_episode_11_the_matching_timeframe_principle_and_steamroller_effect():
+    """
+    Episode 11 Principle: The Matching Timeframe Principle & Steamroller Effect.
+    - Weekly supply retreat cannot be caught by shallow LTF daily/15m demand unless pristine origin.
+    - Monthly supply retreat requires at least Monthly demand.
+    - Quarterly supply retreat slices through daily demand.
+    """
+    # 1. Weekly Supply vs Standard Daily Demand -> Fails (Steamroller risk)
+    matched, msg = DemandSupplyEngine.validate_matching_timeframe(
+        retreat_supply_tf=TimeframeTier.WEEKLY,
+        reaction_demand_tf=TimeframeTier.DAILY,
+        is_pristine_origin=False,
+    )
+    assert matched is False
+    assert "Steamroller Risk" in msg
+
+    # 2. Weekly Supply vs Pristine Daily Origin Base -> Passes
+    matched, msg = DemandSupplyEngine.validate_matching_timeframe(
+        retreat_supply_tf=TimeframeTier.WEEKLY,
+        reaction_demand_tf=TimeframeTier.DAILY,
+        is_pristine_origin=True,
+    )
+    assert matched is True
+    assert "Pristine origin exception satisfied" in msg
+
+    # 3. Monthly Supply vs Monthly Demand -> Passes
+    matched, msg = DemandSupplyEngine.validate_matching_timeframe(
+        retreat_supply_tf=TimeframeTier.MONTHLY,
+        reaction_demand_tf=TimeframeTier.MONTHLY,
+        is_pristine_origin=False,
+    )
+    assert matched is True
+    assert "Matching timeframe satisfied" in msg
+
+    # 4. Quarterly Supply vs Daily Demand -> Fails decisively
+    matched, msg = DemandSupplyEngine.validate_matching_timeframe(
+        retreat_supply_tf=TimeframeTier.QUARTERLY,
+        reaction_demand_tf=TimeframeTier.DAILY,
+        is_pristine_origin=False,
+    )
+    assert matched is False
+    assert "Steamroller Risk" in msg
+
+
+def test_episode_11_evaluate_trading_stance_aggressive_vs_conservative():
+    """
+    Episode 11 Axiom: 'As a trader, you can always be conservative, but you can NEVER be always aggressive.'
+    Aggressive is permitted ONLY when:
+      1. Clean space ahead + aligned trend.
+      2. Proven achievement (closed beyond opposing HTF supply).
+    """
+    engine = DemandSupplyEngine()
+    demand_opens = np.array([200.0, 212.0, 215.0])
+    demand_highs = np.array([202.0, 218.0, 230.0])
+    demand_lows = np.array([198.0, 205.0, 214.0])
+    demand_closes = np.array([211.0, 215.0, 229.0])
+
+    supply_opens = np.array([180.0, 205.0, 200.0])
+    supply_highs = np.array([185.0, 210.0, 201.0])
+    supply_lows = np.array([179.0, 198.0, 180.0])
+    supply_closes = np.array([205.0, 200.0, 182.0])
+
+    ltf_demand = engine.scan_for_zones(demand_opens, demand_highs, demand_lows, demand_closes)[0]
+    ltf_demand.timeframe = TimeframeTier.DAILY
+
+    htf_supply = engine.scan_for_zones(supply_opens, supply_highs, supply_lows, supply_closes)[0]
+    htf_supply.timeframe = TimeframeTier.WEEKLY
+
+    # Scenario A: Retreating from Weekly supply without proven achievement -> Conservative enforced
+    stance, msg = DemandSupplyEngine.evaluate_trading_stance(
+        execution_zone=ltf_demand,
+        opposing_htf_zone=htf_supply,
+        has_proven_achievement=False,
+    )
+    assert stance == TradingStance.CONSERVATIVE
+    assert "Conservative stance enforced" in msg
+    assert ltf_demand.trading_stance == TradingStance.CONSERVATIVE
+
+    # Scenario B: Retreating from Weekly supply WITH Proven Achievement -> Aggressive permitted
+    stance, msg = DemandSupplyEngine.evaluate_trading_stance(
+        execution_zone=ltf_demand,
+        opposing_htf_zone=htf_supply,
+        has_proven_achievement=True,
+    )
+    assert stance == TradingStance.AGGRESSIVE
+    assert "Proven Achievement" in msg
+    assert ltf_demand.trading_stance == TradingStance.AGGRESSIVE
+    assert ltf_demand.has_proven_achievement is True
+
+    # Scenario C: Clean Space Ahead with Uptrend -> Aggressive permitted
+    stance, msg = DemandSupplyEngine.evaluate_trading_stance(
+        execution_zone=ltf_demand,
+        opposing_htf_zone=None,
+        intermediate_trend=TrendDirection.UPTREND,
+        has_clean_space=True,
+    )
+    assert stance == TradingStance.AGGRESSIVE
+    assert "Clean space ahead" in msg
+
+    # Scenario D: Sideways trend without clean space -> Conservative default
+    stance, msg = DemandSupplyEngine.evaluate_trading_stance(
+        execution_zone=ltf_demand,
+        opposing_htf_zone=None,
+        intermediate_trend=TrendDirection.SIDEWAYS,
+        has_clean_space=False,
+    )
+    assert stance == TradingStance.CONSERVATIVE
+
+
+def test_episode_11_anchoring_sl_to_shri_krishna_htf_distal_base():
+    """
+    Episode 11 Case Study: Bank of Baroda & Canara Bank.
+    In sideways / down-leaning intermediate trend, anchor the stop-loss beneath
+    the Distal Line of the underlying Higher Timeframe (Monthly) Demand Zone (Shri Krishna).
+    """
+    engine = DemandSupplyEngine()
+    demand_opens = np.array([200.0, 212.0, 215.0])
+    demand_highs = np.array([202.0, 218.0, 230.0])
+    demand_lows = np.array([198.0, 205.0, 214.0])
+    demand_closes = np.array([211.0, 215.0, 229.0])
+
+    # LTF Daily Demand: PL = 200.0, DL = 195.0
+    ltf_demand = engine.scan_for_zones(demand_opens, demand_highs, demand_lows, demand_closes)[0]
+    ltf_demand.is_demand = True
+    ltf_demand.proximal_line = 200.0
+    ltf_demand.distal_line = 195.0
+
+    # HTF Monthly Demand (Shri Krishna): PL = 205.0, DL = 180.0
+    htf_demand = engine.scan_for_zones(demand_opens, demand_highs, demand_lows, demand_closes)[0]
+    htf_demand.is_demand = True
+    htf_demand.proximal_line = 205.0
+    htf_demand.distal_line = 180.0
+
+    anchored_sl = DemandSupplyEngine.anchor_sl_to_htf_base(
+        ltf_zone=ltf_demand,
+        htf_zone=htf_demand,
+        tick_size=0.05,
+        buffer_ticks=5,
+    )
+
+    # Expected: 180.0 - (0.05 * 5) = 179.75
+    assert anchored_sl == 179.75
+    assert ltf_demand.anchored_htf_stoploss == 179.75
+
+
+def test_episode_11_structural_regime_inversion_detection():
+    """
+    Episode 11 Case Study: TVS Motor Exhaustion Phase at All-Time Highs.
+    Demand failing while supply holds signals institutional distribution.
+    """
+    # Distribution regime: 4 demand zones breached, only 1 held; 3 supply zones held, 1 breached
+    is_inverted, msg = DemandSupplyEngine.detect_structural_regime_inversion(
+        demand_breached_count=4,
+        demand_respected_count=1,
+        supply_breached_count=1,
+        supply_respected_count=3,
+    )
+    assert is_inverted is True
+    assert "Structural Regime Inversion Confirmed" in msg
+    assert "CEASE all aggressive long entries" in msg
+
+    # Normal bullish regime: Demand holds (4 held, 1 breached), Supply fails (3 breached, 1 held)
+    is_inverted, msg = DemandSupplyEngine.detect_structural_regime_inversion(
+        demand_breached_count=1,
+        demand_respected_count=4,
+        supply_breached_count=3,
+        supply_respected_count=1,
+    )
+    assert is_inverted is False
+    assert "Normal regime intact" in msg
+
+
+def test_episode_11_dynamic_20_ema_interaction_and_equilibrium():
+    """
+    Episode 11 Concept: Dynamic 20 EMA Equilibrium Curve.
+    Short trades approaching a rising 20 EMA encounter dynamic bounce support.
+    """
+    # 1. Short trade approaching 20 EMA within 0.5% tolerance
+    res = DemandSupplyEngine.check_dynamic_20_ema_interaction(
+        current_price=100.2,
+        ema_20=100.0,
+        trade_direction="SHORT",
+        tolerance_pct=0.5,
+    )
+    assert res["is_interacting"] is True
+    assert res["warning_level"] == "CAUTION_DYNAMIC_SUPPORT"
+    assert "Book partial profits" in res["action_recommendation"]
+
+    # 2. Short trade comfortably far from 20 EMA (10% away)
+    res = DemandSupplyEngine.check_dynamic_20_ema_interaction(
+        current_price=110.0,
+        ema_20=100.0,
+        trade_direction="SHORT",
+        tolerance_pct=0.5,
+    )
+    assert res["is_interacting"] is False
+    assert res["warning_level"] == "NORMAL"
+    assert "Comfortable distance" in res["action_recommendation"]

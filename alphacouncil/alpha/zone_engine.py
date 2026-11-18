@@ -34,13 +34,21 @@ class MarkingMode(str, Enum):
     WICK_TO_WICK = "WICK_TO_WICK"  # Aggressive GTF Marking (PL on Base Wick, DL on Wick)
 
 
+class TradingStance(str, Enum):
+    CONSERVATIVE = "CONSERVATIVE"  # Default: Safe, deep origin, matching HTF timeframe
+    AGGRESSIVE = "AGGRESSIVE"      # Permitted only when clean space ahead OR proven achievement
+
+
 class TimeframeTier(str, Enum):
-    MONTHLY = "MONTHLY"    # Highest institutional dominance (Weight 4.0)
-    WEEKLY = "WEEKLY"      # Intermediate institutional swing (Weight 3.0)
-    DAILY = "DAILY"        # Standard positional baseline (Weight 2.0)
-    M125 = "125M"          # Exact NSE session partition 3 bars/day (Weight 1.5)
-    M75 = "75M"            # Exact NSE session partition 5 bars/day (Weight 1.25)
-    INTRADAY = "INTRADAY"  # 5m-60m noise vulnerable (Weight 1.0)
+    YEARLY = "YEARLY"          # Macro annual (Weight 6.0)
+    HALF_YEARLY = "HALF_YEARLY" # Macro bi-annual (Weight 5.5)
+    QUARTERLY = "QUARTERLY"    # Macro institutional allocation (Weight 5.0)
+    MONTHLY = "MONTHLY"        # Highest institutional dominance (Weight 4.0)
+    WEEKLY = "WEEKLY"          # Intermediate institutional swing (Weight 3.0)
+    DAILY = "DAILY"            # Standard positional baseline (Weight 2.0)
+    M125 = "125M"              # Exact NSE session partition 3 bars/day (Weight 1.5)
+    M75 = "75M"                # Exact NSE session partition 5 bars/day (Weight 1.25)
+    INTRADAY = "INTRADAY"      # 5m-60m noise vulnerable (Weight 1.0)
 
 
 class TradingStyle(str, Enum):
@@ -227,6 +235,11 @@ class IdentifiedZone:
     # Advanced Price Action Nuance (Episode 10)
     is_htf_overpowering_origin: bool = False  # True if smaller TF zone overpowered opposing HTF structure
 
+    # Execution Stance & Macro Anchoring (Episode 11)
+    trading_stance: TradingStance = TradingStance.CONSERVATIVE
+    has_proven_achievement: bool = False       # True if zone closed beyond opposing HTF zone
+    anchored_htf_stoploss: Optional[float] = None # Stoploss anchored to Shri Krishna (HTF Distal Line)
+
 
 class DemandSupplyEngine:
     """
@@ -237,6 +250,9 @@ class DemandSupplyEngine:
     """
 
     TIMEFRAME_WEIGHTS: Dict[TimeframeTier, float] = {
+        TimeframeTier.YEARLY: 6.0,
+        TimeframeTier.HALF_YEARLY: 5.5,
+        TimeframeTier.QUARTERLY: 5.0,
         TimeframeTier.MONTHLY: 4.0,
         TimeframeTier.WEEKLY: 3.0,
         TimeframeTier.DAILY: 2.0,
@@ -1612,3 +1628,213 @@ class DemandSupplyEngine:
         supply_zones.sort(key=lambda x: x.proximal_line)
 
         return demand_zones, supply_zones
+
+    @classmethod
+    def validate_matching_timeframe(
+        cls,
+        retreat_supply_tf: TimeframeTier,
+        reaction_demand_tf: TimeframeTier,
+        is_pristine_origin: bool = False,
+    ) -> Tuple[bool, str]:
+        """
+        Episode 11: The Matching Timeframe Principle.
+        When price retreats after hitting an opposing HTF Zone:
+        - Retreat from Weekly Supply requires at least Weekly Demand (or pristine Daily origin base).
+        - Retreat from Monthly Supply requires at least Monthly Demand (or pristine Weekly origin).
+        - Retreat from Quarterly/Half-Yearly/Yearly requires at least Quarterly/Half-Yearly Demand.
+        Trading aggressive lower-timeframe demand zones directly underneath an opposing HTF supply
+        runs into the Steamroller Effect.
+        """
+        supply_weight = cls.TIMEFRAME_WEIGHTS.get(retreat_supply_tf, 1.0)
+        demand_weight = cls.TIMEFRAME_WEIGHTS.get(reaction_demand_tf, 1.0)
+
+        # If demand timeframe is equal or higher in hierarchy, it is structurally qualified
+        if demand_weight >= supply_weight:
+            return (
+                True,
+                f"Matching timeframe satisfied: {reaction_demand_tf.value} demand matches or exceeds {retreat_supply_tf.value} supply."
+            )
+
+        # If demand is one level lower but is a pristine origin base, it is permitted
+        if is_pristine_origin and (supply_weight - demand_weight) <= 1.0:
+            return (
+                True,
+                f"Pristine origin exception satisfied: Pristine {reaction_demand_tf.value} origin qualifies against {retreat_supply_tf.value} supply."
+            )
+
+        return (
+            False,
+            f"Steamroller Risk: Price retreating from {retreat_supply_tf.value} supply cannot be absorbed "
+            f"by an aggressive {reaction_demand_tf.value} demand zone (Weight {demand_weight} < {supply_weight}). "
+            f"Requires matching HTF demand or pristine origin base."
+        )
+
+    @classmethod
+    def evaluate_trading_stance(
+        cls,
+        execution_zone: IdentifiedZone,
+        opposing_htf_zone: Optional[IdentifiedZone] = None,
+        intermediate_trend: Optional[TrendDirection] = None,
+        has_clean_space: bool = False,
+        has_proven_achievement: bool = False,
+        is_deep_origin: bool = False,
+    ) -> Tuple[TradingStance, str]:
+        """
+        Episode 11: When to be Aggressive and When to be Conservative.
+        Universal Axiom: 'As a trader, you can always be conservative, but you can NEVER be always aggressive.'
+
+        Conservative is the default stance.
+        Aggressive is permitted ONLY under two conditions:
+          Condition 1: Clean space ahead with intermediate trend aligned and no opposing HTF zone.
+          Condition 2: The Proven Achievement Rule - the execution level closed decisively beyond opposing HTF resistance.
+        """
+        # If opposing HTF zone is present and price retreated from it
+        if opposing_htf_zone is not None:
+            if has_proven_achievement or execution_zone.is_htf_overpowering_origin:
+                execution_zone.trading_stance = TradingStance.AGGRESSIVE
+                execution_zone.has_proven_achievement = True
+                return (
+                    TradingStance.AGGRESSIVE,
+                    f"Proven Achievement: Execution zone has closed beyond opposing {opposing_htf_zone.timeframe.value} "
+                    f"resistance, neutralizing macro supply. Aggressive pullbacks permitted."
+                )
+
+            # Check matching timeframe
+            is_matched, msg = cls.validate_matching_timeframe(
+                opposing_htf_zone.timeframe, execution_zone.timeframe, is_pristine_origin=is_deep_origin
+            )
+            if not is_matched:
+                execution_zone.trading_stance = TradingStance.CONSERVATIVE
+                return (
+                    TradingStance.CONSERVATIVE,
+                    f"Conservative stance enforced: {msg}"
+                )
+
+        # If no opposing HTF zone or clean space
+        if has_clean_space:
+            trend_aligned = False
+            if execution_zone.is_demand and intermediate_trend == TrendDirection.UPTREND:
+                trend_aligned = True
+            elif not execution_zone.is_demand and intermediate_trend == TrendDirection.DOWNTREND:
+                trend_aligned = True
+
+            if trend_aligned:
+                execution_zone.trading_stance = TradingStance.AGGRESSIVE
+                return (
+                    TradingStance.AGGRESSIVE,
+                    "Clean space ahead with aligned intermediate trend: Aggressive entry permitted on upper base / shallow retest."
+                )
+
+        execution_zone.trading_stance = TradingStance.CONSERVATIVE
+        return (
+            TradingStance.CONSERVATIVE,
+            "Conservative stance enforced by default: Wait for deep origin base or clear macro confirmation."
+        )
+
+    @staticmethod
+    def anchor_sl_to_htf_base(
+        ltf_zone: IdentifiedZone,
+        htf_zone: IdentifiedZone,
+        tick_size: float = 0.05,
+        buffer_ticks: int = 5,
+    ) -> float:
+        """
+        Episode 11: Anchoring Stop-Loss to Shri Krishna (HTF Location Base).
+        In sideways or down-leaning intermediate trend conditions, placing a tight SL
+        beneath a shallow LTF base risks premature stop-out.
+        Instead, anchor the stop-loss beneath the Distal Line of the underlying HTF (Monthly) base.
+        """
+        buffer_val = tick_size * buffer_ticks
+        if ltf_zone.is_demand:
+            # Anchor below HTF Distal Line
+            anchored_sl = round(htf_zone.distal_line - buffer_val, 2)
+            ltf_zone.anchored_htf_stoploss = anchored_sl
+            return anchored_sl
+        else:
+            # Anchor above HTF Distal Line for Supply
+            anchored_sl = round(htf_zone.distal_line + buffer_val, 2)
+            ltf_zone.anchored_htf_stoploss = anchored_sl
+            return anchored_sl
+
+    @staticmethod
+    def detect_structural_regime_inversion(
+        demand_breached_count: int,
+        demand_respected_count: int,
+        supply_breached_count: int,
+        supply_respected_count: int,
+    ) -> Tuple[bool, str]:
+        """
+        Episode 11: TVS Motor Master Case Study - Structural Inversion / Regime Shift.
+        Near all-time highs or macro distribution:
+        When fresh demand zones begin to breach repeatedly while fresh supply zones hold,
+        an institutional distribution regime shift is underway.
+        Traders must immediately cease aggressive long entries.
+        """
+        demand_failing = demand_breached_count > demand_respected_count
+        supply_holding = supply_respected_count > supply_breached_count
+
+        if demand_failing and supply_holding:
+            return (
+                True,
+                f"Structural Regime Inversion Confirmed: Demand failing ({demand_breached_count} breached vs {demand_respected_count} held) "
+                f"and Supply holding ({supply_respected_count} held vs {supply_breached_count} breached). "
+                f"Institutional distribution underway; CEASE all aggressive long entries immediately."
+            )
+
+        return (
+            False,
+            f"Normal regime intact: Demand breaches={demand_breached_count}, held={demand_respected_count}; "
+            f"Supply breaches={supply_breached_count}, held={supply_respected_count}."
+        )
+
+    @staticmethod
+    def check_dynamic_20_ema_interaction(
+        current_price: float,
+        ema_20: float,
+        trade_direction: str = "SHORT",
+        tolerance_pct: float = 0.5,
+    ) -> Dict[str, Any]:
+        """
+        Episode 11: Dynamic Moving Average Preview (20 EMA Equilibrium Curve).
+        The 20 EMA functions as dynamic institutional equilibrium.
+        In strong trending conditions, price often kisses the 20 EMA and reverses sharply,
+        delivering 1.5:1 or 2:1 targets before reaching deeper horizontal levels.
+        Traders shorting against an approaching 20 EMA must book profits quickly or trail stops.
+        """
+        distance_pct = abs(current_price - ema_20) / current_price * 100.0
+        is_interacting = distance_pct <= tolerance_pct
+
+        if trade_direction.upper() == "SHORT":
+            if is_interacting or (current_price <= ema_20 and distance_pct <= tolerance_pct * 2):
+                return {
+                    "is_interacting": True,
+                    "distance_pct": round(distance_pct, 2),
+                    "action_recommendation": (
+                        "Approaching dynamic 20 EMA support: High probability of institutional bounce. "
+                        "Book partial profits (1.5:1 / 2:1) or trail stop-loss tight."
+                    ),
+                    "warning_level": "CAUTION_DYNAMIC_SUPPORT",
+                }
+            return {
+                "is_interacting": False,
+                "distance_pct": round(distance_pct, 2),
+                "action_recommendation": "Comfortable distance from dynamic 20 EMA.",
+                "warning_level": "NORMAL",
+            }
+        else:  # LONG
+            if is_interacting:
+                return {
+                    "is_interacting": True,
+                    "distance_pct": round(distance_pct, 2),
+                    "action_recommendation": (
+                        "Price interacting with dynamic 20 EMA support: In strong trend, can reverse sharply "
+                        "without reaching deeper horizontal demand. Monitor for dynamic bounce."
+                    ),
+                    "warning_level": "DYNAMIC_EQUILIBRIUM_TEST",
+                }
+            return {
+                "is_interacting": False,
+                "distance_pct": round(distance_pct, 2),
+                "action_recommendation": "Price not currently at 20 EMA equilibrium.",
+                "warning_level": "NORMAL",
+            }
