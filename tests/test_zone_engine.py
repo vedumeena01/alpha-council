@@ -27,6 +27,10 @@ from alphacouncil.alpha.zone_engine import (
     TradeScoreQuality,
     ZoneAlignmentType,
     TradeScoreBreakdown,
+    EntryType,
+    ZoneAuthenticity,
+    TradingStyleCategory,
+    RejectionAudit,
 )
 
 
@@ -1226,3 +1230,247 @@ def test_episode_08_mtfa_plan_evaluates_execution_zones_scores():
     assert scored_zone.trade_score is not None
     assert isinstance(scored_zone.trade_score, TradeScoreBreakdown)
     assert scored_zone.trade_score.total_score == 7.0
+
+
+# =====================================================================
+# EPISODE 9 TESTS: TRADING STYLE, AUTHENTICITY & EMOTIONAL REJECTION MINDSET
+# =====================================================================
+
+def test_episode_09_entry_type_2_mechanics_and_gap_abort():
+    """
+    Episode 9 Concept 2B: Entry Type 2 (Confirmation Entry).
+    Rule 1: Candle 1 must close inside zone (PL >= Close >= DL).
+    Rule 2: Candle 2 must open inside zone.
+    Gap-down below DL -> Aborted (saved from stop-loss hit).
+    Gap-up above PL -> Missed.
+    """
+    engine = DemandSupplyEngine()
+    # Mock Demand Zone: PL = 100.0, DL = 90.0
+    opens = np.array([110.0, 95.0, 98.0])
+    highs = np.array([111.0, 100.0, 120.0])
+    lows = np.array([94.0, 90.0, 97.0])
+    closes = np.array([95.0, 98.0, 119.0])
+    demand_zone = engine.scan_for_zones(opens, highs, lows, closes)[0]
+    demand_zone.proximal_line = 100.0
+    demand_zone.distal_line = 90.0
+
+    # 1. Successful Entry: Bar 1 closes at 95.0 (inside), Bar 2 opens at 96.0 (inside)
+    ok1, msg1 = DemandSupplyEngine.evaluate_entry_type_2(demand_zone, bar1_close=95.0, bar2_open=96.0)
+    assert ok1 is True
+    assert msg1 == "ENTRY_TRIGGERED_IN_ZONE"
+
+    # 2. Aborted Gap-down: Bar 1 closes at 95.0, Bar 2 opens at 88.0 (< 90.0 DL) -> SAVED FROM SL!
+    ok2, msg2 = DemandSupplyEngine.evaluate_entry_type_2(demand_zone, bar1_close=95.0, bar2_open=88.0)
+    assert ok2 is False
+    assert msg2 == "ABORTED_GAP_DOWN_BELOW_DISTAL"
+
+    # 3. Missed Gap-up: Bar 1 closes at 95.0, Bar 2 opens at 103.0 (> 100.0 PL)
+    ok3, msg3 = DemandSupplyEngine.evaluate_entry_type_2(demand_zone, bar1_close=95.0, bar2_open=103.0)
+    assert ok3 is False
+    assert msg3 == "MISSED_GAP_UP_ABOVE_PROXIMAL"
+
+    # 4. Bar 1 did not close in zone (closed at 105.0)
+    ok4, msg4 = DemandSupplyEngine.evaluate_entry_type_2(demand_zone, bar1_close=105.0, bar2_open=95.0)
+    assert ok4 is False
+    assert msg4 == "BAR1_DID_NOT_CLOSE_IN_ZONE"
+
+
+def test_episode_09_zone_authenticity_and_tradeability():
+    """
+    Episode 9 Concept 3: Authenticity and Credibility of Zones.
+    - Authentic: Forms independently in virgin space.
+    - Non-Authentic: Forms as an immediate reaction bounce to an earlier historical zone.
+    - Tradeability: Non-authentic is tradeable ONLY if leg-out has proven clean closing.
+    """
+    engine = DemandSupplyEngine()
+    # Historical Zone 1: Authentic base (PL 100.0, DL 90.0, indices 0..2)
+    z1 = engine.scan_for_zones(
+        np.array([120.0, 95.0, 100.0]),
+        np.array([121.0, 102.0, 125.0]),
+        np.array([94.0, 90.0, 99.0]),
+        np.array([95.0, 100.0, 124.0]),
+    )[0]
+    z1.proximal_line = 100.0
+    z1.distal_line = 90.0
+    z1.base_start_idx = 1
+    z1.first_leg_out_idx = 2
+
+    # Zone 2: Non-authentic reaction zone formed inside Zone 1 (PL 98.0, DL 92.0, indices 5..7)
+    z2 = engine.scan_for_zones(
+        np.array([110.0, 95.0, 98.0]),
+        np.array([111.0, 100.0, 115.0]),
+        np.array([94.0, 92.0, 97.0]),
+        np.array([95.0, 98.0, 114.0]),
+    )[0]
+    z2.proximal_line = 98.0
+    z2.distal_line = 92.0
+    z2.base_start_idx = 6
+    z2.first_leg_out_idx = 7
+    z2.has_clean_closing = True
+    z2.is_proven_zone = True
+
+    auth2, tradeable2, reason2 = DemandSupplyEngine.evaluate_zone_authenticity(z2, [z1])
+    assert auth2 == ZoneAuthenticity.NON_AUTHENTIC
+    assert tradeable2 is True
+    assert "TRADEABLE_NON_AUTHENTIC_PROVEN" in reason2
+
+    # Zone 3: Non-authentic with unproven/failed close -> Non-tradeable!
+    z3 = engine.scan_for_zones(
+        np.array([110.0, 95.0, 98.0]),
+        np.array([111.0, 100.0, 115.0]),
+        np.array([94.0, 92.0, 97.0]),
+        np.array([95.0, 98.0, 114.0]),
+    )[0]
+    z3.proximal_line = 98.0
+    z3.distal_line = 92.0
+    z3.base_start_idx = 6
+    z3.first_leg_out_idx = 7
+    z3.has_clean_closing = False
+    z3.is_proven_zone = False
+
+    auth3, tradeable3, reason3 = DemandSupplyEngine.evaluate_zone_authenticity(z3, [z1])
+    assert auth3 == ZoneAuthenticity.NON_AUTHENTIC
+    assert tradeable3 is False
+    assert "NON_TRADEABLE_NON_AUTHENTIC" in reason3
+
+    # Zone 4: Authentic virgin zone formed far away (PL 150.0, DL 140.0)
+    z4 = engine.scan_for_zones(
+        np.array([160.0, 142.0, 150.0]),
+        np.array([161.0, 155.0, 175.0]),
+        np.array([141.0, 140.0, 149.0]),
+        np.array([142.0, 150.0, 174.0]),
+    )[0]
+    z4.proximal_line = 150.0
+    z4.distal_line = 140.0
+    z4.base_start_idx = 10
+    z4.first_leg_out_idx = 11
+
+    auth4, tradeable4, reason4 = DemandSupplyEngine.evaluate_zone_authenticity(z4, [z1])
+    assert auth4 == ZoneAuthenticity.AUTHENTIC
+    assert tradeable4 is True
+    assert reason4 == "AUTHENTIC_ORIGIN_ZONE"
+
+
+def test_episode_09_rupee_risk_equality_mit_vs_dit():
+    """
+    Episode 9 Concept 4B: The Rupee-Risk Equality Rule.
+    Through position sizing, a ₹50 stop-loss in MIT and a ₹2 stop-loss in DIT
+    carry the EXACT SAME ₹1,000 monetary risk!
+    """
+    total_risk_inr = 1000.0
+
+    # Positional MIT Trade: Entry 500, SL 450 (Risk = 50 pts)
+    shares_mit = DemandSupplyEngine.calculate_rupee_risk_position_size(
+        total_risk_inr=total_risk_inr, entry_price=500.0, stop_loss=450.0
+    )
+    assert shares_mit == 20
+    assert shares_mit * 50.0 == 1000.0
+
+    # Intraday DIT Trade: Entry 500, SL 498 (Risk = 2 pts)
+    shares_dit = DemandSupplyEngine.calculate_rupee_risk_position_size(
+        total_risk_inr=total_risk_inr, entry_price=500.0, stop_loss=498.0
+    )
+    assert shares_dit == 500
+    assert shares_dit * 2.0 == 1000.0
+
+
+def test_episode_09_mandatory_100_trade_directive():
+    """
+    Episode 9 Concept 4C: The Mandatory 100-Trade Directive.
+    Must complete at least 100 positional/swing trades (WIT/MIT) before unlocking active intraday (HIT/DIT).
+    """
+    assert TradingStyleCategory.INTRADAY.value == "INTRADAY"
+    # 1. Novice trader with 45 positional trades attempts HIT / DIT -> BLOCKED
+    ok_hit, msg_hit = DemandSupplyEngine.enforce_mandatory_100_trade_rule(TradingStyle.HIT, prior_positional_trades=45)
+    assert ok_hit is False
+    assert "45/100 positional trades completed" in msg_hit
+
+    ok_dit, msg_dit = DemandSupplyEngine.enforce_mandatory_100_trade_rule(TradingStyle.DIT, prior_positional_trades=45)
+    assert ok_dit is False
+
+    # 2. Trader attempts swing/positional (WIT or MIT) with 45 trades -> APPROVED
+    ok_wit, msg_wit = DemandSupplyEngine.enforce_mandatory_100_trade_rule(TradingStyle.WIT, prior_positional_trades=45)
+    assert ok_wit is True
+    assert "approved" in msg_wit
+
+    ok_mit, msg_mit = DemandSupplyEngine.enforce_mandatory_100_trade_rule(TradingStyle.MIT, prior_positional_trades=45)
+    assert ok_mit is True
+
+    # 3. Disciplined trader with 110 positional trades attempts DIT -> UNLOCKED!
+    ok_unlocked, msg_unlocked = DemandSupplyEngine.enforce_mandatory_100_trade_rule(
+        TradingStyle.DIT, prior_positional_trades=110
+    )
+    assert ok_unlocked is True
+    assert "unlocked" in msg_unlocked.lower()
+
+
+def test_episode_09_rejection_mindset_audit_pipeline():
+    """
+    Episode 9 Concept 5A: The Rejection Mindset Audit.
+    Runs 6 aggressive rejection filters to filter out emotional/forced trades.
+    """
+    engine = DemandSupplyEngine()
+    # Pristine Maruti-style Setup:
+    # HTF Demand: PL 100, DL 90
+    htf_demand = engine.scan_for_zones(
+        np.array([120.0, 95.0, 100.0]),
+        np.array([121.0, 102.0, 125.0]),
+        np.array([94.0, 90.0, 99.0]),
+        np.array([95.0, 100.0, 124.0]),
+    )[0]
+    # Opposing Weekly Supply: PL 135 (Reward = 37.0 -> RRR > 2.0)
+    opposing_itf = engine.scan_for_zones(
+        np.array([125.0, 140.0, 135.0]),
+        np.array([126.0, 142.0, 136.0]),
+        np.array([124.0, 134.0, 115.0]),
+        np.array([139.0, 135.0, 116.0]),
+    )[0]
+
+    # Coinciding LTF Zone
+    ltf_zone = engine.scan_for_zones(
+        np.array([110.0, 95.0, 98.0]),
+        np.array([111.0, 100.0, 120.0]),
+        np.array([94.0, 92.0, 97.0]),
+        np.array([95.0, 98.0, 119.0]),
+    )[0]
+    ltf_zone.proximal_line = 98.0
+    ltf_zone.distal_line = 92.0
+    ltf_zone.entry_price = 98.0
+    ltf_zone.stop_loss = 91.0
+    ltf_zone.departure_strength = 2
+    ltf_zone.base_candles_count = 1
+    ltf_zone.has_clean_closing = True
+    ltf_zone.is_proven_zone = True
+
+    # 1. Pristine Setup Audit -> Survives Rejection Mindset!
+    audit_clean = DemandSupplyEngine.audit_rejection_mindset(
+        zone=ltf_zone,
+        htf_demand=htf_demand,
+        htf_supply=None,
+        itf_trend=TrendDirection.UPTREND,
+        opposing_itf_zone=opposing_itf,
+        trading_style=TradingStyle.MIT,
+        prior_positional_trades=100,
+        total_risk_inr=1000.0,
+    )
+    assert isinstance(audit_clean, RejectionAudit)
+    assert audit_clean.survived_rejection_mindset is True
+    assert audit_clean.is_rejected is False
+    assert audit_clean.recommended_entry_type == EntryType.SET_AND_FORGET
+    assert audit_clean.rupee_risk_equalized_shares == 142  # 1000 // 7 = 142 shares
+    assert len(audit_clean.rejection_reasons) == 0
+
+    # 2. Flawed Setup Audit (Counter-trend + Intraday without 100 trades) -> REJECTED!
+    audit_flawed = DemandSupplyEngine.audit_rejection_mindset(
+        zone=ltf_zone,
+        htf_demand=htf_demand,
+        htf_supply=None,
+        itf_trend=TrendDirection.DOWNTREND,  # Conflict!
+        opposing_itf_zone=opposing_itf,
+        trading_style=TradingStyle.HIT,       # Conflict (only 20 trades)!
+        prior_positional_trades=20,
+        total_risk_inr=1000.0,
+    )
+    assert audit_flawed.survived_rejection_mindset is False
+    assert audit_flawed.is_rejected is True
+    assert len(audit_flawed.rejection_reasons) >= 2

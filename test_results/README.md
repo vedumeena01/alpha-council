@@ -16,7 +16,8 @@
 | **06** | Price Action Behind Candles (Closing, Gap-Base, Garbage) | 6 | **100%** (6/6) | 0.15s | The Closing Concept (Proven vs. Unproven), Gap+Base Exciting Equation, LOTL Stacking, Garbage Area Filter, Origin Pivot Isolation | [`EPISODE_06_TEST_RESULTS.md`](EPISODE_06_TEST_RESULTS.md) |
 | **07** | Multiple Time Frame Analysis (MTFA, 50 SMA Clock, Boundary Rule) | 5 | **100%** (5/5) | 0.23s | 50 SMA Clock Method (7th Candle Rule), 5 Curve Sections, Curve vs. Trend Matrix, The Boundary Rule, ATH Shorting Prohibition | [`EPISODE_07_TEST_RESULTS.md`](EPISODE_07_TEST_RESULTS.md) |
 | **08** | Trade Score, Mahabharata Alignment & Dynamic Target | 5 | **100%** (5/5) | 0.38s | Trade Score (Max 7/7), 4 Characters (Krishna, Bhishma, Arjuna, Duryodhana), Opposing ITF Target Rule, Best Setup Gold Standard | [`EPISODE_08_TEST_RESULTS.md`](EPISODE_08_TEST_RESULTS.md) |
-| **Total** | **All Episodes (Cumulative)** | **34** | **100%** (34/34) | **0.30s** | **Full GTF Price Action Core (`zone_engine.py`)** | - |
+| **09** | Trading Style, Authentic Zones & The Rejection Mindset | 5 | **100%** (5/5) | 0.25s | Entry Types (Set & Forget vs. Type 2 In-Zone), Zone Authenticity & Retest Vulnerability, Rupee-Risk Equality, Mandatory 100-Trade Rule, Rejection Mindset Audit | [`EPISODE_09_TEST_RESULTS.md`](EPISODE_09_TEST_RESULTS.md) |
+| **Total** | **All Episodes (Cumulative)** | **39** | **100%** (39/39) | **0.35s** | **Full GTF Price Action Core (`zone_engine.py`)** | - |
 
 ---
 
@@ -24,10 +25,10 @@
 
 ```text
 Module: alphacouncil/alpha/zone_engine.py
-Statements: 648
-Missed: 98
-Test Coverage: 85.0%
-Total Suite Tests: 53 (100% Passed)
+Statements: 758
+Missed: 120
+Test Coverage: 84.2%
+Total Suite Tests: 58 (100% Passed)
 Linter Status: Ruff 0 errors, 0 warnings
 CI Status: GitHub Actions 100% Green (Python 3.11 & 3.12)
 ```
@@ -43,3 +44,4 @@ CI Status: GitHub Actions 100% Green (Python 3.11 & 3.12)
 - [`EPISODE_06_TEST_RESULTS.md`](EPISODE_06_TEST_RESULTS.md) - The Closing concept, Gap+Base exciting, LOTL stacking, origin pivot & garbage filter.
 - [`EPISODE_07_TEST_RESULTS.md`](EPISODE_07_TEST_RESULTS.md) - Multiple Time Frame Analysis (MTFA), 50 SMA clock method, 5 curve tiers & boundary rule.
 - [`EPISODE_08_TEST_RESULTS.md`](EPISODE_08_TEST_RESULTS.md) - Trade Score (7/7), Mahabharata Alignment, Dynamic Opposing ITF Target & Best Setup Gold Standard.
+- [`EPISODE_09_TEST_RESULTS.md`](EPISODE_09_TEST_RESULTS.md) - Trading Style, Authentic Zones, Rupee-Risk Equality, 100-Trade Directive & Rejection Mindset.

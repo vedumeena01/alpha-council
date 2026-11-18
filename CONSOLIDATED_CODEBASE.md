@@ -458,6 +458,33 @@ class TradeScoreBreakdown:
     rejection_reasons: List[str] = field(default_factory=list)
 
 
+class EntryType(str, Enum):
+    SET_AND_FORGET = "SET_AND_FORGET"          # Entry Type 1: Limit order slightly above PL (The Gold Standard)
+    CONFIRMATION_IN_ZONE = "CONFIRMATION_IN_ZONE"  # Entry Type 2: 1st closes in zone, 2nd opens in zone
+    BREAKOUT_DEPARTURE = "BREAKOUT_DEPARTURE"      # Entry Type 3: 1st in zone, subsequent exits zone
+
+
+class ZoneAuthenticity(str, Enum):
+    AUTHENTIC = "AUTHENTIC"          # Formed in virgin/clean space, genuine origin of order flow
+    NON_AUTHENTIC = "NON_AUTHENTIC"  # Reaction bounce off a preceding historical zone
+
+
+class TradingStyleCategory(str, Enum):
+    INTRADAY = "INTRADAY"    # HIT, DIT (High noise, micro SL, requires >=100 prior positional trades)
+    POSITIONAL = "POSITIONAL" # WIT, MIT, QIT (Structurally durable, top-down vision)
+
+
+@dataclass
+class RejectionAudit:
+    is_rejected: bool
+    rejection_reasons: List[str]
+    survived_rejection_mindset: bool
+    recommended_entry_type: EntryType
+    rupee_risk_equalized_shares: int = 0
+    positional_trade_count: int = 0
+    intraday_advisory: str = ""
+
+
 @dataclass
 class CandleFeature:
     index: int
@@ -532,6 +559,11 @@ class IdentifiedZone:
 
     # Quantitative Zone Rating & Best Setup Evaluation (Episode 8)
     trade_score: Optional[TradeScoreBreakdown] = None
+
+    # Authenticity & Execution Mechanics (Episode 9)
+    authenticity: ZoneAuthenticity = ZoneAuthenticity.AUTHENTIC
+    reaction_parent_idx: Optional[int] = None
+    recommended_entry_type: EntryType = EntryType.SET_AND_FORGET
 
 
 class DemandSupplyEngine:
@@ -1182,6 +1214,228 @@ class DemandSupplyEngine:
             is_target_acceptable=is_target_acceptable,
             rejection_reasons=rejection_reasons,
         )
+
+
+
+    # =========================================================================
+    # EPISODE 9: ENTRY TYPES, AUTHENTICITY, TRADING STYLES & REJECTION MINDSET
+    # =========================================================================
+
+    @staticmethod
+    def evaluate_entry_type_2(
+        zone: IdentifiedZone,
+        bar1_close: float,
+        bar2_open: float,
+    ) -> Tuple[bool, str]:
+        """
+        Episode 9: Entry Type 2 (Confirmation Entry).
+        Rule 1: Incoming candle must enter and close inside zone boundaries (between PL and DL).
+        Rule 2: Trade executes only if second candle opens inside zone boundaries.
+        Outcomes:
+        - Gap Down below DL (Demand) / Gap Up above DL (Supply): Aborted! Saves trader from SL hit.
+        - Gap Up above PL (Demand) / Gap Down below PL (Supply): Missed! Price departs without fill.
+        - In-zone Open: Entry triggered.
+        """
+        if zone.is_demand:
+            # Demand: DL is bottom, PL is top
+            bar1_in = zone.distal_line <= bar1_close <= zone.proximal_line
+            if not bar1_in:
+                return False, "BAR1_DID_NOT_CLOSE_IN_ZONE"
+
+            if bar2_open < zone.distal_line:
+                return False, "ABORTED_GAP_DOWN_BELOW_DISTAL"
+            elif bar2_open > zone.proximal_line:
+                return False, "MISSED_GAP_UP_ABOVE_PROXIMAL"
+            else:
+                return True, "ENTRY_TRIGGERED_IN_ZONE"
+        else:
+            # Supply: PL is bottom, DL is top
+            bar1_in = zone.proximal_line <= bar1_close <= zone.distal_line
+            if not bar1_in:
+                return False, "BAR1_DID_NOT_CLOSE_IN_ZONE"
+
+            if bar2_open > zone.distal_line:
+                return False, "ABORTED_GAP_UP_ABOVE_DISTAL"
+            elif bar2_open < zone.proximal_line:
+                return False, "MISSED_GAP_DOWN_BELOW_PROXIMAL"
+            else:
+                return True, "ENTRY_TRIGGERED_IN_ZONE"
+
+    @staticmethod
+    def evaluate_zone_authenticity(
+        zone: IdentifiedZone,
+        historical_zones: List[IdentifiedZone],
+    ) -> Tuple[ZoneAuthenticity, bool, str]:
+        """
+        Episode 9: Authenticity and Credibility of Zones.
+        - Authentic Zone: Forms independently in virgin space (origin of institutional order flow).
+        - Non-Authentic Zone: Forms as an immediate reaction bounce to an earlier historical zone.
+        Tradeability:
+        - Non-authentic is Non-Tradeable by default if leg-out fails clean closing.
+        - Non-authentic becomes Tradeable ONLY if it has an explosive, proven closing above leg-in.
+        """
+        is_reaction = False
+        for h in historical_zones:
+            if h.is_demand == zone.is_demand and h.first_leg_out_idx < zone.base_start_idx:
+                if zone.is_demand:
+                    # Check if zone base formed inside historical demand
+                    if (h.distal_line <= zone.proximal_line <= h.proximal_line) or (
+                        h.distal_line <= zone.distal_line <= h.proximal_line
+                    ):
+                        is_reaction = True
+                        break
+                else:
+                    # Check if zone base formed inside historical supply
+                    if (h.proximal_line <= zone.proximal_line <= h.distal_line) or (
+                        h.proximal_line <= zone.distal_line <= h.distal_line
+                    ):
+                        is_reaction = True
+                        break
+
+        if is_reaction:
+            authenticity = ZoneAuthenticity.NON_AUTHENTIC
+            if zone.has_clean_closing and zone.is_proven_zone:
+                is_tradeable = True
+                rationale = "TRADEABLE_NON_AUTHENTIC_PROVEN_DEPARTURE"
+            else:
+                is_tradeable = False
+                rationale = "NON_TRADEABLE_NON_AUTHENTIC_UNPROVEN_DEPARTURE"
+        else:
+            authenticity = ZoneAuthenticity.AUTHENTIC
+            is_tradeable = True
+            rationale = "AUTHENTIC_ORIGIN_ZONE"
+
+        return authenticity, is_tradeable, rationale
+
+    @staticmethod
+    def calculate_rupee_risk_position_size(
+        total_risk_inr: float,
+        entry_price: float,
+        stop_loss: float,
+    ) -> int:
+        """
+        Episode 9 Concept 4B: The Rupee-Risk Equality Rule.
+        A ₹50 stop-loss in an MIT positional trade and a ₹2 stop-loss in a DIT intraday trade
+        carry the exact same monetary risk through position sizing.
+        Formula: Quantity = floor(Total_Risk_INR / abs(Entry - StopLoss))
+        """
+        risk_pts = abs(entry_price - stop_loss)
+        if risk_pts <= 0.0:
+            return 0
+        shares = int(total_risk_inr // risk_pts)
+        return max(shares, 1)
+
+    @staticmethod
+    def enforce_mandatory_100_trade_rule(
+        trading_style: TradingStyle,
+        prior_positional_trades: int,
+    ) -> Tuple[bool, str]:
+        """
+        Episode 9 Concept 4C: The Mandatory 100-Trade Directive.
+        Every trader must execute at least 100 trades strictly in positional frameworks (WIT / MIT)
+        before attempting high-stress active intraday styles (HIT / DIT).
+        """
+        if trading_style in (TradingStyle.HIT, TradingStyle.DIT):
+            if prior_positional_trades < 100:
+                return (
+                    False,
+                    f"Mandatory 100-Trade Directive: Only {prior_positional_trades}/100 positional trades completed. "
+                    f"Intraday {trading_style.value} locked until 100 swing/positional trades achieved.",
+                )
+            else:
+                return (
+                    True,
+                    f"Intraday {trading_style.value} unlocked: {prior_positional_trades} positional trades completed.",
+                )
+        else:
+            return (
+                True,
+                f"Positional style {trading_style.value} is approved for systematic execution.",
+            )
+
+    @classmethod
+    def audit_rejection_mindset(
+        cls,
+        zone: IdentifiedZone,
+        htf_demand: Optional[IdentifiedZone] = None,
+        htf_supply: Optional[IdentifiedZone] = None,
+        itf_trend: TrendDirection = TrendDirection.UPTREND,
+        opposing_itf_zone: Optional[IdentifiedZone] = None,
+        trading_style: TradingStyle = TradingStyle.MIT,
+        prior_positional_trades: int = 100,
+        total_risk_inr: float = 1000.0,
+        historical_zones: Optional[List[IdentifiedZone]] = None,
+    ) -> RejectionAudit:
+        """
+        Episode 9 Concept 5A: The Rejection Mindset Audit.
+        Instead of seeking reasons to buy, the professional filter actively hunts for reasons
+        to REJECT the trade setup:
+        1. Intermediate Trend Conflict -> Reject.
+        2. Unproven / Poor Leg-out Closing -> Reject.
+        3. Aggressive Level without 7/7 Score -> Reject.
+        4. Non-Authentic Reaction without Proven Close -> Reject.
+        5. Opposing ITF Target RRR < 2.0:1 -> Reject.
+        6. Intraday Style attempted before 100 Positional Trades -> Reject.
+
+        Surviving setups possess pristine institutional edge and eliminate over 50% of emotional turmoil.
+        """
+        rejection_reasons: List[str] = []
+
+        # 1. 100-Trade Directive
+        style_ok, style_msg = cls.enforce_mandatory_100_trade_rule(trading_style, prior_positional_trades)
+        if not style_ok:
+            rejection_reasons.append(style_msg)
+
+        # 2. Trend Conflict
+        if zone.is_demand and itf_trend != TrendDirection.UPTREND:
+            rejection_reasons.append(f"Rejection: Long trade conflicts with ITF trend {itf_trend.value}.")
+        elif not zone.is_demand and itf_trend != TrendDirection.DOWNTREND:
+            rejection_reasons.append(f"Rejection: Short trade conflicts with ITF trend {itf_trend.value}.")
+
+        # 3. Closing Concept
+        if not zone.has_clean_closing or not zone.is_proven_zone:
+            rejection_reasons.append("Rejection: Leg-out failed decisive close above leg-in / overhead consolidation.")
+
+        # 4. Mahabharata Alignment & Traps
+        alignment = cls.evaluate_character_alignment(zone, htf_demand, htf_supply)
+        if alignment == ZoneAlignmentType.FATAL_TRAP:
+            rejection_reasons.append("Rejection: Fatal Trap! Execution zone sits inside opposing HTF institutional territory.")
+
+        # 5. Authenticity
+        if historical_zones:
+            auth, is_tradeable, auth_reason = cls.evaluate_zone_authenticity(zone, historical_zones)
+            if not is_tradeable:
+                rejection_reasons.append(f"Rejection: Non-authentic reaction zone with unproven departure ({auth_reason}).")
+
+        # 6. Opposing ITF Target RRR
+        target_price, rrr, rrr_ok = cls.calculate_opposing_itf_target(zone, opposing_itf_zone)
+        if not rrr_ok:
+            rejection_reasons.append(f"Rejection: Opposing ITF target offers {rrr}:1 RRR (minimum 2.0:1 required).")
+
+        survived = len(rejection_reasons) == 0
+
+        # Recommended Entry Type (Gold Standard: Set & Forget for Pristine/Solid)
+        trade_score = getattr(zone, 'trade_score', None)
+        tot_score = trade_score.total_score if trade_score else 7.0
+        if tot_score >= 6.5 and zone.has_clean_closing:
+            rec_entry = EntryType.SET_AND_FORGET
+        elif 5.5 <= tot_score < 6.5:
+            rec_entry = EntryType.CONFIRMATION_IN_ZONE
+        else:
+            rec_entry = EntryType.SET_AND_FORGET
+
+        shares = cls.calculate_rupee_risk_position_size(total_risk_inr, zone.entry_price, zone.stop_loss)
+
+        return RejectionAudit(
+            is_rejected=not survived,
+            rejection_reasons=rejection_reasons,
+            survived_rejection_mindset=survived,
+            recommended_entry_type=rec_entry,
+            rupee_risk_equalized_shares=shares,
+            positional_trade_count=prior_positional_trades,
+            intraday_advisory=style_msg,
+        )
+
 
     def classify_candle(
         self,

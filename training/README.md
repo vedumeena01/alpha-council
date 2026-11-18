@@ -16,5 +16,6 @@
 | **06** | **Price Action Behind Candles (Closing, Gap-Base, Garbage)** | ✅ **Codified & Trained** | [`training/EPISODE_06_PRICE_ACTION_BEHIND_THE_CANDLES.md`](EPISODE_06_PRICE_ACTION_BEHIND_THE_CANDLES.md) |
 | **07** | **Multiple Time Frame Analysis (MTFA, 50 SMA Clock, Curve)** | ✅ **Codified & Trained** | [`training/EPISODE_07_MULTIPLE_TIMEFRAME_ANALYSIS.md`](EPISODE_07_MULTIPLE_TIMEFRAME_ANALYSIS.md) |
 | **08** | **Trade Score (7/7), Mahabharata Alignment & Dynamic Target** | ✅ **Codified & Trained** | [`training/EPISODE_08_TRADE_SCORE_AND_BEST_SETUP.md`](EPISODE_08_TRADE_SCORE_AND_BEST_SETUP.md) |
-| **09** | *Upcoming...* | ⏳ Pending | - |
+| **09** | **Trading Style, Authentic Zones & Emotional Mastery** | ✅ **Codified & Trained** | [`training/EPISODE_09_TRADING_STYLE_EMOTIONS_AND_AUTHENTICITY.md`](EPISODE_09_TRADING_STYLE_EMOTIONS_AND_AUTHENTICITY.md) |
+| **10** | *Upcoming (Risk Management & Capital Protection)...* | ⏳ Pending | - |
 | **...**| *Episodes 09 - 20* | ⏳ Pending | - |
