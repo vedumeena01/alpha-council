@@ -2143,3 +2143,245 @@ def test_episode_12_dynamic_ma_buffer_stoploss_placement():
         buffer_ticks=5,
     )
     assert sl_normal == 99.75
+
+
+# ==============================================================================
+# EPISODE 13 TESTS: ADVANCED TREND ANALYSIS & EMA 20 ALGORITHMIC CONFLUENCE
+# ==============================================================================
+
+
+def test_episode_13_advanced_trend_violation_matrix_downtrend_to_uptrend():
+    """
+    Episode 13 Case Study: Maruti Suzuki Trend Transition.
+    Downtrend advances through Drop-Base-Drop (DBD) supply structures.
+    - 1st Supply Zone breached by close -> Transitions to SIDEWAYS.
+    - 2nd consecutive Supply Zone breached by close -> UPTREND CONFIRMED.
+    Traders declare uptrend near the bottom, two steps ahead of lagging Dow Theory.
+    """
+    # 0 Breaches -> Downtrend intact
+    trend, msg = DemandSupplyEngine.calculate_advanced_trend(
+        prior_trend=TrendDirection.DOWNTREND,
+        consecutive_supply_breaches=0,
+        consecutive_demand_breaches=0,
+    )
+    assert trend == TrendDirection.DOWNTREND
+    assert "Downtrend intact" in msg
+
+    # 1st Supply Breached -> Sideways
+    trend, msg = DemandSupplyEngine.calculate_advanced_trend(
+        prior_trend=TrendDirection.DOWNTREND,
+        consecutive_supply_breaches=1,
+        consecutive_demand_breaches=0,
+    )
+    assert trend == TrendDirection.SIDEWAYS
+    assert "transitioned to SIDEWAYS" in msg
+
+    # 2nd Supply Breached -> Uptrend Confirmed!
+    trend, msg = DemandSupplyEngine.calculate_advanced_trend(
+        prior_trend=TrendDirection.DOWNTREND,
+        consecutive_supply_breaches=2,
+        consecutive_demand_breaches=0,
+    )
+    assert trend == TrendDirection.UPTREND
+    assert "UPTREND CONFIRMED" in msg
+
+
+def test_episode_13_advanced_trend_mandatory_candle_close_filter():
+    """
+    Episode 13 Rule: Mandatory Candle Close Filter.
+    Intra-candle wick piercing beyond distal line does NOT count as a zone breach.
+    The candle must physically CLOSE outside the distal boundary.
+    """
+    engine = DemandSupplyEngine()
+    demand_opens = np.array([200.0, 212.0, 215.0])
+    demand_highs = np.array([202.0, 218.0, 230.0])
+    demand_lows = np.array([198.0, 205.0, 214.0])
+    demand_closes = np.array([211.0, 215.0, 229.0])
+
+    supply_opens = np.array([180.0, 205.0, 200.0])
+    supply_highs = np.array([185.0, 210.0, 201.0])
+    supply_lows = np.array([179.0, 198.0, 180.0])
+    supply_closes = np.array([205.0, 200.0, 182.0])
+
+    # 1. Supply Zone: PL = 100.0, DL = 110.0
+    supply_zone = engine.scan_for_zones(supply_opens, supply_highs, supply_lows, supply_closes)[0]
+    supply_zone.is_demand = False
+    supply_zone.proximal_line = 100.0
+    supply_zone.distal_line = 110.0
+
+    # Wick spikes to 115.0, but candle closes at 108.0 (inside zone) -> NOT breached!
+    breached_wick_only = DemandSupplyEngine.evaluate_zone_breach_by_close(
+        candle_close=108.0,
+        candle_high=115.0,
+        candle_low=98.0,
+        zone=supply_zone,
+    )
+    assert breached_wick_only is False
+
+    # Candle closes at 112.0 (above distal line 110.0) -> BREACHED!
+    breached_by_close = DemandSupplyEngine.evaluate_zone_breach_by_close(
+        candle_close=112.0,
+        candle_high=115.0,
+        candle_low=98.0,
+        zone=supply_zone,
+    )
+    assert breached_by_close is True
+
+    # 2. Demand Zone: PL = 200.0, DL = 190.0
+    demand_zone = engine.scan_for_zones(demand_opens, demand_highs, demand_lows, demand_closes)[0]
+    demand_zone.is_demand = True
+    demand_zone.proximal_line = 200.0
+    demand_zone.distal_line = 190.0
+
+    # Wick spikes down to 185.0, but candle closes at 192.0 (inside zone) -> NOT breached!
+    d_breached_wick = DemandSupplyEngine.evaluate_zone_breach_by_close(
+        candle_close=192.0,
+        candle_high=205.0,
+        candle_low=185.0,
+        zone=demand_zone,
+    )
+    assert d_breached_wick is False
+
+    # Candle closes at 188.0 (below distal line 190.0) -> BREACHED!
+    d_breached_close = DemandSupplyEngine.evaluate_zone_breach_by_close(
+        candle_close=188.0,
+        candle_high=205.0,
+        candle_low=185.0,
+        zone=demand_zone,
+    )
+    assert d_breached_close is True
+
+
+def test_episode_13_advanced_trend_violation_matrix_uptrend_to_downtrend():
+    """
+    Episode 13: Advanced Trend Violation Matrix (Uptrend to Downtrend and Sideways transitions).
+    """
+    # Uptrend + 1 Demand Breached -> Sideways
+    trend, msg = DemandSupplyEngine.calculate_advanced_trend(
+        prior_trend=TrendDirection.UPTREND,
+        consecutive_supply_breaches=0,
+        consecutive_demand_breaches=1,
+    )
+    assert trend == TrendDirection.SIDEWAYS
+    assert "Uptrend broken" in msg
+
+    # Uptrend + 2 Demand Breached -> Downtrend Confirmed
+    trend, msg = DemandSupplyEngine.calculate_advanced_trend(
+        prior_trend=TrendDirection.UPTREND,
+        consecutive_supply_breaches=0,
+        consecutive_demand_breaches=2,
+    )
+    assert trend == TrendDirection.DOWNTREND
+    assert "DOWNTREND CONFIRMED" in msg
+
+    # Sideways + 1 Supply Breached -> Uptrend
+    trend, msg = DemandSupplyEngine.calculate_advanced_trend(
+        prior_trend=TrendDirection.SIDEWAYS,
+        consecutive_supply_breaches=1,
+        consecutive_demand_breaches=0,
+    )
+    assert trend == TrendDirection.UPTREND
+    assert "UPTREND CONFIRMED from Sideways" in msg
+
+    # Sideways + 1 Demand Breached -> Downtrend
+    trend, msg = DemandSupplyEngine.calculate_advanced_trend(
+        prior_trend=TrendDirection.SIDEWAYS,
+        consecutive_supply_breaches=0,
+        consecutive_demand_breaches=1,
+    )
+    assert trend == TrendDirection.DOWNTREND
+    assert "DOWNTREND CONFIRMED from Sideways" in msg
+
+
+def test_episode_13_ema20_zone_confluence_extra_trade_score():
+    """
+    Episode 13: EMA 20 Extra Trade Score Confluence.
+    Trending EMA 20 passing between Proximal and Distal Line awards +1 Extra Trade Score (8/7).
+    Choppy/sideways markets reject moving average confluence.
+    """
+    engine = DemandSupplyEngine()
+    demand_opens = np.array([200.0, 212.0, 215.0])
+    demand_highs = np.array([202.0, 218.0, 230.0])
+    demand_lows = np.array([198.0, 205.0, 214.0])
+    demand_closes = np.array([211.0, 215.0, 229.0])
+    zone = engine.scan_for_zones(demand_opens, demand_highs, demand_lows, demand_closes)[0]
+    zone.proximal_line = 215.0
+    zone.distal_line = 205.0
+
+    # Setup baseline pristine 7.0 score
+    zone.trade_score = TradeScoreBreakdown(
+        freshness_score=3.0,
+        strength_score=2.0,
+        time_at_base_score=2.0,
+        total_score=7.0,
+        quality=TradeScoreQuality.PRISTINE,
+        alignment=ZoneAlignmentType.COINCIDING,
+        is_best_setup=True,
+    )
+
+    # 1. Trending market, EMA 20 = 210.0 (inside 205-215 zone) -> +1 Extra Trade Score (Total 8.0)
+    is_valid, bonus, msg = DemandSupplyEngine.evaluate_ema20_confluence_bonus(
+        zone=zone,
+        ema_20_val=210.0,
+        is_trending_market=True,
+    )
+    assert is_valid is True
+    assert bonus == 1
+    assert "Extra Trade Score Awarded" in msg
+    assert zone.trade_score.total_score == 8.0
+    assert zone.trade_score.ema20_confluence_bonus == 1
+
+    # 2. Choppy/sideways market -> Rejected (MAs lose predictive power)
+    is_valid_c, bonus_c, msg_c = DemandSupplyEngine.evaluate_ema20_confluence_bonus(
+        zone=zone,
+        ema_20_val=210.0,
+        is_trending_market=False,
+    )
+    assert is_valid_c is False
+    assert bonus_c == 0
+    assert "choppy/sideways" in msg_c
+
+    # 3. Trending market, but EMA 20 = 250.0 (outside zone) -> No bonus
+    is_valid_out, bonus_out, msg_out = DemandSupplyEngine.evaluate_ema20_confluence_bonus(
+        zone=zone,
+        ema_20_val=250.0,
+        is_trending_market=True,
+    )
+    assert is_valid_out is False
+    assert bonus_out == 0
+    assert "sits outside zone" in msg_out
+
+
+def test_episode_13_ema20_volatility_squeeze_detection():
+    """
+    Episode 13: Phase 2 Volatility Squeeze Detection.
+    Gap between price candles and EMA 20 contracts into tight base candles (<= 0.4%),
+    signaling equilibrium compression preceding explosive breakout.
+    """
+    # 1. Squeeze: Tight consolidation around flat EMA 20
+    closes_squeeze = np.array([100.1, 99.9, 100.2, 100.0, 99.8])
+    ema_squeeze = np.array([100.0, 100.0, 100.0, 100.0, 100.0])
+
+    is_squeeze, mean_dist, msg = DemandSupplyEngine.detect_ema20_squeeze(
+        closes=closes_squeeze,
+        ema_20=ema_squeeze,
+        lookback=5,
+        squeeze_threshold_pct=0.4,
+    )
+    assert is_squeeze is True
+    assert mean_dist <= 0.4
+    assert "Volatility Squeeze Detected" in msg
+
+    # 2. Non-Squeeze: Expanding price action away from EMA 20
+    closes_wide = np.array([105.0, 108.0, 110.0, 112.0, 115.0])
+    ema_wide = np.array([100.0, 100.5, 101.0, 101.5, 102.0])
+
+    is_squeeze_w, mean_dist_w, msg_w = DemandSupplyEngine.detect_ema20_squeeze(
+        closes=closes_wide,
+        ema_20=ema_wide,
+        lookback=5,
+        squeeze_threshold_pct=0.4,
+    )
+    assert is_squeeze_w is False
+    assert mean_dist_w > 0.4
+    assert "Normal price-to-EMA spread" in msg_w

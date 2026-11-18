@@ -20,7 +20,8 @@
 | **10** | Risk Management, Position Sizing & Anti-Tamper Discipline | 5 | **100%** (5/5) | 0.28s | Exact Position Sizing ($Qty = \lfloor RPT / |Entry - SL| \rfloor$), Monetary Risk Invariance, Anti-Tamper Guards (Widening, Averaging, Chasing), 10 Trades/Month Cap, 40-Mistake Elimination, Excel Growth Model, HTF Overpowering | [`EPISODE_10_TEST_RESULTS.md`](EPISODE_10_TEST_RESULTS.md) |
 | **11** | When to be Aggressive vs. Conservative (Execution Stances) | 5 | **100%** (5/5) | 0.28s | Aggressive vs. Conservative Stance Selector, The Matching Timeframe Principle, The Steamroller Effect, Proven Achievement Rule, Anchoring SL to Shri Krishna, TVS Motor Regime Inversion, Dynamic 20 EMA Interaction | [`EPISODE_11_TEST_RESULTS.md`](EPISODE_11_TEST_RESULTS.md) |
 | **12** | Moving Averages & Correlation (SMA, EMA, Retail Crossover Traps & Extra Score) | 5 | **100%** (5/5) | 0.31s | SMA Equal Weighting vs. EMA Exponential Weighting, Lagging Indicator Mathematical Proof, Golden & Death Crossover Detectors, Retail Supply & Demand Traps Filter, Extra Trade Score (+1 Bonus Point) for 8/7, Dynamic MA Buffer Stop-Loss | [`EPISODE_12_TEST_RESULTS.md`](EPISODE_12_TEST_RESULTS.md) |
-| **Total** | **All Episodes (Cumulative)** | **54** | **100%** (54/54) | **0.65s** | **Full GTF Price Action, Risk, Execution Stances & Moving Average Architecture (`zone_engine.py` + `gtf_risk.py`)** | - |
+| **13** | Advanced Trend Analysis (Demand/Supply Violation & Algorithmic EMA 20 Footprint) | 5 | **100%** (5/5) | 0.30s | Advanced Trend Violation Matrix, Continuous Patterns Integration (DBD/RBR), Mandatory Candle Close Filter, EMA 20 Algorithmic Confluence (+1 Bonus), Phase 2 Volatility Squeeze Detection | [`EPISODE_13_TEST_RESULTS.md`](EPISODE_13_TEST_RESULTS.md) |
+| **Total** | **All Episodes (Cumulative)** | **59** | **100%** (59/59) | **0.72s** | **Full GTF Price Action, Risk, Execution Stances & Advanced Trend Violation Architecture (`zone_engine.py` + `gtf_risk.py`)** | - |
 
 ---
 
@@ -28,9 +29,9 @@
 
 ```text
 Modules: alphacouncil/alpha/zone_engine.py + alphacouncil/risk/gtf_risk.py
-Zone Engine Statements: 921 (Coverage: 83%)
+Zone Engine Statements: 970 (Coverage: 84%)
 GTF Risk Statements: 132 (Coverage: 95%)
-Total Suite Tests: 73 (100% Passed)
+Total Suite Tests: 78 (100% Passed)
 Linter Status: Ruff 0 errors, 0 warnings
 CI Status: GitHub Actions 100% Green (Python 3.11 & 3.12)
 ```
@@ -50,3 +51,4 @@ CI Status: GitHub Actions 100% Green (Python 3.11 & 3.12)
 - [`EPISODE_10_TEST_RESULTS.md`](EPISODE_10_TEST_RESULTS.md) - Risk Management, Position Sizing, Anti-Tamper Guards, 10 Trades/Month Cap & Excel Growth Models.
 - [`EPISODE_11_TEST_RESULTS.md`](EPISODE_11_TEST_RESULTS.md) - Aggressive vs. Conservative Execution Stances, The Steamroller Effect, The Matching Timeframe Principle, Macro Anchoring to Shri Krishna & Regime Inversion.
 - [`EPISODE_12_TEST_RESULTS.md`](EPISODE_12_TEST_RESULTS.md) - Moving Averages (SMA vs EMA), Lagging Proof, Retail Crossover Traps Filtering, Extra Trade Score (8/7) & Dynamic MA Buffer Stop-Loss.
+- [`EPISODE_13_TEST_RESULTS.md`](EPISODE_13_TEST_RESULTS.md) - Advanced Trend Analysis (Demand/Supply Violation Technique), Mandatory Close Filter, Algorithmic EMA 20 Footprint & Volatility Squeeze.

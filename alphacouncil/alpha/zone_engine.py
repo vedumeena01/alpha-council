@@ -131,6 +131,7 @@ class TradeScoreBreakdown:
     rejection_reasons: List[str] = field(default_factory=list)
     ma_crossover_bonus: int = 0        # 0 or 1 point from Episode 12
     crossover_type: MACrossoverType = MACrossoverType.NO_CROSSOVER
+    ema20_confluence_bonus: int = 0    # 0 or 1 point from Episode 13
 
 
 class EntryType(str, Enum):
@@ -2015,3 +2016,174 @@ class DemandSupplyEngine:
             if max_ma > zone.distal_line:
                 return round(max_ma + buffer_val, 2)
             return round(zone.distal_line + buffer_val, 2)
+
+    @staticmethod
+    def evaluate_zone_breach_by_close(
+        candle_close: float,
+        candle_high: float,
+        candle_low: float,
+        zone: IdentifiedZone,
+    ) -> bool:
+        """
+        Episode 13: The Mandatory Candle Close Filter for Zone Elimination.
+        A mere intra-candle wick spike beyond the distal line does NOT count as a zone breach.
+        The candle must physically CLOSE outside the distal boundary to count as an eliminated zone:
+          - Supply Zone Breach: Candle Close > Distal Line.
+          - Demand Zone Breach: Candle Close < Distal Line.
+        """
+        if zone.is_demand:
+            # Demand zone breach requires candle close below distal line
+            return candle_close < zone.distal_line
+        else:
+            # Supply zone breach requires candle close above distal line
+            return candle_close > zone.distal_line
+
+    @staticmethod
+    def calculate_advanced_trend(
+        prior_trend: TrendDirection,
+        consecutive_supply_breaches: int,
+        consecutive_demand_breaches: int,
+    ) -> Tuple[TrendDirection, str]:
+        """
+        Episode 13: Advanced Trend Violation Matrix.
+        Tracks the systematic destruction of opposing institutional zones:
+          - Downtrend:
+              1 Supply Breached & Closed Above -> SIDEWAYS
+              2 Consecutive Supplies Breached & Closed Above -> UPTREND CONFIRMED
+          - Uptrend:
+              1 Demand Breached & Closed Below -> SIDEWAYS
+              2 Consecutive Demands Breached & Closed Below -> DOWNTREND CONFIRMED
+          - Sideways:
+              1 Supply Breached -> UPTREND
+              1 Demand Breached -> DOWNTREND
+        Integrates Continuous Patterns (DBD in drops, RBR in rallies) positioning the trader
+        Two Steps Ahead of conventional technical analysts who wait for macro reversal highs.
+        """
+        if prior_trend == TrendDirection.DOWNTREND:
+            if consecutive_supply_breaches >= 2:
+                return (
+                    TrendDirection.UPTREND,
+                    f"Advanced Trend: UPTREND CONFIRMED ({consecutive_supply_breaches} consecutive supply zones eliminated by close). "
+                    f"Institutional buyers have completely overpowered macro sellers."
+                )
+            elif consecutive_supply_breaches == 1:
+                return (
+                    TrendDirection.SIDEWAYS,
+                    "Advanced Trend: Downtrend broken; trend transitioned to SIDEWAYS (1st supply zone eliminated by close)."
+                )
+            return (
+                TrendDirection.DOWNTREND,
+                "Advanced Trend: Downtrend intact (0 supply zones eliminated)."
+            )
+
+        elif prior_trend == TrendDirection.UPTREND:
+            if consecutive_demand_breaches >= 2:
+                return (
+                    TrendDirection.DOWNTREND,
+                    f"Advanced Trend: DOWNTREND CONFIRMED ({consecutive_demand_breaches} consecutive demand zones eliminated by close). "
+                    f"Institutional sellers have completely overpowered macro buyers."
+                )
+            elif consecutive_demand_breaches == 1:
+                return (
+                    TrendDirection.SIDEWAYS,
+                    "Advanced Trend: Uptrend broken; trend transitioned to SIDEWAYS (1st demand zone eliminated by close)."
+                )
+            return (
+                TrendDirection.UPTREND,
+                "Advanced Trend: Uptrend intact (0 demand zones eliminated)."
+            )
+
+        else:  # SIDEWAYS
+            if consecutive_supply_breaches >= 1:
+                return (
+                    TrendDirection.UPTREND,
+                    f"Advanced Trend: UPTREND CONFIRMED from Sideways ({consecutive_supply_breaches} supply zone eliminated)."
+                )
+            elif consecutive_demand_breaches >= 1:
+                return (
+                    TrendDirection.DOWNTREND,
+                    f"Advanced Trend: DOWNTREND CONFIRMED from Sideways ({consecutive_demand_breaches} demand zone eliminated)."
+                )
+            return (
+                TrendDirection.SIDEWAYS,
+                "Advanced Trend: Sideways consolidation intact (no opposing zones eliminated)."
+            )
+
+    @staticmethod
+    def evaluate_ema20_confluence_bonus(
+        zone: IdentifiedZone,
+        ema_20_val: float,
+        is_trending_market: bool = True,
+    ) -> Tuple[bool, int, str]:
+        """
+        Episode 13: Algorithmic EMA 20 Footprint & Extra Trade Score Confluence.
+        - Institutional algos program baseline buy/sell logic around the 20-period exponential average.
+        - If a trending EMA 20 passes between Proximal Line and Distal Line of the execution zone,
+          award +1 Extra Trade Score (elevating 7/7 to 8/7 bonus confirmation).
+        - Functions strictly in trending markets (choppy/sideways markets weave and lose predictive power).
+        """
+        if not is_trending_market:
+            return (
+                False,
+                0,
+                "EMA 20 confluence rejected: In choppy/sideways markets, moving averages lose predictive utility."
+            )
+
+        lower_bound = min(zone.proximal_line, zone.distal_line) - 0.05
+        upper_bound = max(zone.proximal_line, zone.distal_line) + 0.05
+
+        if lower_bound <= ema_20_val <= upper_bound:
+            if zone.trade_score is not None:
+                zone.trade_score.ema20_confluence_bonus = 1
+                zone.trade_score.total_score += 1.0
+
+            zone_desc = "Demand Zone" if zone.is_demand else "Supply Zone"
+            return (
+                True,
+                1,
+                f"Extra Trade Score Awarded: Trending EMA 20 ({ema_20_val:.2f}) passes inside {zone_desc} "
+                f"[{min(zone.proximal_line, zone.distal_line):.2f} - {max(zone.proximal_line, zone.distal_line):.2f}]. "
+                f"Institutional algorithmic confluence +1 bonus."
+            )
+
+        return (
+            False,
+            0,
+            f"EMA 20 ({ema_20_val:.2f}) sits outside zone boundaries [{min(zone.proximal_line, zone.distal_line):.2f} - {max(zone.proximal_line, zone.distal_line):.2f}]."
+        )
+
+    @staticmethod
+    def detect_ema20_squeeze(
+        closes: np.ndarray,
+        ema_20: np.ndarray,
+        lookback: int = 5,
+        squeeze_threshold_pct: float = 0.4,
+    ) -> Tuple[bool, float, str]:
+        """
+        Episode 13: Volatility Squeeze Indicator (Phase 2).
+        When price consolidates after prolonged move, the gap between candles and EMA 20
+        steadily contracts into tight base candles.
+        Signals equilibrium compression preceding an explosive breakout.
+        """
+        if len(closes) < lookback or len(ema_20) < lookback:
+            return False, 0.0, "Insufficient data for squeeze evaluation."
+
+        recent_closes = closes[-lookback:]
+        recent_ema = ema_20[-lookback:]
+
+        dist_pcts = np.abs(recent_closes - recent_ema) / recent_closes * 100.0
+        mean_dist = float(np.mean(dist_pcts))
+
+        if mean_dist <= squeeze_threshold_pct:
+            return (
+                True,
+                round(mean_dist, 2),
+                f"Volatility Squeeze Detected (Phase 2): Price and EMA 20 compressed into tight base candles "
+                f"(average distance {mean_dist:.2f}% <= {squeeze_threshold_pct}%). Extreme compression preceding breakout."
+            )
+
+        return (
+            False,
+            round(mean_dist, 2),
+            f"Normal price-to-EMA spread ({mean_dist:.2f}% > {squeeze_threshold_pct}%)."
+        )
