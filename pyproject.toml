@@ -28,6 +28,10 @@ dev = [
     "ruff>=0.3.0",
 ]
 
+[tool.setuptools.packages.find]
+include = ["alphacouncil*"]
+exclude = ["training*", "tests*", "docs*"]
+
 [tool.pytest.ini_options]
 minversion = "8.0"
 testpaths = ["tests"]
