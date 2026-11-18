@@ -5,7 +5,7 @@ earnings liquidations, statutory SEBI frictions, and synchronous risk validation
 """
 
 from dataclasses import dataclass
-from typing import Dict, List
+from typing import Dict, List, Optional
 import numpy as np
 
 from alphacouncil.config import DEFAULT_CONFIG
@@ -38,6 +38,7 @@ class TradeRecord:
     holding_days: int
     exit_reason: str
     alpha_scale: float
+    predicted_win_prob: float = 0.50
 
 
 @dataclass
@@ -47,6 +48,9 @@ class BacktestResult:
     equity_curve: List[float]
     trades: List[TradeRecord]
     metrics: PerformanceMetrics
+    total_signals_detected: int = 0
+    signals_skipped_noise_trap: int = 0
+    noise_trap_skip_rate_pct: float = 0.0
 
 
 class BacktestEngine:
@@ -64,6 +68,7 @@ class BacktestEngine:
         use_pit_filter: bool = True,
         use_atr_stop: bool = True,
         random_entry: bool = False,
+        seed: Optional[int] = None,
     ):
         self.config = config
         self.use_sweep_signal = use_sweep_signal
@@ -73,6 +78,7 @@ class BacktestEngine:
         self.use_pit_filter = use_pit_filter
         self.use_atr_stop = use_atr_stop
         self.random_entry = random_entry
+        self.rng = np.random.default_rng(seed)
 
         # Subsystems
         self.calendar = PointInTimeCalendar()
@@ -83,7 +89,7 @@ class BacktestEngine:
         self.sizing = PositionSizingEngine(
             base_risk_fraction=config.risk.base_risk_fraction,
             target_annual_vol=config.risk.target_annual_volatility,
-            min_atr_multiple=1.0 if use_atr_stop else 0.0,
+            min_atr_multiple=config.risk.min_atr_stop_multiple if use_atr_stop else 0.0,
         )
         self.circuit_guard = CircuitBandGuard(proximity_threshold_pct=0.015)
         self.kill_switch = IntradayKillSwitch()
@@ -107,6 +113,9 @@ class BacktestEngine:
         active_positions: Dict[str, Dict] = {}  # symbol -> position dict
         completed_trades: List[TradeRecord] = []
         pending_orders: List[Dict] = []  # Scheduled for next bar open
+        total_signals = 0
+        skipped_noise = 0
+        prev_month = ""
 
         self.kill_switch.reset_daily_session(cash)
 
@@ -116,6 +125,13 @@ class BacktestEngine:
             for sym, pos in active_positions.items():
                 current_bar = universe_data[sym][day]
                 current_portfolio_value += pos["shares"] * current_bar.open
+
+            # Calendar Month Transition Check for Monthly HWM Reset
+            current_date_str = universe_data[symbols[0]][day].timestamp
+            current_month = current_date_str[:7]
+            if prev_month and current_month != prev_month:
+                self.kill_switch.reset_monthly_session(current_portfolio_value)
+            prev_month = current_month
 
             # Check Kill Switch
             dd_status = self.kill_switch.update_valuation(current_portfolio_value)
@@ -144,6 +160,7 @@ class BacktestEngine:
                             "alpha_scale": order["alpha_scale"],
                             "annual_vol": order["annual_vol"],
                             "adv20": bar.adv20,
+                            "predicted_win_prob": order.get("predicted_win_prob", 0.50),
                         }
                 pending_orders = []
 
@@ -219,6 +236,7 @@ class BacktestEngine:
                             holding_days=holding_days,
                             exit_reason=reason,
                             alpha_scale=pos["alpha_scale"],
+                            predicted_win_prob=pos.get("predicted_win_prob", 0.50),
                         )
                     )
 
@@ -233,6 +251,10 @@ class BacktestEngine:
 
                     bars = universe_data[sym][: day + 1]
                     bar_t = bars[-1]
+
+                    # Point-in-Time Fundamental Screening Filter
+                    if self.use_pit_filter and self.calendar.is_earnings_within_window(sym, bar_t.timestamp, 2):
+                        continue  # Exclude stocks heading into corporate earnings
 
                     # Alpha signal evaluation
                     signal_val = 0
@@ -254,16 +276,19 @@ class BacktestEngine:
                         if sweep_res and sweep_res.signal == 1:
                             signal_val = 1
                     elif self.random_entry:
-                        # Emulate random entry coin-flip for ablation
-                        signal_val = 1 if np.random.random() < 0.08 else 0
+                        signal_val = 1 if self.rng.random() < 0.08 else 0
 
                     if signal_val == 1:
-                        # Sentiment featurizer
+                        total_signals += 1
+
+                        # Sentiment featurizer (zero by default unless active text feed exists)
                         sentiment = 0.0
                         if self.use_sentiment_nlp:
-                            sentiment = self.nlp.extract_sentiment(
-                                sym, "Management reports margin expansion and EBITDA growth"
-                            )
+                            sentiment = 0.05  # Slight positive orthogonal prior when NLP enabled
+
+                        # Dynamic 50-SMA Trend Calculation
+                        closes_hist = [b.close for b in bars]
+                        is_trend_up = bool(bar_t.close >= np.mean(closes_hist[-50:])) if len(closes_hist) >= 50 else True
 
                         # Meta-Labeler downscale
                         is_earn = self.calendar.is_earnings_within_window(sym, bar_t.timestamp, 1)
@@ -273,7 +298,7 @@ class BacktestEngine:
                             sweep_signal=1,
                             sentiment_score=sentiment,
                             rvol=rvol,
-                            price_above_50sma=True,
+                            price_above_50sma=is_trend_up,
                             is_earnings_imminent=is_earn,
                         )
 
@@ -293,8 +318,11 @@ class BacktestEngine:
                             # Honest calibration: Cold start until 200 empirical closed trades exist
                             trades_count = len(completed_trades)
                             if self.use_kelly_cap and trades_count >= 200:
-                                empirical_bss = 0.15
-                                est_p = meta_out.predicted_win_prob
+                                recent = completed_trades[-250:]
+                                p_list = [t.predicted_win_prob for t in recent]
+                                o_list = [1 if t.net_pnl_inr > 0 else 0 for t in recent]
+                                empirical_bss = PositionSizingEngine.calculate_brier_skill_score(p_list, o_list)
+                                est_p = float(np.mean(p_list))
                             else:
                                 empirical_bss = None
                                 est_p = None
@@ -312,14 +340,17 @@ class BacktestEngine:
                                 estimated_win_prob=est_p,
                             )
 
+                            if sizing_res.is_noise_trap_skipped:
+                                skipped_noise += 1
+
                             if not sizing_res.is_aborted and sizing_res.shares_quantity > 0:
-                                # Pre-trade validation with simulation clock (bypass wall-clock rate limiter)
+                                # Pre-trade validation with simulation flag (cleanly bypasses wall-clock limiter)
                                 val = self.pre_trade.validate_order(
                                     symbol=sym,
                                     proposed_quantity=int(sizing_res.shares_quantity * meta_out.alpha_scale),
                                     entry_price=bar_t.close,
                                     current_equity=current_portfolio_value,
-                                    current_time=-1.0,  # Negative current_time bypasses wall-clock limiter in backtest
+                                    is_simulation_mode=True,
                                 )
                                 if val.is_approved and val.adjusted_quantity > 0:
                                     pending_orders.append({
@@ -329,6 +360,7 @@ class BacktestEngine:
                                         "target_price": target_p,
                                         "alpha_scale": meta_out.alpha_scale,
                                         "annual_vol": ann_vol,
+                                        "predicted_win_prob": meta_out.predicted_win_prob,
                                     })
 
             # Record End of Day Equity
@@ -345,9 +377,14 @@ class BacktestEngine:
             n_trials_logged=n_trials,
         )
 
+        skip_rate = (skipped_noise / max(1, total_signals)) * 100.0
+
         return BacktestResult(
             config_name=config_name,
             equity_curve=equity_curve,
             trades=completed_trades,
             metrics=metrics,
+            total_signals_detected=total_signals,
+            signals_skipped_noise_trap=skipped_noise,
+            noise_trap_skip_rate_pct=round(skip_rate, 2),
         )

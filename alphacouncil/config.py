@@ -32,7 +32,7 @@ class RiskParameters(BaseModel):
     circuit_proximity_threshold: float = Field(default=0.015, description="1.5% distance threshold from circuit bands")
     mwpl_ban_entry_threshold: float = Field(default=0.95, description="95% MWPL F&O derivative hedge ban entry")
     mwpl_ban_exit_threshold: float = Field(default=0.80, description="80% MWPL F&O derivative hedge ban exit")
-    min_atr_stop_multiple: float = Field(default=1.0, description="Skip setup if stop distance < 1.0 * ATR14")
+    min_atr_stop_multiple: float = Field(default=0.25, description="Skip setup if stop distance < 0.25 * ATR14 (micro-noise filter)")
     cold_start_trade_threshold: int = Field(default=200, description="Bypass Kelly until 200 trades closed")
     rolling_calibration_window: int = Field(default=250, description="Rolling window for Brier Skill Score")
 

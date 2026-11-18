@@ -51,14 +51,52 @@ class QuantMetricsCalculator:
             return float(1.0 - QuantMetricsCalculator._norm_cdf(-x))
 
     @staticmethod
+    def _norm_ppf(p: float) -> float:
+        """
+        Inverse standard normal CDF (probit) using Acklam's rational approximation.
+        Error < 1.15e-9 across 0 < p < 1.
+        """
+        a = (-3.969683028665376e+01, 2.209460984245205e+02,
+             -2.759285104469687e+02, 1.383577518672690e+02,
+             -3.066479806614716e+01, 2.506628277459239e+00)
+        b = (-5.447609879822406e+01, 1.615858368580409e+02,
+             -1.556989798598866e+02, 6.680131188771972e+01,
+             -1.328068155288572e+01)
+        c = (-7.784894002430293e-03, -3.223964580411365e-01,
+             -2.400758277161838e+00, -2.549732539343734e+00,
+             4.374664141464968e+00, 2.938163982698783e+00)
+        d = (7.784695709041462e-03, 3.224671290700398e-01,
+             2.445134137142996e+00, 3.754408661907416e+00)
+
+        p_low = 0.02425
+        p_high = 1.0 - p_low
+        p_clamped = float(np.clip(p, 1e-12, 1.0 - 1e-12))
+
+        if p_clamped < p_low:
+            q = np.sqrt(-2.0 * np.log(p_clamped))
+            return (((((c[0]*q+c[1])*q+c[2])*q+c[3])*q+c[4])*q+c[5]) / \
+                   ((((d[0]*q+d[1])*q+d[2])*q+d[3])*q+1.0)
+        elif p_clamped <= p_high:
+            q = p_clamped - 0.5
+            r = q * q
+            return (((((a[0]*r+a[1])*r+a[2])*r+a[3])*r+a[4])*r+a[5])*q / \
+                   (((((b[0]*r+b[1])*r+b[2])*r+b[3])*r+b[4])*r+1.0)
+        else:
+            q = np.sqrt(-2.0 * np.log(1.0 - p_clamped))
+            return -(((((c[0]*q+c[1])*q+c[2])*q+c[3])*q+c[4])*q+c[5]) / \
+                    ((((d[0]*q+d[1])*q+d[2])*q+d[3])*q+1.0)
+
+    @staticmethod
     def compute_deflated_sharpe_ratio(
         returns: np.ndarray,
         n_trials: int = 150,
         benchmark_sr: float = 0.0,
+        var_trials_sr: float = 1.0,
     ) -> float:
         """
-        Marcos López de Prado Deflated Sharpe Ratio (AFML Chapter 14).
+        Marcos López de Prado Deflated Sharpe Ratio (AFML Chapter 14 & Bailey/de Prado 2014 Eq 8).
         Adjusts for multiple testing selection bias and non-normality (skewness, kurtosis).
+        var_trials_sr: Empirical variance of Sharpe ratio estimates across the N_trials.
         """
         n = len(returns)
         if n < 30:
@@ -77,11 +115,13 @@ class QuantMetricsCalculator:
         kurt = float(np.mean(z ** 4))  # Pearson kurtosis (Normal = 3)
 
         # Expected maximum annualized Sharpe under Null Hypothesis of zero skill across N_trials
-        # Bailey & López de Prado (2014) / AFML Chapter 14
+        # Bailey & López de Prado (2014) / AFML Chapter 14, Equation 8:
+        # E[max {SR_k}] ≈ sqrt(V) * [ (1 - gamma)*Z^-1(1 - 1/N) + gamma*Z^-1(1 - 1/(N*e)) ]
         gamma_em = 0.5772156649
         if n_trials > 1:
-            log_n = np.log(n_trials)
-            sr_star_ann = np.sqrt(2.0 * log_n) + (gamma_em / np.sqrt(2.0 * log_n))
+            z1 = QuantMetricsCalculator._norm_ppf(1.0 - (1.0 / n_trials))
+            z2 = QuantMetricsCalculator._norm_ppf(1.0 - (1.0 / (n_trials * np.e)))
+            sr_star_ann = np.sqrt(max(1e-4, var_trials_sr)) * ((1.0 - gamma_em) * z1 + gamma_em * z2)
             # Convert annualized expected max to daily scale
             sr_star = sr_star_ann / np.sqrt(252.0)
         else:
@@ -105,10 +145,12 @@ class QuantMetricsCalculator:
         trade_pnls: List[float],
         n_trials_logged: int = 150,
         risk_free_rate: float = 0.0,
+        var_trials_sr: float = 1.0,
     ) -> PerformanceMetrics:
         """
         Computes comprehensive institutional metrics.
         risk_free_rate: Annualized risk-free benchmark (default 0.0 for pure excess returns).
+        var_trials_sr: Variance of Sharpe ratio estimates across multiple trial iterations.
         """
         eq = np.array(daily_equity_curve)
         n_days = len(eq)
@@ -161,7 +203,7 @@ class QuantMetricsCalculator:
             profit_factor = 0.0
 
         dsr = QuantMetricsCalculator.compute_deflated_sharpe_ratio(
-            daily_returns, n_trials=n_trials_logged
+            daily_returns, n_trials=n_trials_logged, var_trials_sr=var_trials_sr
         )
 
         return PerformanceMetrics(

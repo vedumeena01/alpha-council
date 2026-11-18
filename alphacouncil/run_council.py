@@ -113,7 +113,7 @@ def run_interactive_pitch_demo():
         proposed_quantity=int(sizing_res.shares_quantity * meta_out.alpha_scale),
         entry_price=entry_p,
         current_equity=DEFAULT_CONFIG.initial_equity,
-        current_time=-1.0,
+        is_simulation_mode=True,
     )
 
     # Run Friction Model

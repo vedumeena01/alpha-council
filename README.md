@@ -7,14 +7,14 @@
 [![Code Quality](https://img.shields.io/badge/ruff-0%20errors-000000?style=for-the-badge&logo=ruff&logoColor=white)](https://github.com/astral-sh/ruff)
 [![Python Version](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12%20%7C%203.13-blue?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
 [![Market](https://img.shields.io/badge/Exchange-NSE%20%2F%20BSE-FF6F00?style=for-the-badge&logo=googlefinance&logoColor=white)](https://www.nseindia.com)
-[![Regulatory Compliance](https://img.shields.io/badge/SEBI-Oct%202024%20Tariff%20Compliant-red?style=for-the-badge)](https://www.sebi.gov.in)
+[![Friction Schedule](https://img.shields.io/badge/Friction-SEBI%20Oct%202024%20Tariff%20Schedule-informational?style=for-the-badge)](https://www.sebi.gov.in)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blueviolet?style=for-the-badge)](LICENSE)
 
 <br/>
 
-**Built for Quantitative Prop Desks, Algorithmic Hedge Funds & Institutional Asset Allocators.**
+**An Open Architecture Quantitative Trading & Risk Research Platform for Indian Equities (NSE/BSE).**
 
-*Decoupling alpha discovery from execution safety through synchronous deterministic mathematical risk gates, López de Prado meta-labeling, and Almgren-Chriss market impact modeling.*
+*Decoupling alpha discovery from deterministic execution safety using Marcos López de Prado meta-labeling, volatility-targeted sizing, and statutory market friction modeling.*
 
 ---
 
@@ -25,7 +25,7 @@
 [Mathematical Formulations](#-mathematical-rigor--quantitative-foundations) •
 [Performance Metrics](#-empirical-backtest--risk-benchmarks) •
 [Quickstart](#-rapid-deployment--cli) •
-[Pitch Deck](#-institutional-pitch--capital-allocation)
+[Documentation & RFC](#-quantitative-whitepaper--engineering-reports)
 
 ---
 
@@ -54,7 +54,7 @@
 | **Ablation Suite** | [`alphacouncil/backtest/ablation.py`](alphacouncil/backtest/ablation.py) | 7-model orthogonal ablation runner isolating alpha from sizing and risk |
 | **Metrics & DSR** | [`alphacouncil/backtest/metrics.py`](alphacouncil/backtest/metrics.py) | López de Prado Deflated Sharpe Ratio (DSR) penalizing $N_{\text{trials}}=150$ |
 | **Interactive TUI** | [`alphacouncil/run_council.py`](alphacouncil/run_council.py) | Live Bloomberg-style console pitch runner & visual telemetry |
-| **Audit Report** | [`CODE_REVIEW_REPORT.md`](CODE_REVIEW_REPORT.md) | Formal Senior Quant Code Review Report (Score: 97/100) |
+| **Audit Report** | [`CODE_REVIEW_REPORT.md`](CODE_REVIEW_REPORT.md) | Internal Architecture Verification Notes & Checklist |
 
 <br/>
 
@@ -98,40 +98,64 @@ Most retail algorithmic trading bots fail due to **three fatal design flaws**:
 
 ---
 
-## 🖥️ Live Terminal Preview
+## 🖥️ Live Terminal Interface
 
-AlphaCouncil ships with a rich, Bloomberg-inspired Terminal User Interface (TUI) for real-time market telemetry, council voting consensus, and pre-trade risk interception:
+AlphaCouncil includes an interactive Terminal User Interface (TUI) powered by rich to inspect three-plane execution, lookahead contamination probes, real-time risk gating, statutory friction calculation, and orthogonal ablation suites:
 
-```ansi
-[1;36m========================================================================================================[0m
-[1;37;44m  ALPHACOUNCIL v5.0 | HIGH-FREQUENCY QUANTITATIVE EXECUTION DESK | NSE EQUITIES                         [0m
-[1;36m========================================================================================================[0m
- [1;33mPORTFOLIO NAV:[0m ₹10,000,000.00   [1;32mUNREALIZED PnL:[0m +₹48,320.50 (+0.48%)   [1;31mPEAK DD:[0m -1.84% (Max: 12.00%)
- [1;33mACTIVE REGIME:[0m BULLISH_EXPANSION  [1;32mCALMAR RATIO:[0m 3.81                   [1;32mSHARPE (ANN):[0m 2.14
-────────────────────────────────────────────────────────────────────────────────────────────────────────
- [1;35m[COUNCIL CONSENSUS ENGINE][0m
-   ├─ [1;32mCHARTIST_SMC[0m      : [1;32mBUY [0m [Confidence: 86.4%] | Bullish Liquidity Sweep at Demand Zone
-   ├─ [1;32mMOMENTUM_VOL[0m      : [1;32mBUY [0m [Confidence: 79.1%] | ROC-20 > 0, Vol-Parity Risk Alloc 1.25x
-   └─ [1;33mFUNDAMENTAL_EVENT[0m : [1;33mHOLD[0m [Confidence: 55.0%] | FinBERT Neutral (Score: +0.12), No Active Filing
-   [1;37m>> CONSENSUS DECISION: [1;32mAPPROVED (Weighted Score: +0.762)[0m
+```text
+═══════════════════════════════════════════════════════════════════════════════
+  ALPHACOUNCIL QUANTITATIVE TRADING PLATFORM (RFC v5.0)
+  Separation of Alpha, Deterministic Risk, and Execution (Marcos López de Prado AFML)
+  Author: Vedprakash Meena (@vedumeena01) | Target: NSE Cash & Derivatives
+═══════════════════════════════════════════════════════════════════════════════
+                  Three-Plane Architecture Operational Status                  
+┌─────────────────────┬─────────────────────────────┬─────────────────────────┐
+│ Plane               │ Primary Responsibility      │ Safety Guardrail        │
+├─────────────────────┼─────────────────────────────┼─────────────────────────┤
+│ I. Signal & NLP     │ Deterministic Sweep (H1) +  │ Strict t+1 Open (Zero   │
+│ Plane               │ FinBERT (H2)                │ Lookahead)              │
+│ II. Deterministic   │ Volatility-Targeted Sizing  │ Meta-Labeler One-Way    │
+│ Risk Plane          │ + Kelly Cap                 │ Downscaler              │
+│ III. Execution      │ Idempotent OMS +            │ 1-Sec Partial-Fill      │
+│ Plane               │ Broker-Side GTT/SL-M        │ Quantity Sync           │
+└─────────────────────┴─────────────────────────────┴─────────────────────────┘
 
- [1;35m[PRE-TRADE RISK ARBITER (DETERMINISTIC GATES)][0m
-   ├─ [PASS] Kill-Switch Check         : Portfolio Drawdown -1.84% < Threshold 12.00%
-   ├─ [PASS] Value-at-Risk (99% VaR)   : Proposed 0.42% < Daily Portfolio Budget 2.00%
-   ├─ [PASS] Single-Name Exposure      : ₹248,500.00 (2.48% NAV) < Cap 10.00%
-   ├─ [PASS] Sector Concentration      : ENERGY at 14.2% < Sector Cap 25.00%
-   └─ [PASS] SEBI Earnings Blackout    : Reliance Ind (RELIANCE) next board meeting in 18 days
-   [1;32m>> RISK DECISION: CLEARED FOR EXECUTION [Status: ZERO_VETO][0m
+┌────────────────────────── Lookahead Bias Defense ───────────────────────────┐
+│ LLM CONTAMINATION & LEAKAGE AUDIT PROBE (Hypothesis H0: p <= 0.02)          │
+│ Total Redacted Excerpts Tested: 105                                         │
+│ Model Ticker Guess Accuracy: 1.9% vs Random Baseline: 2.0%                  │
+│ Exact Binomial Cumulative p-value: 0.6232 (Threshold: alpha = 0.01)         │
+│ Status: AUDIT PASSED: Model shows zero statistical memory retention over    │
+│ random baseline.                                                            │
+└─────────────────────────────────────────────────────────────────────────────┘
 
- [1;35m[LÓPEZ DE PRADO META-SIZING & EXECUTION][0m
-   ├─ Ornstein-Uhlenbeck Half-Life     : 6.2 trading sessions (Dynamic Vertical Time Barrier)
-   ├─ Meta-Label Probability P(y=1)    : 0.741 -> Position Sizing Scalar: 0.825x
-   ├─ Recommended Position Quantity    : 100 shares @ ₹2,485.00 (Notional: ₹248,500.00)
-   ├─ Almgren-Chriss Slippage Impact   : 0.0384% (₹95.42) on 20-day ADV ₹1.82B
-   └─ SEBI Oct 1 2024 Transaction Cost : STT: ₹248.50 | Exch: ₹7.38 | Stamp: ₹37.28 | GST: ₹3.60
-   [1;32m>> ROUTED: Broker-Side GTT Bracket Placed [SL: ₹2,435.30 | TP: ₹2,584.40][0m
-────────────────────────────────────────────────────────────────────────────────────────────────────────
-[1;30mSystem Status: ONLINE (100 Hz Sync) | Nautilus Pre-Trade Latency: 1.42ms | Heartbeat OK[0m
+                  Order Execution Ticket: RELIANCE [NSE CASH]                  
+┌────────────────────────┬──────────────────────────┬─────────────────────────┐
+│ Parameter              │ Value / Level            │ Institutional Governance│
+├────────────────────────┼──────────────────────────┼─────────────────────────┤
+│ Order Action           │ BUY (Long-Biased Cash    │ Next-Bar Open Execution │
+│                        │ Swing)                   │                         │
+│ Execution Entry Price  │ ₹2,292.89                │ Unadjusted Market Open  │
+│ Structural Stop Price  │ ₹2,256.74                │ Native Broker-Side GTT  │
+│ Triple Barrier Target  │ ₹2,365.19                │ Payoff Ratio b = 2.0x   │
+│ Position Size (Shares) │ 872 shares               │ Notional: ₹1,999,400.08 │
+│ Meta-Labeler Scaling   │ α_scale = 1.00           │ Model Win Prob = 57.8%  │
+│ Sizing Regime Mode     │ COLD_START               │ Governed by Rolling BSS │
+└────────────────────────┴──────────────────────────┴─────────────────────────┘
+
+          Tested Statutory NSE/SEBI Friction Breakdown (Oct 1, 2024)           
+┌────────────────────────────────┬─────────────────────────────┬──────────────┐
+│ Charge Component               │ Statutory Rate              │ Amount (INR) │
+├────────────────────────────────┼─────────────────────────────┼──────────────┤
+│ Securities Transaction Tax     │ 0.10% (Delivery Buy & Sell) │ ₹4,061.85    │
+│ Brokerage                      │ ₹20 flat per order cap      │ ₹40.00       │
+│ NSE Exchange Turnover          │ 0.00297% of notional        │ ₹120.64      │
+│ SEBI Turnover Fee              │ 0.0001% (₹10 / Crore)       │ ₹4.06        │
+│ Stamp Duty                     │ 0.015% (Buy side only)      │ ₹299.91      │
+│ GST                            │ 18% on (Brok + Txn + SEBI)  │ ₹29.65       │
+│ Square-Root Market Impact      │ γ=0.314, σ=22%, Q/ADV       │ ₹671.53      │
+│ TOTAL FRICTION (ROUND-TRIP)    │ 26.2 bps of notional        │ ₹5,243.56    │
+└────────────────────────────────┴─────────────────────────────┴──────────────┘
 ```
 
 ---
@@ -141,7 +165,7 @@ AlphaCouncil ships with a rich, Bloomberg-inspired Terminal User Interface (TUI)
 | Component | Standard Retail Bots | AlphaCouncil System | Institutional Advantage |
 | :--- | :--- | :--- | :--- |
 | **Trade Decision** | Single RSI / MACD crossover | Tri-Agent Consensus (SMC + Momentum + NLP) | Prevents whipsaw regime traps |
-| **Risk Enforcement** | Optional stop loss | Synchronous Deterministic Pre-Trade Veto | Mathematical certainty against black-swans |
+| **Risk Enforcement** | Optional stop loss | Synchronous Deterministic Pre-Trade Veto | Deterministic pre-trade risk interception |
 | **Sizing Logic** | Fixed lot / 100% all-in | López de Prado Meta-Labeling + Kelly Sizing | Maximizes compound growth without ruin |
 | **Time Horizon** | Infinite holding or fixed bars | Ornstein-Uhlenbeck Mean-Reversion Half-Life | Dynamically cuts dead-capital exposure |
 | **Execution Microstructure** | Assumed zero slippage | Almgren-Chriss Square-Root Impact Model | Realistic fills without paper-wealth illusion |
@@ -197,7 +221,7 @@ Orders exceeding $2.5\%$ of interval volume are automatically routed to TWAP/VWA
 <details>
 <summary><b>4. SEBI True-to-Label Statutory Tariff Engine (Oct 1, 2024)</b> [Click to expand]</summary>
 
-AlphaCouncil guarantees exact statutory transaction deduction down to the paise:
+AlphaCouncil computes statutory transaction friction according to exchange and SEBI tariff schedules (Oct 1, 2024 circular):
 
 | Charge Type | Rate / Specification | Applicable Leg |
 | :--- | :--- | :--- |
@@ -341,7 +365,7 @@ python -m alphacouncil.cli.demo
 
 ## 💼 Quantitative Whitepaper & Engineering Reports
 
-For quants, allocators, and hiring committees:
+Technical Documentation & Whitepapers:
 
 - 📄 **Quantitative Whitepaper & Engineering RFC:** [TRADING_AI_PROPOSAL_REPORT.md](TRADING_AI_PROPOSAL_REPORT.md)
   - Complete 8-section mathematical proof addressing lookahead leakage, multi-hypothesis testing ($N_{\text{trials}}=150$), and synchronous execution safety.

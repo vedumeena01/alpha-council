@@ -40,11 +40,12 @@ class PreTradeRiskEngine:
         current_equity: float,
         current_position_shares: int = 0,
         is_reduce_only: bool = False,
+        is_simulation_mode: bool = False,
         current_time: Optional[float] = None,
     ) -> RiskValidationResult:
         """
         Validates proposed trade against hard pre-trade parameters.
-        Supports injected current_time for deterministic backtesting.
+        Set is_simulation_mode=True to bypass wall-clock rate limiter in backtest runs.
         """
         # 1. Critical Invariant: Reduce-Only (Risk Exits & Liquidations) must NEVER be blocked
         # by rate-limiting, cash availability, or concentration limits.
@@ -69,10 +70,9 @@ class PreTradeRiskEngine:
                 reason="REDUCE_ONLY_PASSED: Liquidation / risk exit approved unconditionally",
             )
 
-        # 2. Rate-Limiting & Anti-Runaway Loop Check (with time injection)
-        now = time.time() if current_time is None else current_time
-        # In backtests, if current_time is negative, rate limiter is bypassed
-        if now >= 0:
+        # 2. Rate-Limiting & Anti-Runaway Loop Check (bypassed in simulation mode)
+        if not is_simulation_mode:
+            now = time.time() if current_time is None else current_time
             self.order_timestamps = [t for t in self.order_timestamps if now - t < 1.0]
             if len(self.order_timestamps) >= self.max_orders_per_sec:
                 return RiskValidationResult(

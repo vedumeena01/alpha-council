@@ -49,8 +49,10 @@ class IntradayKillSwitch:
         self.is_session_halted = False
 
     def reset_monthly_session(self, starting_equity: float):
-        """Called at calendar month boundary to establish new monthly HWM baseline."""
+        """Called at calendar month boundary to establish new monthly HWM baseline and lift monthly freeze."""
         self.monthly_hwm = starting_equity
+        self.is_strategy_frozen = False
+        self.is_session_halted = False
 
     def update_valuation(self, mid_market_equity: float) -> DrawdownStatus:
         """

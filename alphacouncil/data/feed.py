@@ -6,6 +6,7 @@ daily volume variations, and dynamic circuit limits.
 
 from dataclasses import dataclass
 from typing import List, Dict
+import datetime
 import numpy as np
 
 
@@ -68,6 +69,15 @@ class MarketDataFeed:
             vol_multiplier = np.exp(self.rng.normal(0.0, 0.35))
             volumes.append(max(10_000.0, base_adv * vol_multiplier))
 
+        # Trading day calendar (excluding weekends)
+        cur_d = datetime.date(2025, 1, 1)
+        bar_dates = []
+        for _ in range(n_bars):
+            while cur_d.weekday() >= 5:
+                cur_d += datetime.timedelta(days=1)
+            bar_dates.append(cur_d.isoformat())
+            cur_d += datetime.timedelta(days=1)
+
         bars: List[Bar] = []
         highs = []
         lows = []
@@ -112,7 +122,7 @@ class MarketDataFeed:
             lower_circuit = round(prior_close * 0.90, 2)
 
             bar = Bar(
-                timestamp=f"2025-{(i // 22) + 1:02d}-{(i % 22) + 1:02d}",
+                timestamp=bar_dates[i],
                 symbol=symbol,
                 open=round(float(p_open), 2),
                 high=round(float(p_high), 2),

@@ -39,7 +39,7 @@ class PositionSizingEngine:
         target_annual_vol: float = 0.15,    # 15% target vol
         max_risk_ceiling: float = 0.015,    # 1.5% max risk
         max_notional_pct: float = 0.20,     # 20% max single-stock notional
-        min_atr_multiple: float = 1.0,      # Skip if stop < 1.0 * ATR
+        min_atr_multiple: float = 0.25,      # Skip if stop < 0.25 * ATR (filters micro-noise without over-discarding sweeps)
     ):
         self.base_risk_fraction = base_risk_fraction
         self.target_annual_vol = target_annual_vol
