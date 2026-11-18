@@ -413,9 +413,9 @@ def test_episode_05_zone_strength_base_candle_count():
     # Setup B: 4 base candles (DBR)
     # Leg-in (idx 0), Base 1-4 (idx 1..4), Leg-out (idx 5)
     opens_b = np.array([130.0, 105.0, 106.0, 105.5, 106.5, 108.0])
-    highs_b = np.array([131.0, 108.0, 107.5, 108.0, 108.5, 125.0])
+    highs_b = np.array([131.0, 108.0, 107.5, 108.0, 108.5, 136.0])
     lows_b = np.array([104.0, 102.0, 103.0, 102.5, 103.0, 107.0])
-    closes_b = np.array([105.0, 106.0, 105.5, 106.5, 107.0, 124.0])
+    closes_b = np.array([105.0, 106.0, 105.5, 106.5, 107.0, 135.0])
 
     z_b = engine.scan_for_zones(opens_b, highs_b, lows_b, closes_b)[0]
     assert z_b.base_candles_count == 4
@@ -564,4 +564,155 @@ def test_episode_05_psychology_news_trap_evaluation():
     trap_neutral = engine.evaluate_psychology_news_trap(z_demand, news_sentiment_score=0.05)
     assert trap_neutral.is_news_trap is False
     assert trap_neutral.recommendation == "TRADE_STANDARD_PRICE_ACTION"
+
+
+# =====================================================================
+# EPISODE 6 TESTS: PRICE ACTION BEHIND CANDLES (CLOSING, GAP-BASE, GARBAGE)
+# =====================================================================
+
+def test_episode_06_closing_concept_demand():
+    """
+    Episode 6 Concept 1: The Closing Concept in Demand Zones.
+    - Proven Zone: Leg-out closes decisively ABOVE Leg-in high.
+    - Unproven Zone: Leg-out fails to close above Leg-in high (overhead supply active).
+    """
+    engine = DemandSupplyEngine()
+
+    # Case A: Proven Zone (Leg-in Drop High = 121.0, Leg-out Rally Close = 124.0 > 121.0)
+    opens_a = np.array([120.0, 105.0, 107.0])
+    highs_a = np.array([121.0, 109.0, 126.0])
+    lows_a = np.array([104.0, 101.0, 106.0])
+    closes_a = np.array([105.0, 107.0, 124.0])
+
+    z_proven = engine.scan_for_zones(opens_a, highs_a, lows_a, closes_a)[0]
+    assert z_proven.has_clean_closing is True
+    assert z_proven.is_proven_zone is True
+    assert z_proven.is_high_quality is True
+
+    # Case B: Unproven Zone (Leg-in Drop High = 135.0, Leg-out Rally Close = 118.0 < 135.0)
+    opens_b = np.array([130.0, 105.0, 107.0])
+    highs_b = np.array([135.0, 109.0, 120.0])  # Leg-in high is 135
+    lows_b = np.array([104.0, 101.0, 106.0])
+    closes_b = np.array([105.0, 107.0, 118.0])  # Leg-out closes at 118 < 135 (stalled!)
+
+    z_unproven = engine.scan_for_zones(opens_b, highs_b, lows_b, closes_b)[0]
+    assert z_unproven.has_clean_closing is False
+    assert z_unproven.is_proven_zone is False
+    assert z_unproven.is_high_quality is False
+    assert z_unproven.strength_score <= 0.60
+
+
+def test_episode_06_closing_concept_supply():
+    """
+    Episode 6 Concept 1: The Closing Concept in Supply Zones.
+    - Proven Zone: Leg-out closes decisively BELOW Leg-in low.
+    - Unproven Zone: Leg-out fails to close below Leg-in low (underlying demand active).
+    """
+    engine = DemandSupplyEngine()
+
+    # Case A: Proven Zone (Leg-in Rally Low = 99.0, Leg-out Drop Close = 95.0 < 99.0)
+    opens_a = np.array([100.0, 114.0, 113.0])
+    highs_a = np.array([115.0, 118.0, 114.0])
+    lows_a = np.array([99.0, 111.0, 93.0])
+    closes_a = np.array([114.0, 113.0, 95.0])
+
+    z_proven = engine.scan_for_zones(opens_a, highs_a, lows_a, closes_a)[0]
+    assert z_proven.has_clean_closing is True
+    assert z_proven.is_proven_zone is True
+
+    # Case B: Unproven Zone (Leg-in Rally Low = 85.0, Leg-out Drop Close = 100.0 > 85.0)
+    opens_b = np.array([90.0, 114.0, 113.0])
+    highs_b = np.array([115.0, 118.0, 114.0])
+    lows_b = np.array([85.0, 111.0, 98.0])      # Leg-in low is 85
+    closes_b = np.array([114.0, 113.0, 100.0])  # Leg-out closes at 100 > 85
+
+    z_unproven = engine.scan_for_zones(opens_b, highs_b, lows_b, closes_b)[0]
+    assert z_unproven.has_clean_closing is False
+    assert z_unproven.is_proven_zone is False
+
+
+def test_episode_06_gap_plus_base_equals_exciting_candle():
+    """
+    Episode 6 Concept 2: Significant Gap + Base Candle = Invisible Exciting Candle.
+    - Overnight gap up from 100 to 105.
+    - Intraday trades in 104.8 to 105.5 (range 0.7, body 0.2 -> ratio 28% = Base).
+    - Synthetic body from 100 is (105.2 - 100) = 5.2 / 5.5 = 94.5% -> Classified GREEN_EXCITING!
+    """
+    engine = DemandSupplyEngine()
+    c = engine.classify_candle(
+        index=1,
+        open_p=105.0,
+        high_p=105.5,
+        low_p=104.8,
+        close_p=105.2,
+        atr14=2.0,
+        prev_close=100.0,
+        prev_high=100.5,
+        prev_low=99.5,
+    )
+    assert c.candle_type == CandleType.GREEN_EXCITING
+    assert c.is_gap_exciting is True
+    assert c.gap_distance == 5.0
+
+
+def test_episode_06_level_on_top_of_level_lotl():
+    """
+    Episode 6 Concept 2: Stacking Zones (LOTL).
+    Zone 2 sits directly above Zone 1 as an absorption cushion.
+    """
+    engine = DemandSupplyEngine()
+
+    # Zone 1 (Origin Baseline Demand): PL = 100.0, DL = 90.0
+    opens = np.array([115.0, 98.0, 100.0, 105.0, 103.0, 104.0])
+    highs = np.array([116.0, 102.0, 106.0, 106.5, 105.0, 118.0])
+    lows = np.array([97.0, 90.0, 99.0, 102.5, 102.0, 103.5])
+    closes = np.array([98.0, 100.0, 105.0, 103.0, 104.0, 117.0])
+
+    zones = engine.scan_for_zones(opens, highs, lows, closes)
+    # Detect stacked levels
+    lotl = engine.detect_level_on_top_of_level(zones)
+    if len(lotl) > 0:
+        pair = lotl[0]
+        assert pair["type"] == "DEMAND_LOTL"
+        assert pair["absorption_cushion_active"] is True
+        assert pair["combined_entry"] >= pair["combined_stop_loss"]
+
+
+def test_episode_06_garbage_area_filtering():
+    """
+    Episode 6 Concept 5: Garbage Areas.
+    Prolonged sideways consolidation of 6+ bars with overlapping wicks and no escape.
+    Must be identified and skipped.
+    """
+    highs = np.array([101.0, 101.2, 100.9, 101.1, 101.0, 101.2, 101.1])
+    lows = np.array([100.0, 100.1, 99.8, 100.0, 99.9, 100.1, 100.0])
+
+    is_garbage = DemandSupplyEngine.is_garbage_cluster(highs, lows, start_idx=0, end_idx=6, min_bars=6)
+    assert is_garbage is True
+
+
+def test_episode_06_origin_pivot_isolation():
+    """
+    Episode 6 Concept 3: Origin of Buying & Selling.
+    In a multi-base cluster (>= 3 base candles), locate the true pivot origin candle.
+    """
+    engine = DemandSupplyEngine()
+
+    # Cluster of 4 base candles (DBR):
+    # Base 0: Low 103
+    # Base 1: Low 101 (True lowest pivot origin!)
+    # Base 2: Low 102
+    # Base 3: Low 104
+    opens = np.array([125.0, 105.0, 104.0, 103.5, 105.0, 106.0])
+    highs = np.array([126.0, 107.0, 106.0, 105.5, 107.0, 122.0])
+    lows = np.array([104.0, 103.0, 101.0, 102.0, 104.0, 105.5])
+    closes = np.array([105.0, 104.0, 103.5, 105.0, 106.0, 120.0])
+
+    zones = engine.scan_for_zones(opens, highs, lows, closes)
+    assert len(zones) == 1
+    z = zones[0]
+    assert z.base_candles_count == 4
+    # Origin candle index must point to index 2 (Base 1, where low was 101.0)
+    assert z.origin_candle_idx == 2
+
 

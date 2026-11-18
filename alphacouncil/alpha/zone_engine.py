@@ -5,13 +5,14 @@ structural zone detection (DBR, RBR, RBD, DBD), exact Zone Marking (Proximal & D
 Normal vs. Exceptional marking (reversal vs. continuous wick rules),
 Wick-to-Wick aggressive zone mapping, Direct Reversals (missing base candles),
 Zone strength scoring (1-3 base vs. 4-5+ base candles), Timeframe Hierarchy,
-Entry, Stop-Loss (with speeding bus volatility buffers), Target (2:1 RRR),
+The Closing Concept (Proven vs. Unproven Zones), Gap + Base = Exciting Candle Equation,
+Level-on-Top-of-Level (LOTL) Stacking, Origin Pivot Isolation, Garbage Area Filtering,
 and Trading Psychology Anti-News Liquidity Trap filtering ("Human can lie, but chart can't").
 """
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 import numpy as np
 
 
@@ -53,6 +54,8 @@ class CandleFeature:
     body: float
     body_ratio: float
     candle_type: CandleType
+    is_gap_exciting: bool = False  # Episode 6: Gap + Base = Exciting Candle
+    gap_distance: float = 0.0
 
 
 @dataclass
@@ -106,12 +109,19 @@ class IdentifiedZone:
     is_direct_reversal: bool = False        # True if 0 base candles (V-reversal)
     timeframe_weight: float = 2.0           # Dominance factor (Monthly 4.0, Daily 2.0, etc.)
 
+    # Price Action Nuances (Episode 6)
+    has_clean_closing: bool = True          # Leg-out closed decisively above Leg-in (Demand) or below (Supply)
+    is_proven_zone: bool = True             # True if clean close cleared opposing overhead/underlying orders
+    origin_candle_idx: Optional[int] = None # True origin pivot candle in multi-base cluster
+    is_gap_base_zone: bool = False          # Zone formed via Gap + Base synthetic exciting candle
+
 
 class DemandSupplyEngine:
     """
     Core Price Action Engine trained on Institutional Order Flow,
     Demand-Supply Imbalances, Normal vs. Exceptional Zone Marking,
-    Wick-to-Wick Mapping, Timeframe Hierarchy, and Trading Psychology Anti-News Traps.
+    Wick-to-Wick Mapping, Timeframe Hierarchy, The Closing Concept,
+    Gap+Base Identity, Origin Isolation, and Trading Psychology.
     """
 
     TIMEFRAME_WEIGHTS: Dict[TimeframeTier, float] = {
@@ -133,6 +143,7 @@ class DemandSupplyEngine:
         target_rrr: float = 2.0,
         default_marking_mode: MarkingMode = MarkingMode.BODY_TO_WICK,
         default_timeframe: TimeframeTier = TimeframeTier.DAILY,
+        min_gap_ratio: float = 0.50,
     ):
         self.min_range_atr_ratio = min_range_atr_ratio
         self.max_base_candles = max_base_candles
@@ -142,12 +153,12 @@ class DemandSupplyEngine:
         self.target_rrr = target_rrr
         self.default_marking_mode = default_marking_mode
         self.default_timeframe = default_timeframe
+        self.min_gap_ratio = min_gap_ratio
 
     @staticmethod
     def get_nse_session_partitions() -> Dict[str, int]:
         """
         Episode 1: Standard 375-minute Indian market session (09:15 to 15:30 IST).
-        Eliminates distorted/orphan candles caused by 60-minute charts (6.25 bars).
         - 75-minute timeframe: exactly 5 bars per session (375 / 75 = 5).
         - 125-minute timeframe: exactly 3 bars per session (375 / 125 = 3).
         """
@@ -175,10 +186,6 @@ class DemandSupplyEngine:
         """
         Episode 5: "Human can lie, but chart can't."
         Evaluates institutional liquidity traps created by retail news reactions.
-        - Extreme negative news + Fresh Demand Zone -> RETAIL_PANIC_LIQUIDITY_TRAP
-          Institutions exploit retail panic dumping as counterparty entry liquidity.
-        - Extreme positive news + Fresh Supply Zone -> RETAIL_EUPHORIA_LIQUIDITY_TRAP
-          Institutions exploit retail FOMO buying as counterparty exit liquidity.
         """
         if zone.is_demand and zone.is_fresh and news_sentiment_score <= -0.40:
             return PsychologyNewsTrapAssessment(
@@ -216,6 +223,79 @@ class DemandSupplyEngine:
                 institutional_action="STANDARD_EXECUTION",
             )
 
+    @staticmethod
+    def is_garbage_cluster(
+        highs: np.ndarray,
+        lows: np.ndarray,
+        start_idx: int,
+        end_idx: int,
+        min_bars: int = 6,
+    ) -> bool:
+        """
+        Episode 6 Concept 5: Garbage Areas
+        Prolonged directionless sideways consolidation packed with overlapping wicks,
+        no directional progress, and lack of distance from origin.
+        """
+        count = end_idx - start_idx + 1
+        if count < min_bars:
+            return False
+
+        cluster_high = float(np.max(highs[start_idx : end_idx + 1]))
+        cluster_low = float(np.min(lows[start_idx : end_idx + 1]))
+        cluster_range = cluster_high - cluster_low
+
+        avg_bar_range = float(np.mean(highs[start_idx : end_idx + 1] - lows[start_idx : end_idx + 1]))
+        if avg_bar_range <= 1e-6:
+            return True
+
+        # If 6+ bars are crammed within <= 2.2x of the average single bar range -> Garbage churn
+        return bool(cluster_range <= (2.2 * avg_bar_range))
+
+    @classmethod
+    def detect_level_on_top_of_level(
+        cls, zones: List[IdentifiedZone], max_distance_pct: float = 0.08
+    ) -> List[Dict[str, Any]]:
+        """
+        Episode 6 Concept 2: Stacking Zones (Level-on-Top-of-Level - LOTL).
+        Identifies stacked adjacent demand or supply zones:
+        - Zone 1 (Origin Baseline)
+        - Zone 2 (Upper Gap-Base / Secondary Zone)
+        Zone 2 acts as an absorption cushion, absorbing incoming momentum before Zone 1.
+        """
+        lotl_pairs: List[Dict[str, Any]] = []
+        n_z = len(zones)
+        for i in range(n_z):
+            z1 = zones[i]
+            for j in range(i + 1, n_z):
+                z2 = zones[j]
+                if z1.is_demand and z2.is_demand:
+                    lower = z1 if z1.proximal_line < z2.proximal_line else z2
+                    upper = z2 if z1.proximal_line < z2.proximal_line else z1
+                    dist = (upper.distal_line - lower.proximal_line) / lower.proximal_line
+                    if 0 <= dist <= max_distance_pct:
+                        lotl_pairs.append({
+                            "type": "DEMAND_LOTL",
+                            "origin_zone": lower,
+                            "cushion_zone": upper,
+                            "combined_entry": upper.entry_price,
+                            "combined_stop_loss": lower.stop_loss,
+                            "absorption_cushion_active": True,
+                        })
+                elif not z1.is_demand and not z2.is_demand:
+                    lower = z1 if z1.proximal_line < z2.proximal_line else z2
+                    upper = z2 if z1.proximal_line < z2.proximal_line else z1
+                    dist = (upper.proximal_line - lower.distal_line) / lower.proximal_line
+                    if 0 <= dist <= max_distance_pct:
+                        lotl_pairs.append({
+                            "type": "SUPPLY_LOTL",
+                            "origin_zone": upper,
+                            "cushion_zone": lower,
+                            "combined_entry": lower.entry_price,
+                            "combined_stop_loss": upper.stop_loss,
+                            "absorption_cushion_active": True,
+                        })
+        return lotl_pairs
+
     def classify_candle(
         self,
         index: int,
@@ -224,9 +304,13 @@ class DemandSupplyEngine:
         low_p: float,
         close_p: float,
         atr14: float = 0.0,
+        prev_close: Optional[float] = None,
+        prev_high: Optional[float] = None,
+        prev_low: Optional[float] = None,
     ) -> CandleFeature:
         """
-        Classifies a single candlestick using GTF 50% body-to-range rule.
+        Classifies a single candlestick using GTF 50% body-to-range rule
+        and Episode 6 Gap + Base = Invisible Exciting Candle equation.
         """
         total_range = high_p - low_p
         if total_range <= 1e-6:
@@ -242,10 +326,37 @@ class DemandSupplyEngine:
         if atr14 > 0 and total_range < (self.min_range_atr_ratio * atr14):
             is_meaningful = False
 
+        c_type = CandleType.BASE
+        is_gap_exciting = False
+        gap_dist = 0.0
+
         if body_ratio >= 0.50 and is_meaningful:
             c_type = CandleType.GREEN_EXCITING if close_p > open_p else CandleType.RED_EXCITING
-        else:
-            c_type = CandleType.BASE
+        elif prev_close is not None and prev_close > 0:
+            # Episode 6 Concept 2: Significant Gap + Base Candle = Exciting Candle
+            # A true significant gap requires at least 1.5% displacement (or >= 0.5 ATR) beyond previous range
+            min_gap_dist = self.min_gap_ratio * atr14 if atr14 > 0 else (0.015 * prev_close)
+            gap_dist = open_p - prev_close
+
+            is_gap_up = bool(
+                gap_dist >= min_gap_dist and (prev_high is None or open_p > prev_high)
+            )
+            is_gap_down = bool(
+                (-gap_dist) >= min_gap_dist and (prev_low is None or open_p < prev_low)
+            )
+
+            if is_gap_up:
+                synthetic_net_body = abs(close_p - prev_close)
+                combined_range = max(high_p, prev_close) - min(low_p, prev_close)
+                if combined_range > 1e-6 and (synthetic_net_body / combined_range) >= 0.50 and close_p >= prev_close:
+                    c_type = CandleType.GREEN_EXCITING
+                    is_gap_exciting = True
+            elif is_gap_down:
+                synthetic_net_body = abs(close_p - prev_close)
+                combined_range = max(high_p, prev_close) - min(low_p, prev_close)
+                if combined_range > 1e-6 and (synthetic_net_body / combined_range) >= 0.50 and close_p <= prev_close:
+                    c_type = CandleType.RED_EXCITING
+                    is_gap_exciting = True
 
         return CandleFeature(
             index=index,
@@ -257,6 +368,8 @@ class DemandSupplyEngine:
             body=round(body, 2),
             body_ratio=round(body_ratio, 3),
             candle_type=c_type,
+            is_gap_exciting=is_gap_exciting,
+            gap_distance=round(gap_dist, 2),
         )
 
     def scan_for_zones(
@@ -270,6 +383,7 @@ class DemandSupplyEngine:
         marking_mode: Optional[MarkingMode] = None,
         timeframe: Optional[TimeframeTier] = None,
         allow_direct_reversals: bool = True,
+        filter_garbage_areas: bool = True,
     ) -> List[IdentifiedZone]:
         """
         Scans series of candles to identify institutional Demand and Supply zones:
@@ -278,6 +392,9 @@ class DemandSupplyEngine:
         - Normal (Body-to-Wick) and Wick-to-Wick Marking
         - Direct Reversals (0 Base Candles)
         - Base candle count strength evaluation (1-3 vs 4-5+)
+        - The Closing Concept (Proven vs. Unproven Zones)
+        - Origin Pivot Isolation
+        - Garbage Area Filtering
         - Timeframe hierarchy weights
         """
         n = len(closes)
@@ -291,12 +408,18 @@ class DemandSupplyEngine:
         tf_eff = self.default_timeframe if timeframe is None else timeframe
         tf_weight = self.TIMEFRAME_WEIGHTS.get(tf_eff, 1.0)
 
-        # 1. Classify all candles
+        # 1. Classify all candles (with previous close & highs/lows for Gap+Base detection)
         classified: List[CandleFeature] = []
         for i in range(n):
             a = float(atr14[i]) if atr14 is not None and i < len(atr14) else 0.0
+            prev_c = float(closes[i - 1]) if i > 0 else None
+            prev_h = float(highs[i - 1]) if i > 0 else None
+            prev_l = float(lows[i - 1]) if i > 0 else None
             classified.append(
-                self.classify_candle(i, opens[i], highs[i], lows[i], closes[i], a)
+                self.classify_candle(
+                    i, opens[i], highs[i], lows[i], closes[i], a,
+                    prev_close=prev_c, prev_high=prev_h, prev_low=prev_l
+                )
             )
 
         zones: List[IdentifiedZone] = []
@@ -331,8 +454,9 @@ class DemandSupplyEngine:
                     first_leg_out_idx = i
                     dep_velocity = abs(leg_out.close - leg_out.open)
 
+                    # Episode 6: The Closing Concept
                     if is_demand:
-                        # Reversal interface body boundary
+                        has_clean_closing = bool(leg_out.close > leg_in.high)
                         proximal = max(leg_in.close, leg_out.open)
                         distal = min(leg_in.low, leg_out.low)
                         zone_width = round(proximal - distal, 2)
@@ -343,6 +467,7 @@ class DemandSupplyEngine:
                         target_p = round(entry_p + (self.target_rrr * risk_ps), 2)
                         reward_ps = round(target_p - entry_p, 2)
                     else:
+                        has_clean_closing = bool(leg_out.close < leg_in.low)
                         proximal = min(leg_in.close, leg_out.open)
                         distal = max(leg_in.high, leg_out.high)
                         zone_width = round(distal - proximal, 2)
@@ -366,6 +491,9 @@ class DemandSupplyEngine:
                             tested_at = k
                             break
 
+                    is_hq = bool(has_clean_closing)
+                    score = 0.90 if has_clean_closing else 0.50
+
                     zones.append(
                         IdentifiedZone(
                             zone_type=z_type,
@@ -384,7 +512,7 @@ class DemandSupplyEngine:
                             departure_velocity=round(dep_velocity, 2),
                             is_fresh=is_fresh,
                             tested_at_idx=tested_at,
-                            is_high_quality=True,
+                            is_high_quality=is_hq,
                             is_exceptional=use_exceptional_eff,
                             entry_price=entry_p,
                             stop_loss=sl_p,
@@ -395,9 +523,13 @@ class DemandSupplyEngine:
                             marking_mode=mode_eff,
                             timeframe=tf_eff,
                             strength_rating="DIRECT_REVERSAL",
-                            strength_score=0.90,
+                            strength_score=score,
                             is_direct_reversal=True,
                             timeframe_weight=tf_weight,
+                            has_clean_closing=has_clean_closing,
+                            is_proven_zone=has_clean_closing,
+                            origin_candle_idx=None,
+                            is_gap_base_zone=(leg_in.is_gap_exciting or leg_out.is_gap_exciting),
                         )
                     )
                     i += 1
@@ -416,6 +548,12 @@ class DemandSupplyEngine:
                     leg_out = classified[i]
                     first_leg_out_idx = i
 
+                    # Episode 6 Concept 5: Garbage Area Filter
+                    if filter_garbage_areas and base_count >= 6:
+                        if self.is_garbage_cluster(highs, lows, base_start, base_end, min_bars=6):
+                            i += 1
+                            continue
+
                     # Count consecutive exciting candles in leg-out
                     departure_strength = 0
                     dep_idx = i
@@ -428,24 +566,6 @@ class DemandSupplyEngine:
                         dep_idx += 1
 
                     dep_velocity = abs(departure_p_end - departure_p_start)
-
-                    # Episode 5 Base Candle Strength Rating:
-                    if 1 <= base_count <= 2:
-                        strength_rating = "HIGH_STRENGTH"
-                        strength_score = 1.00
-                        is_hq = True
-                    elif base_count == 3:
-                        strength_rating = "HIGH_STRENGTH"
-                        strength_score = 0.85
-                        is_hq = True
-                    elif 4 <= base_count <= 5:
-                        strength_rating = "MODERATE_STRENGTH"
-                        strength_score = 0.60
-                        is_hq = departure_strength >= 1
-                    else:
-                        strength_rating = "LOW_STRENGTH"
-                        strength_score = 0.30
-                        is_hq = False
 
                     # Determine zone type
                     z_type = None
@@ -472,17 +592,46 @@ class DemandSupplyEngine:
                     if z_type:
                         base_candles = classified[base_start : base_end + 1]
 
+                        # Episode 6 Concept 1: The Closing Concept
                         if is_demand:
-                            # Proximal Line:
+                            has_clean_closing = bool(leg_out.close > leg_in.high)
+                        else:
+                            has_clean_closing = bool(leg_out.close < leg_in.low)
+
+                        # Episode 5 & 6 Base Candle Strength & Quality Rating:
+                        if 1 <= base_count <= 2:
+                            strength_rating = "HIGH_STRENGTH"
+                            base_score = 1.00
+                        elif base_count == 3:
+                            strength_rating = "HIGH_STRENGTH"
+                            base_score = 0.85
+                        elif 4 <= base_count <= 5:
+                            strength_rating = "MODERATE_STRENGTH"
+                            base_score = 0.60
+                        else:
+                            strength_rating = "LOW_STRENGTH"
+                            base_score = 0.30
+
+                        # Unproven zone penalty if clean closing fails
+                        strength_score = base_score if has_clean_closing else round(base_score * 0.60, 2)
+                        is_hq = bool((1 <= base_count <= self.max_base_candles) and has_clean_closing)
+
+                        # Episode 6 Concept 3: Origin Pivot Isolation
+                        origin_idx = None
+                        if base_count >= 3:
+                            if is_demand:
+                                origin_idx = base_start + int(np.argmin([b.low for b in base_candles]))
+                            else:
+                                origin_idx = base_start + int(np.argmax([b.high for b in base_candles]))
+
+                        if is_demand:
                             if mode_eff == MarkingMode.WICK_TO_WICK:
                                 proximal = max(b.high for b in base_candles)
                             else:
                                 proximal = max(max(b.open, b.close) for b in base_candles)
 
-                            # Distal Normal:
                             distal_normal = min(b.low for b in base_candles)
 
-                            # Distal Exceptional:
                             if is_reversal:
                                 distal_exceptional = min(leg_in.low, distal_normal, leg_out.low)
                             else:
@@ -501,16 +650,13 @@ class DemandSupplyEngine:
                             reward_ps = round(target_p - entry_p, 2)
 
                         else:
-                            # Supply Proximal:
                             if mode_eff == MarkingMode.WICK_TO_WICK:
                                 proximal = min(b.low for b in base_candles)
                             else:
                                 proximal = min(min(b.open, b.close) for b in base_candles)
 
-                            # Distal Normal:
                             distal_normal = max(b.high for b in base_candles)
 
-                            # Distal Exceptional:
                             if is_reversal:
                                 distal_exceptional = max(leg_in.high, distal_normal, leg_out.high)
                             else:
@@ -541,6 +687,8 @@ class DemandSupplyEngine:
                                 is_fresh = False
                                 tested_at = k
                                 break
+
+                        has_gap_base = any(b.is_gap_exciting for b in base_candles) or leg_in.is_gap_exciting or leg_out.is_gap_exciting
 
                         zones.append(
                             IdentifiedZone(
@@ -574,6 +722,10 @@ class DemandSupplyEngine:
                                 strength_score=strength_score,
                                 is_direct_reversal=False,
                                 timeframe_weight=tf_weight,
+                                has_clean_closing=has_clean_closing,
+                                is_proven_zone=has_clean_closing,
+                                origin_candle_idx=origin_idx,
+                                is_gap_base_zone=has_gap_base,
                             )
                         )
             else:
@@ -592,11 +744,13 @@ class DemandSupplyEngine:
         use_exceptional: Optional[bool] = None,
         marking_mode: Optional[MarkingMode] = None,
         timeframe: Optional[TimeframeTier] = None,
+        filter_unproven: bool = False,
     ) -> Tuple[List[IdentifiedZone], List[IdentifiedZone]]:
         """
-        Navigates relative to Current Market Price (CMP) as taught in Episodes 3, 4 & 5:
+        Navigates relative to Current Market Price (CMP) as taught in Episodes 3-6:
         1. Demand Zones: Look Left & Down (Proximal Line < CMP).
         2. Supply Zones: Look Left & Up (Proximal Line > CMP).
+        Optional `filter_unproven`: excludes zones that failed the Closing Concept.
         """
         all_zones = self.scan_for_zones(
             opens,
@@ -613,6 +767,8 @@ class DemandSupplyEngine:
 
         for z in all_zones:
             if only_fresh and not z.is_fresh:
+                continue
+            if filter_unproven and not z.is_proven_zone:
                 continue
 
             if z.is_demand and z.proximal_line < cmp:

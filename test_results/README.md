@@ -13,7 +13,8 @@
 | **03** | Demand & Supply Zone Marking & Freshness | 4 | **100%** (4/4) | 0.14s | Proximal/Distal Line Placement, 4 Patterns (DBR, RBR, RBD, DBD), Fresh vs. Tested, CMP Navigation | [`EPISODE_03_TEST_RESULTS.md`](EPISODE_03_TEST_RESULTS.md) |
 | **04** | Entry, Stoploss, Target & Exceptional Marking | 6 | **100%** (6/6) | 0.14s | Proximal Invariance, Reversal 3-Wick Rule, Continuous Leg-in Exclusion, Speeding Bus SL Buffer, 2:1 Target | [`EPISODE_04_TEST_RESULTS.md`](EPISODE_04_TEST_RESULTS.md) |
 | **05** | Trading Psychology, Wick-to-Wick & Anti-News Engine | 5 | **100%** (5/5) | 0.14s | Base Candle Count Scorer (1-3 vs 4-5+), Wick-to-Wick Marking, Direct Reversals (0 Base), Timeframe Hierarchy (Monthly 4.0x), News Trap Contrarian Filter | [`EPISODE_05_TEST_RESULTS.md`](EPISODE_05_TEST_RESULTS.md) |
-| **Total** | **All Episodes (Cumulative)** | **18** | **100%** (18/18) | **0.39s** | **Full GTF Price Action Core (`zone_engine.py`)** | - |
+| **06** | Price Action Behind Candles (Closing, Gap-Base, Garbage) | 6 | **100%** (6/6) | 0.15s | The Closing Concept (Proven vs. Unproven), Gap+Base Exciting Equation, LOTL Stacking, Garbage Area Filter, Origin Pivot Isolation | [`EPISODE_06_TEST_RESULTS.md`](EPISODE_06_TEST_RESULTS.md) |
+| **Total** | **All Episodes (Cumulative)** | **24** | **100%** (24/24) | **0.20s** | **Full GTF Price Action Core (`zone_engine.py`)** | - |
 
 ---
 
@@ -21,9 +22,9 @@
 
 ```text
 Module: alphacouncil/alpha/zone_engine.py
-Statements: 254
-Missed: 16
-Test Coverage: 93.7%
+Statements: 334
+Missed: 24
+Test Coverage: 92.8%
 Linter Status: Ruff 0 errors, 0 warnings
 CI Status: GitHub Actions 100% Green (Python 3.11 & 3.12)
 ```
@@ -36,3 +37,4 @@ CI Status: GitHub Actions 100% Green (Python 3.11 & 3.12)
 - [`EPISODE_03_TEST_RESULTS.md`](EPISODE_03_TEST_RESULTS.md) - Zone marking & freshness.
 - [`EPISODE_04_TEST_RESULTS.md`](EPISODE_04_TEST_RESULTS.md) - Exceptional marking & trade execution.
 - [`EPISODE_05_TEST_RESULTS.md`](EPISODE_05_TEST_RESULTS.md) - Trading psychology, wick-to-wick, direct reversals & news traps.
+- [`EPISODE_06_TEST_RESULTS.md`](EPISODE_06_TEST_RESULTS.md) - The Closing concept, Gap+Base exciting, LOTL stacking, origin pivot & garbage filter.
