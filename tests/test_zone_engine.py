@@ -27,6 +27,7 @@ from alphacouncil.alpha.zone_engine import (
     MultiTimeframePlan,
     TradeScoreQuality,
     ZoneAlignmentType,
+    MACrossoverType,
     TradeScoreBreakdown,
     EntryType,
     ZoneAuthenticity,
@@ -1935,3 +1936,210 @@ def test_episode_11_dynamic_20_ema_interaction_and_equilibrium():
     assert res["is_interacting"] is False
     assert res["warning_level"] == "NORMAL"
     assert "Comfortable distance" in res["action_recommendation"]
+
+
+# ==============================================================================
+# EPISODE 12 TESTS: MOVING AVERAGES, CORRELATION & RETAIL CROSSOVER TRAPS
+# ==============================================================================
+
+
+def test_episode_12_sma_and_ema_mathematical_calculations_and_lagging_proof():
+    """
+    Episode 12 Mathematical Mechanics:
+    - SMA 50: Equal weight (1/n) for all candles.
+    - EMA 50: Exponential weight (alpha = 2/(n+1)) hugging recent prices.
+    - Demonstrates mathematically why Moving Averages lag during a V-reversal:
+      Prices collapse from 1,200 to 800, then rally to 1,000.
+      While real price rallies, SMA 50 continues falling because added price < dropped price.
+    """
+    # 1. Basic calculation verification
+    prices = np.array([10.0, 20.0, 30.0, 40.0, 50.0])
+    sma3 = DemandSupplyEngine.calculate_sma(prices, period=3)
+    assert np.isnan(sma3[0])
+    assert np.isnan(sma3[1])
+    assert sma3[2] == 20.0  # (10+20+30)/3
+    assert sma3[3] == 30.0  # (20+30+40)/3
+    assert sma3[4] == 40.0  # (30+40+50)/3
+
+    ema3 = DemandSupplyEngine.calculate_ema(prices, period=3)
+    # alpha = 2 / (3 + 1) = 0.5
+    # Seed at index 2 = mean(10, 20, 30) = 20.0
+    # idx 3 = 40.0 * 0.5 + 20.0 * 0.5 = 30.0
+    # idx 4 = 50.0 * 0.5 + 30.0 * 0.5 = 40.0
+    assert ema3[2] == 20.0
+    assert ema3[3] == 30.0
+    assert ema3[4] == 40.0
+
+    # 2. Lagging indicator proof (COVID-19 HDFC Bank style crash & V-reversal)
+    # 50 candles: first 40 candles flat at 1,200, next 5 crash to 800, last 5 rally to 1,000
+    crash_series = np.concatenate([
+        np.full(40, 1200.0),
+        np.linspace(1200.0, 800.0, 5),
+        np.linspace(800.0, 1000.0, 5),
+    ])
+    sma50 = DemandSupplyEngine.calculate_sma(crash_series, period=20)
+    # At index 44 price is bottom, then price rallies to 1000
+    # Even though price rallied from 800 to 1000, SMA continues sloping down!
+    assert crash_series[-1] > crash_series[-5]  # Price rallied
+    assert sma50[-1] < sma50[-5]  # SMA 20 is strictly lower (lagging!)
+
+
+def test_episode_12_detect_golden_and_death_crossovers():
+    """
+    Episode 12: Detect Golden Crossover (EMA 20 crossing above EMA 50)
+    and Death Crossover (EMA 20 crossing below EMA 50).
+    """
+    # Fast crosses above slow at the end
+    fast = np.array([98.0, 99.0, 100.0, 102.0, 105.0])
+    slow = np.array([101.0, 101.0, 101.0, 101.0, 101.0])
+
+    cross_type, bar_idx, price = DemandSupplyEngine.detect_ma_crossover(fast, slow, lookback_bars=3)
+    assert cross_type == MACrossoverType.GOLDEN_CROSSOVER
+    assert bar_idx == 3  # Crossed at index 3 (102 > 101)
+    assert price == 102.0
+
+    # Fast crosses below slow at the end
+    fast_down = np.array([105.0, 103.0, 101.0, 99.0, 97.0])
+    slow_down = np.array([100.0, 100.0, 100.0, 100.0, 100.0])
+
+    cross_type_down, bar_idx_down, price_down = DemandSupplyEngine.detect_ma_crossover(fast_down, slow_down, lookback_bars=3)
+    assert cross_type_down == MACrossoverType.DEATH_CROSSOVER
+    assert bar_idx_down == 3
+    assert price_down == 99.0
+
+    # No crossover (parallel lines)
+    parallel_fast = np.array([105.0, 106.0, 107.0, 108.0])
+    parallel_slow = np.array([100.0, 101.0, 102.0, 103.0])
+    no_cross, _, _ = DemandSupplyEngine.detect_ma_crossover(parallel_fast, parallel_slow, lookback_bars=3)
+    assert no_cross == MACrossoverType.NO_CROSSOVER
+
+
+def test_episode_12_retail_crossover_traps_detection():
+    """
+    Episode 12 Concept: The Retail Crossover Trap.
+    - Golden Crossover into Opposing HTF Supply: Institutions use retail crossover buying
+      liquidity to dump shares. System flags trap and rejects bonus.
+    - Death Crossover into Opposing HTF Demand: Institutions accumulate retail panic selling.
+      System flags trap and rejects bonus.
+    """
+    engine = DemandSupplyEngine()
+    demand_opens = np.array([200.0, 212.0, 215.0])
+    demand_highs = np.array([202.0, 218.0, 230.0])
+    demand_lows = np.array([198.0, 205.0, 214.0])
+    demand_closes = np.array([211.0, 215.0, 229.0])
+    ltf_demand = engine.scan_for_zones(demand_opens, demand_highs, demand_lows, demand_closes)[0]
+
+    supply_opens = np.array([180.0, 205.0, 200.0])
+    supply_highs = np.array([185.0, 210.0, 201.0])
+    supply_lows = np.array([179.0, 198.0, 180.0])
+    supply_closes = np.array([205.0, 200.0, 182.0])
+    htf_supply = engine.scan_for_zones(supply_opens, supply_highs, supply_lows, supply_closes)[0]
+    htf_supply.proximal_line = 500.0
+    htf_supply.distal_line = 520.0
+
+    # 1. Retail Supply Trap: Golden Crossover triggers at ₹496, right into HTF Supply (PL 500)
+    is_valid, bonus, msg = DemandSupplyEngine.evaluate_crossover_trade_score_bonus(
+        zone=ltf_demand,
+        crossover_type=MACrossoverType.GOLDEN_CROSSOVER,
+        crossover_price=496.0,
+        opposing_htf_supply=htf_supply,
+    )
+    assert is_valid is False
+    assert bonus == 0
+    assert "Retail Supply Trap" in msg
+
+    # 2. Retail Demand Trap: Death Crossover triggers at ₹101, right into HTF Demand (PL 100)
+    htf_demand = engine.scan_for_zones(demand_opens, demand_highs, demand_lows, demand_closes)[0]
+    htf_demand.proximal_line = 100.0
+    htf_demand.distal_line = 90.0
+
+    ltf_supply = engine.scan_for_zones(supply_opens, supply_highs, supply_lows, supply_closes)[0]
+    ltf_supply.is_demand = False
+
+    is_valid_d, bonus_d, msg_d = DemandSupplyEngine.evaluate_crossover_trade_score_bonus(
+        zone=ltf_supply,
+        crossover_type=MACrossoverType.DEATH_CROSSOVER,
+        crossover_price=101.0,
+        opposing_htf_demand=htf_demand,
+    )
+    assert is_valid_d is False
+    assert bonus_d == 0
+    assert "Retail Demand Trap" in msg_d
+
+
+def test_episode_12_extra_trade_score_bonus_on_execution_zone():
+    """
+    Episode 12 Rule: Crossovers as an 'Extra Trade Score' (Optional +1 Bonus Point).
+    A pristine 7/7 setup with a coinciding Golden Crossover earns 8/7.
+    Absence of crossover does NOT invalidate a 7/7 setup.
+    """
+    engine = DemandSupplyEngine()
+    demand_opens = np.array([200.0, 212.0, 215.0])
+    demand_highs = np.array([202.0, 218.0, 230.0])
+    demand_lows = np.array([198.0, 205.0, 214.0])
+    demand_closes = np.array([211.0, 215.0, 229.0])
+    zone = engine.scan_for_zones(demand_opens, demand_highs, demand_lows, demand_closes)[0]
+    zone.proximal_line = 215.0
+    zone.distal_line = 205.0
+
+    # Setup pristine 7.0 score breakdown
+    zone.trade_score = TradeScoreBreakdown(
+        freshness_score=3.0,
+        strength_score=2.0,
+        time_at_base_score=2.0,
+        total_score=7.0,
+        quality=TradeScoreQuality.PRISTINE,
+        alignment=ZoneAlignmentType.COINCIDING,
+        is_best_setup=True,
+    )
+
+    # Coinciding Golden Crossover at 214.0 (inside zone)
+    is_valid, bonus, msg = DemandSupplyEngine.evaluate_crossover_trade_score_bonus(
+        zone=zone,
+        crossover_type=MACrossoverType.GOLDEN_CROSSOVER,
+        crossover_price=214.0,
+        opposing_htf_supply=None,
+    )
+    assert is_valid is True
+    assert bonus == 1
+    assert "Extra Trade Score Awarded" in msg
+    assert zone.trade_score.total_score == 8.0
+    assert zone.trade_score.ma_crossover_bonus == 1
+    assert zone.trade_score.crossover_type == MACrossoverType.GOLDEN_CROSSOVER
+
+
+def test_episode_12_dynamic_ma_buffer_stoploss_placement():
+    """
+    Episode 12 Rule 3: Dynamic Stop-Loss Protection via Moving Average Buffer.
+    When a moving average cross sits just beneath a demand zone's distal line,
+    anchor the stop-loss below the moving average level for institutional insulation.
+    """
+    engine = DemandSupplyEngine()
+    demand_opens = np.array([200.0, 212.0, 215.0])
+    demand_highs = np.array([202.0, 218.0, 230.0])
+    demand_lows = np.array([198.0, 205.0, 214.0])
+    demand_closes = np.array([211.0, 215.0, 229.0])
+    zone = engine.scan_for_zones(demand_opens, demand_highs, demand_lows, demand_closes)[0]
+    zone.is_demand = True
+    zone.distal_line = 100.0
+
+    # MA sits below distal line at 99.20
+    sl = DemandSupplyEngine.calculate_dynamic_ma_buffer_sl(
+        zone=zone,
+        ema_fast=99.50,
+        ema_slow=99.20,
+        tick_size=0.05,
+        buffer_ticks=5,
+    )
+    # Expected: 99.20 - (0.05 * 5) = 98.95 (instead of 100.0 - 0.25 = 99.75)
+    assert sl == 98.95
+
+    # MA sits inside zone above distal line at 101.0 -> Normal distal buffer applied
+    sl_normal = DemandSupplyEngine.calculate_dynamic_ma_buffer_sl(
+        zone=zone,
+        ema_fast=102.0,
+        ema_slow=101.0,
+        tick_size=0.05,
+        buffer_ticks=5,
+    )
+    assert sl_normal == 99.75

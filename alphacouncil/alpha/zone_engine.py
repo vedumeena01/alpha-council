@@ -110,12 +110,18 @@ class ZoneAlignmentType(str, Enum):
     FATAL_TRAP = "FATAL_TRAP"  # Arjuna entering Bhishma Pitamah or Duryodhana right after Shri Krishna bounce
 
 
+class MACrossoverType(str, Enum):
+    GOLDEN_CROSSOVER = "GOLDEN_CROSSOVER"  # EMA 20 crosses above EMA 50
+    DEATH_CROSSOVER = "DEATH_CROSSOVER"    # EMA 20 crosses below EMA 50
+    NO_CROSSOVER = "NO_CROSSOVER"
+
+
 @dataclass
 class TradeScoreBreakdown:
     freshness_score: float             # 0.0, 1.5, or 3.0
     strength_score: float              # 1.0 or 2.0
     time_at_base_score: float          # 0.0, 1.0, or 2.0
-    total_score: float                 # Sum out of 7.0
+    total_score: float                 # Sum out of 7.0 (or up to 8.0 with bonus)
     quality: TradeScoreQuality
     alignment: ZoneAlignmentType
     is_best_setup: bool
@@ -123,6 +129,8 @@ class TradeScoreBreakdown:
     realized_rrr: float = 0.0
     is_target_acceptable: bool = True
     rejection_reasons: List[str] = field(default_factory=list)
+    ma_crossover_bonus: int = 0        # 0 or 1 point from Episode 12
+    crossover_type: MACrossoverType = MACrossoverType.NO_CROSSOVER
 
 
 class EntryType(str, Enum):
@@ -1838,3 +1846,172 @@ class DemandSupplyEngine:
                 "action_recommendation": "Price not currently at 20 EMA equilibrium.",
                 "warning_level": "NORMAL",
             }
+
+    @staticmethod
+    def calculate_sma(series: np.ndarray, period: int) -> np.ndarray:
+        """
+        Episode 12: Simple Moving Average (SMA) Formula:
+        SMA_n = (Sum of Closing Prices of Last n Candles) / n
+        Equal Weighting: Each candle in the lookback window has identical statistical weight (1/n).
+        """
+        if len(series) < period or period <= 0:
+            return np.full_like(series, np.nan, dtype=np.float64)
+        ret = np.full_like(series, np.nan, dtype=np.float64)
+        cumsum = np.cumsum(np.insert(series, 0, 0))
+        ret[period - 1:] = (cumsum[period:] - cumsum[:-period]) / float(period)
+        return ret
+
+    @staticmethod
+    def calculate_ema(series: np.ndarray, period: int) -> np.ndarray:
+        """
+        Episode 12: Exponential Moving Average (EMA) Formula:
+        alpha = 2 / (period + 1)
+        EMA_t = Close_t * alpha + EMA_{t-1} * (1 - alpha)
+        Exponential Weighting: Assigns exponentially decreasing weights to older data points,
+        prioritizing recent price action and hugging the chart tighter than SMA.
+        """
+        if len(series) < period or period <= 0:
+            return np.full_like(series, np.nan, dtype=np.float64)
+        ret = np.full_like(series, np.nan, dtype=np.float64)
+        alpha = 2.0 / (period + 1.0)
+        # Seed first EMA value with initial SMA
+        ret[period - 1] = float(np.mean(series[:period]))
+        for i in range(period, len(series)):
+            ret[i] = (series[i] * alpha) + (ret[i - 1] * (1.0 - alpha))
+        return ret
+
+    @staticmethod
+    def detect_ma_crossover(
+        fast_series: np.ndarray,
+        slow_series: np.ndarray,
+        lookback_bars: int = 5,
+    ) -> Tuple[MACrossoverType, int, float]:
+        """
+        Episode 12: Golden Crossover & Death Crossover Detection.
+        - Golden Crossover: Fast EMA crosses above Slow EMA.
+        - Death Crossover: Fast EMA crosses below Slow EMA.
+        Searches backwards within the last `lookback_bars` completed candles.
+        Returns (crossover_type, bar_index_of_cross, price_at_cross).
+        """
+        n = len(fast_series)
+        if n < 2 or len(slow_series) != n:
+            return MACrossoverType.NO_CROSSOVER, -1, 0.0
+
+        start_idx = max(1, n - lookback_bars)
+        for i in range(n - 1, start_idx - 1, -1):
+            if np.isnan(fast_series[i]) or np.isnan(slow_series[i]):
+                continue
+            if np.isnan(fast_series[i - 1]) or np.isnan(slow_series[i - 1]):
+                continue
+
+            # Golden Crossover: fast was <= slow, now fast > slow
+            if fast_series[i - 1] <= slow_series[i - 1] and fast_series[i] > slow_series[i]:
+                return MACrossoverType.GOLDEN_CROSSOVER, i, float(fast_series[i])
+
+            # Death Crossover: fast was >= slow, now fast < slow
+            if fast_series[i - 1] >= slow_series[i - 1] and fast_series[i] < slow_series[i]:
+                return MACrossoverType.DEATH_CROSSOVER, i, float(fast_series[i])
+
+        return MACrossoverType.NO_CROSSOVER, -1, 0.0
+
+    @staticmethod
+    def evaluate_crossover_trade_score_bonus(
+        zone: IdentifiedZone,
+        crossover_type: MACrossoverType,
+        crossover_price: float,
+        opposing_htf_supply: Optional[IdentifiedZone] = None,
+        opposing_htf_demand: Optional[IdentifiedZone] = None,
+    ) -> Tuple[bool, int, str]:
+        """
+        Episode 12 GTF Rule: Moving Average Crossovers as an Extra Trade Score.
+        - Crossovers are NEVER standalone triggers; baseline setup must qualify on 3 timeframes.
+        - Crossovers on execution timeframe award +1 Extra Trade Score (8/7).
+        - Filters out Retail Crossover Traps (Golden Crossover into HTF supply, Death Crossover into HTF demand).
+        """
+        if crossover_type == MACrossoverType.NO_CROSSOVER:
+            return False, 0, "No crossover detected; baseline trade score intact."
+
+        # Retail Supply Trap: Golden crossover triggered when price enters/approaches opposing HTF supply
+        if crossover_type == MACrossoverType.GOLDEN_CROSSOVER:
+            if opposing_htf_supply is not None:
+                supply_trap_boundary = opposing_htf_supply.proximal_line * 0.985
+                if crossover_price >= supply_trap_boundary:
+                    return (
+                        False,
+                        0,
+                        f"Retail Supply Trap: Golden Crossover at {crossover_price:.2f} triggered directly "
+                        f"into opposing HTF Supply (PL: {opposing_htf_supply.proximal_line:.2f}). "
+                        f"Institutions dump into retail buying liquidity; bonus rejected."
+                    )
+
+            # Valid Extra Trade Score for Demand Zone
+            if zone.is_demand:
+                zone_buffer = (zone.proximal_line - zone.distal_line) * 1.5
+                if (zone.distal_line - zone_buffer) <= crossover_price <= (zone.proximal_line + zone_buffer):
+                    if zone.trade_score is not None:
+                        zone.trade_score.ma_crossover_bonus = 1
+                        zone.trade_score.total_score += 1.0
+                        zone.trade_score.crossover_type = crossover_type
+                    return (
+                        True,
+                        1,
+                        f"Extra Trade Score Awarded: Golden Crossover coincides with execution Demand Zone "
+                        f"(PL: {zone.proximal_line:.2f}, DL: {zone.distal_line:.2f}). Bonus +1 confirmation."
+                    )
+
+        # Retail Demand Trap: Death crossover triggered when price enters/approaches opposing HTF demand
+        elif crossover_type == MACrossoverType.DEATH_CROSSOVER:
+            if opposing_htf_demand is not None:
+                demand_trap_boundary = opposing_htf_demand.proximal_line * 1.015
+                if crossover_price <= demand_trap_boundary:
+                    return (
+                        False,
+                        0,
+                        f"Retail Demand Trap: Death Crossover at {crossover_price:.2f} triggered directly "
+                        f"into opposing HTF Demand (PL: {opposing_htf_demand.proximal_line:.2f}). "
+                        f"Institutions accumulate from retail panic selling; bonus rejected."
+                    )
+
+            # Valid Extra Trade Score for Supply Zone
+            if not zone.is_demand:
+                zone_buffer = (zone.distal_line - zone.proximal_line) * 1.5
+                if (zone.proximal_line - zone_buffer) <= crossover_price <= (zone.distal_line + zone_buffer):
+                    if zone.trade_score is not None:
+                        zone.trade_score.ma_crossover_bonus = 1
+                        zone.trade_score.total_score += 1.0
+                        zone.trade_score.crossover_type = crossover_type
+                    return (
+                        True,
+                        1,
+                        f"Extra Trade Score Awarded: Death Crossover coincides with execution Supply Zone "
+                        f"(PL: {zone.proximal_line:.2f}, DL: {zone.distal_line:.2f}). Bonus +1 confirmation."
+                    )
+
+        return False, 0, "Crossover did not coincide with execution zone boundaries; baseline score intact."
+
+    @staticmethod
+    def calculate_dynamic_ma_buffer_sl(
+        zone: IdentifiedZone,
+        ema_fast: float,
+        ema_slow: float,
+        tick_size: float = 0.05,
+        buffer_ticks: int = 5,
+    ) -> float:
+        """
+        Episode 12 Rule 3: Dynamic Stop-Loss Protection via Moving Average Buffer.
+        If a moving average crossover sits just beneath a demand zone's distal line,
+        placing the stop-loss below the moving average cross provides an extra institutional buffer.
+        """
+        buffer_val = tick_size * buffer_ticks
+        if zone.is_demand:
+            min_ma = min(ema_fast, ema_slow)
+            # If MA sits below distal line, anchor SL below the MA
+            if min_ma < zone.distal_line:
+                return round(min_ma - buffer_val, 2)
+            return round(zone.distal_line - buffer_val, 2)
+        else:
+            max_ma = max(ema_fast, ema_slow)
+            # If MA sits above distal line for supply, anchor SL above the MA
+            if max_ma > zone.distal_line:
+                return round(max_ma + buffer_val, 2)
+            return round(zone.distal_line + buffer_val, 2)

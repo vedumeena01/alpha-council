@@ -19,5 +19,6 @@
 | **09** | **Trading Style, Authentic Zones & Emotional Mastery** | ✅ **Codified & Trained** | [`training/EPISODE_09_TRADING_STYLE_EMOTIONS_AND_AUTHENTICITY.md`](EPISODE_09_TRADING_STYLE_EMOTIONS_AND_AUTHENTICITY.md) |
 | **10** | **Risk Management, Capital Protection & Sizing Formula** | ✅ **Codified & Trained** | [`training/EPISODE_10_RISK_MANAGEMENT_AND_CAPITAL_PROTECTION.md`](EPISODE_10_RISK_MANAGEMENT_AND_CAPITAL_PROTECTION.md) |
 | **11** | **When to be Aggressive vs. Conservative (Execution Stances)** | ✅ **Codified & Trained** | [`training/EPISODE_11_AGGRESSIVE_VS_CONSERVATIVE_EXECUTION.md`](EPISODE_11_AGGRESSIVE_VS_CONSERVATIVE_EXECUTION.md) |
-| **12** | *Upcoming...* | ⏳ Pending | - |
-| **...**| *Episodes 12 - 20* | ⏳ Pending | - |
+| **12** | **Moving Averages & Correlation (SMA, EMA, Retail Crossover Traps & Extra Score)** | ✅ **Codified & Trained** | [`training/EPISODE_12_MOVING_AVERAGES_AND_CORRELATION.md`](EPISODE_12_MOVING_AVERAGES_AND_CORRELATION.md) |
+| **13** | *Upcoming...* | ⏳ Pending | - |
+| **...**| *Episodes 13 - 20* | ⏳ Pending | - |
