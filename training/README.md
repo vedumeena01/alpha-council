@@ -21,5 +21,6 @@
 | **11** | **When to be Aggressive vs. Conservative (Execution Stances)** | ✅ **Codified & Trained** | [`training/EPISODE_11_AGGRESSIVE_VS_CONSERVATIVE_EXECUTION.md`](EPISODE_11_AGGRESSIVE_VS_CONSERVATIVE_EXECUTION.md) |
 | **12** | **Moving Averages & Correlation (SMA, EMA, Retail Crossover Traps & Extra Score)** | ✅ **Codified & Trained** | [`training/EPISODE_12_MOVING_AVERAGES_AND_CORRELATION.md`](EPISODE_12_MOVING_AVERAGES_AND_CORRELATION.md) |
 | **13** | **Advanced Trend Analysis (Demand/Supply Violation & Algorithmic EMA 20 Footprint)** | ✅ **Codified & Trained** | [`training/EPISODE_13_ADVANCED_TREND_ANALYSIS.md`](EPISODE_13_ADVANCED_TREND_ANALYSIS.md) |
-| **14** | *Upcoming...* | ⏳ Pending | - |
-| **...**| *Episodes 14 - 20* | ⏳ Pending | - |
+| **14** | **Trading Against the Trend (Confirmation Entry & Macro Risk Compression)** | ✅ **Codified & Trained** | [`training/EPISODE_14_TRADING_AGAINST_THE_TREND.md`](EPISODE_14_TRADING_AGAINST_THE_TREND.md) |
+| **15** | *Upcoming...* | ⏳ Pending | - |
+| **...**| *Episodes 15 - 20* | ⏳ Pending | - |

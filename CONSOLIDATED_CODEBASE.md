@@ -503,6 +503,27 @@ class RejectionAudit:
     intraday_advisory: str = ""
 
 
+class ConfirmationEntryType(str, Enum):
+    MACRO_HTF_CONFIRMATION = "MACRO_HTF_CONFIRMATION"  # Episode 14: 1 LTF supply breached backed by HTF demand
+    STANDARD_LIMIT = "STANDARD_LIMIT"                  # Episode 9: Type 1 Set & Forget limit
+    ATL_PROHIBITED = "ATL_PROHIBITED"                  # All-Time Low long entry prohibited
+
+
+@dataclass
+class ConfirmationTradePlan:
+    htf_demand_zone: "IdentifiedZone"
+    nearest_ltf_supply_zone: "IdentifiedZone"
+    is_htf_demand_tested: bool
+    is_supply_eliminated_by_close: bool
+    newly_formed_ltf_demand: Optional["IdentifiedZone"]
+    macro_risk_per_share: float
+    compressed_risk_per_share: float
+    risk_compression_ratio: float
+    realized_target_rrr: float
+    is_confirmed: bool
+    status_message: str
+
+
 @dataclass
 class CandleFeature:
     index: int
@@ -2528,6 +2549,148 @@ class DemandSupplyEngine:
             False,
             round(mean_dist, 2),
             f"Normal price-to-EMA spread ({mean_dist:.2f}% > {squeeze_threshold_pct}%)."
+        )
+
+    @classmethod
+    def evaluate_trading_against_the_trend_confirmation(
+        cls,
+        htf_demand_zone: IdentifiedZone,
+        nearest_ltf_supply_zone: IdentifiedZone,
+        breakout_candle_close: float,
+        newly_formed_ltf_demand: Optional[IdentifiedZone] = None,
+        is_all_time_low: bool = False,
+        consecutive_supply_breaches_count: int = 1,
+        macro_opposing_supply_target: Optional[float] = None,
+    ) -> ConfirmationTradePlan:
+        """
+        Episode 14: Trading Against the Trend with Confirmation Entry.
+        - Blind entry at HTF Demand proximal line carries massive stop-loss distance and falling knife risk.
+        - Rule: When backed by a macro HTF (Monthly/Quarterly) Demand Zone (Shri Krishna),
+          ONLY 1 nearest LTF Supply Zone needs to be breached and closed above!
+        - Entry executes on the newly formed LTF Demand Zone that created the breakout.
+        - Compresses macro risk (e.g. ₹900 down to ₹30) unlocking 3:1 to 20:1 RRR.
+        - Guard: If stock is at All-Time Low, long trades are strictly prohibited unless
+          >= 2 consecutive supply zones are eliminated on intermediate timeframe.
+        """
+        macro_risk = abs(htf_demand_zone.proximal_line - htf_demand_zone.distal_line)
+
+        # All-Time Low Check
+        if is_all_time_low:
+            if consecutive_supply_breaches_count < 2:
+                return ConfirmationTradePlan(
+                    htf_demand_zone=htf_demand_zone,
+                    nearest_ltf_supply_zone=nearest_ltf_supply_zone,
+                    is_htf_demand_tested=True,
+                    is_supply_eliminated_by_close=False,
+                    newly_formed_ltf_demand=None,
+                    macro_risk_per_share=macro_risk,
+                    compressed_risk_per_share=0.0,
+                    risk_compression_ratio=1.0,
+                    realized_target_rrr=0.0,
+                    is_confirmed=False,
+                    status_message=(
+                        "All-Time Low Protection: Long entries strictly prohibited in ATL assets. "
+                        "Must eliminate at least 2 consecutive supply zones to establish bottom-out criteria."
+                    ),
+                )
+
+        # Check Mandatory Candle Close Filter for Supply Breach
+        is_breached = breakout_candle_close > nearest_ltf_supply_zone.distal_line
+        if not is_breached:
+            return ConfirmationTradePlan(
+                htf_demand_zone=htf_demand_zone,
+                nearest_ltf_supply_zone=nearest_ltf_supply_zone,
+                is_htf_demand_tested=True,
+                is_supply_eliminated_by_close=False,
+                newly_formed_ltf_demand=None,
+                macro_risk_per_share=macro_risk,
+                compressed_risk_per_share=0.0,
+                risk_compression_ratio=1.0,
+                realized_target_rrr=0.0,
+                is_confirmed=False,
+                status_message=(
+                    f"Unconfirmed: Breakout candle close ({breakout_candle_close:.2f}) failed to close above "
+                    f"LTF supply distal line ({nearest_ltf_supply_zone.distal_line:.2f}). Mandatory close required."
+                ),
+            )
+
+        # Supply is breached by close! Now check newly formed LTF demand
+        if newly_formed_ltf_demand is None:
+            return ConfirmationTradePlan(
+                htf_demand_zone=htf_demand_zone,
+                nearest_ltf_supply_zone=nearest_ltf_supply_zone,
+                is_htf_demand_tested=True,
+                is_supply_eliminated_by_close=True,
+                newly_formed_ltf_demand=None,
+                macro_risk_per_share=macro_risk,
+                compressed_risk_per_share=0.0,
+                risk_compression_ratio=1.0,
+                realized_target_rrr=0.0,
+                is_confirmed=False,
+                status_message=(
+                    "Supply breached by close, but newly formed LTF demand zone not yet established. "
+                    "Do not chase continuous breakout candles; await base formation."
+                ),
+            )
+
+        # Newly formed demand exists
+        compressed_risk = abs(newly_formed_ltf_demand.proximal_line - newly_formed_ltf_demand.distal_line)
+        compression_ratio = round(macro_risk / compressed_risk, 2) if compressed_risk > 0 else 1.0
+
+        # Calculate RRR
+        if macro_opposing_supply_target is not None and compressed_risk > 0:
+            target_distance = abs(macro_opposing_supply_target - newly_formed_ltf_demand.proximal_line)
+            realized_rrr = round(target_distance / compressed_risk, 2)
+        else:
+            realized_rrr = newly_formed_ltf_demand.risk_reward_ratio
+
+        newly_formed_ltf_demand.trading_stance = TradingStance.AGGRESSIVE
+        newly_formed_ltf_demand.has_proven_achievement = True
+
+        return ConfirmationTradePlan(
+            htf_demand_zone=htf_demand_zone,
+            nearest_ltf_supply_zone=nearest_ltf_supply_zone,
+            is_htf_demand_tested=True,
+            is_supply_eliminated_by_close=True,
+            newly_formed_ltf_demand=newly_formed_ltf_demand,
+            macro_risk_per_share=macro_risk,
+            compressed_risk_per_share=compressed_risk,
+            risk_compression_ratio=compression_ratio,
+            realized_target_rrr=realized_rrr,
+            is_confirmed=True,
+            status_message=(
+                f"Confirmed (Episode 14): Backed by macro HTF Demand ({htf_demand_zone.timeframe.value}), "
+                f"1 LTF Supply Zone eliminated by close. Micro-risk entry on newly formed LTF demand "
+                f"(Risk compressed {compression_ratio:.1f}x from ₹{macro_risk:.1f} to ₹{compressed_risk:.1f}, "
+                f"RRR: {realized_rrr:.1f}:1)."
+            ),
+        )
+
+    @staticmethod
+    def validate_all_time_low_bottom_out(
+        is_at_all_time_low: bool,
+        consecutive_supply_breaches: int,
+    ) -> Tuple[bool, str]:
+        """
+        Episode 14 Rule: All-Time Low (ATL) Protocol.
+        In an All-Time Low asset, long trades are strictly forbidden.
+        Bottom-Out Criteria: An ATL stock cannot be assumed to have bottomed out until
+        at least 2 consecutive supply zones are eliminated on the intermediate timeframe.
+        """
+        if not is_at_all_time_low:
+            return True, "Asset not at All-Time Low; normal confirmation rules apply."
+
+        if consecutive_supply_breaches >= 2:
+            return (
+                True,
+                f"ATL Bottom-Out Qualified: {consecutive_supply_breaches} consecutive supply zones eliminated on intermediate timeframe. "
+                f"Macro institutional demand base established; long confirmation entries permitted."
+            )
+
+        return (
+            False,
+            f"ATL Long Prohibition: Asset at All-Time Low with only {consecutive_supply_breaches} supply breach(es). "
+            f"Long trades strictly forbidden. Requires >= 2 consecutive supply zones eliminated."
         )
 
 ```
@@ -5178,6 +5341,7 @@ if __name__ == "__main__":
 ---
 
 ---
+
 
 
 

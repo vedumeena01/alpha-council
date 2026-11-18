@@ -33,6 +33,8 @@ from alphacouncil.alpha.zone_engine import (
     ZoneAuthenticity,
     TradingStyleCategory,
     RejectionAudit,
+    ConfirmationEntryType,
+    ConfirmationTradePlan,
 )
 from alphacouncil.risk.gtf_risk import (
     RiskTier,
@@ -2385,3 +2387,250 @@ def test_episode_13_ema20_volatility_squeeze_detection():
     assert is_squeeze_w is False
     assert mean_dist_w > 0.4
     assert "Normal price-to-EMA spread" in msg_w
+
+
+# ==============================================================================
+# EPISODE 14 TESTS: TRADING AGAINST THE TREND (CONFIRMATION ENTRY)
+# ==============================================================================
+
+
+def test_episode_14_maruti_suzuki_confirmation_entry_risk_compression():
+    """
+    Episode 14 Benchmark Case Study: Maruti Suzuki March 2020 Crash.
+    - Macro Quarterly Demand: PL = 5,600, DL = 4,700 (Macro Risk = ₹900).
+    - Blind entry requires ₹900 SL and ₹1,800 to ₹2,000 target expansion.
+    - Confirmation Entry: Nearest Daily DBD Supply (DL = 5,200) breached by close at 5,230.
+    - Newly formed Daily Demand: PL = 5,210, DL = 5,180 (Compressed Risk = ₹30).
+    - Compresses risk 30.0x from ₹900 to ₹30, delivering 7:1 RRR to opposing macro resistance!
+    """
+    engine = DemandSupplyEngine()
+    demand_opens = np.array([200.0, 212.0, 215.0])
+    demand_highs = np.array([202.0, 218.0, 230.0])
+    demand_lows = np.array([198.0, 205.0, 214.0])
+    demand_closes = np.array([211.0, 215.0, 229.0])
+
+    supply_opens = np.array([180.0, 205.0, 200.0])
+    supply_highs = np.array([185.0, 210.0, 201.0])
+    supply_lows = np.array([179.0, 198.0, 180.0])
+    supply_closes = np.array([205.0, 200.0, 182.0])
+
+    # Macro Quarterly Demand (Shri Krishna)
+    htf_demand = engine.scan_for_zones(demand_opens, demand_highs, demand_lows, demand_closes)[0]
+    htf_demand.timeframe = TimeframeTier.QUARTERLY
+    htf_demand.proximal_line = 5600.0
+    htf_demand.distal_line = 4700.0
+
+    # Nearest Daily Supply (Hurdle)
+    ltf_supply = engine.scan_for_zones(supply_opens, supply_highs, supply_lows, supply_closes)[0]
+    ltf_supply.timeframe = TimeframeTier.DAILY
+    ltf_supply.proximal_line = 5100.0
+    ltf_supply.distal_line = 5200.0
+
+    # Newly formed Daily Demand formed by breakout rally
+    new_daily_demand = engine.scan_for_zones(demand_opens, demand_highs, demand_lows, demand_closes)[0]
+    new_daily_demand.timeframe = TimeframeTier.DAILY
+    new_daily_demand.proximal_line = 5210.0
+    new_daily_demand.distal_line = 5180.0
+
+    plan = DemandSupplyEngine.evaluate_trading_against_the_trend_confirmation(
+        htf_demand_zone=htf_demand,
+        nearest_ltf_supply_zone=ltf_supply,
+        breakout_candle_close=5230.0,  # Decisively closed above DL 5200.0
+        newly_formed_ltf_demand=new_daily_demand,
+        is_all_time_low=False,
+        macro_opposing_supply_target=5420.0,
+    )
+
+    assert isinstance(plan, ConfirmationTradePlan)
+    assert ConfirmationEntryType.MACRO_HTF_CONFIRMATION == "MACRO_HTF_CONFIRMATION"
+    assert plan.is_confirmed is True
+    assert plan.is_supply_eliminated_by_close is True
+    assert plan.macro_risk_per_share == 900.0
+    assert plan.compressed_risk_per_share == 30.0
+    assert plan.risk_compression_ratio == 30.0
+    assert plan.realized_target_rrr == 7.0  # (5420 - 5210) / 30 = 210 / 30 = 7.0:1
+    assert "Risk compressed 30.0x" in plan.status_message
+
+
+def test_episode_14_confirmation_requires_only_one_supply_breach_with_htf_backing():
+    """
+    Episode 14 Core Rule: Contrasts Advanced Trend vs. Confirmation Entry.
+    - Advanced Trend (Without HTF backing): Requires 2 supply breaches to confirm uptrend.
+    - Confirmation Entry (With HTF backing): Requires ONLY 1 supply breach!
+    """
+    engine = DemandSupplyEngine()
+    demand_opens = np.array([200.0, 212.0, 215.0])
+    demand_highs = np.array([202.0, 218.0, 230.0])
+    demand_lows = np.array([198.0, 205.0, 214.0])
+    demand_closes = np.array([211.0, 215.0, 229.0])
+
+    supply_opens = np.array([180.0, 205.0, 200.0])
+    supply_highs = np.array([185.0, 210.0, 201.0])
+    supply_lows = np.array([179.0, 198.0, 180.0])
+    supply_closes = np.array([205.0, 200.0, 182.0])
+
+    htf_demand = engine.scan_for_zones(demand_opens, demand_highs, demand_lows, demand_closes)[0]
+    htf_demand.timeframe = TimeframeTier.MONTHLY
+    htf_demand.proximal_line = 1000.0
+    htf_demand.distal_line = 900.0
+
+    ltf_supply = engine.scan_for_zones(supply_opens, supply_highs, supply_lows, supply_closes)[0]
+    ltf_supply.distal_line = 950.0
+
+    new_ltf_demand = engine.scan_for_zones(demand_opens, demand_highs, demand_lows, demand_closes)[0]
+    new_ltf_demand.proximal_line = 955.0
+    new_ltf_demand.distal_line = 945.0
+
+    # 1. Without HTF demand backing: 1 supply breach only gives Sideways (Episode 13)
+    trend_no_htf, _ = DemandSupplyEngine.calculate_advanced_trend(
+        prior_trend=TrendDirection.DOWNTREND,
+        consecutive_supply_breaches=1,
+        consecutive_demand_breaches=0,
+    )
+    assert trend_no_htf == TrendDirection.SIDEWAYS
+
+    # 2. With HTF demand backing: 1 supply breach unlocks confirmed trade entry! (Episode 14)
+    plan_with_htf = DemandSupplyEngine.evaluate_trading_against_the_trend_confirmation(
+        htf_demand_zone=htf_demand,
+        nearest_ltf_supply_zone=ltf_supply,
+        breakout_candle_close=955.0,  # Closes above DL 950.0
+        newly_formed_ltf_demand=new_ltf_demand,
+        is_all_time_low=False,
+    )
+    assert plan_with_htf.is_confirmed is True
+
+
+def test_episode_14_mandatory_close_filter_in_confirmation_entry():
+    """
+    Episode 14: Intra-candle wick spikes past supply distal line do NOT confirm entry.
+    Must physically close above distal line.
+    """
+    engine = DemandSupplyEngine()
+    demand_opens = np.array([200.0, 212.0, 215.0])
+    demand_highs = np.array([202.0, 218.0, 230.0])
+    demand_lows = np.array([198.0, 205.0, 214.0])
+    demand_closes = np.array([211.0, 215.0, 229.0])
+
+    supply_opens = np.array([180.0, 205.0, 200.0])
+    supply_highs = np.array([185.0, 210.0, 201.0])
+    supply_lows = np.array([179.0, 198.0, 180.0])
+    supply_closes = np.array([205.0, 200.0, 182.0])
+
+    htf_demand = engine.scan_for_zones(demand_opens, demand_highs, demand_lows, demand_closes)[0]
+    htf_demand.timeframe = TimeframeTier.MONTHLY
+    htf_demand.proximal_line = 1000.0
+    htf_demand.distal_line = 900.0
+
+    ltf_supply = engine.scan_for_zones(supply_opens, supply_highs, supply_lows, supply_closes)[0]
+    ltf_supply.distal_line = 950.0
+
+    new_ltf_demand = engine.scan_for_zones(demand_opens, demand_highs, demand_lows, demand_closes)[0]
+    new_ltf_demand.proximal_line = 955.0
+    new_ltf_demand.distal_line = 945.0
+
+    # Candle spikes to 955.0, but closes at 948.0 (below DL 950.0) -> Unconfirmed!
+    plan = DemandSupplyEngine.evaluate_trading_against_the_trend_confirmation(
+        htf_demand_zone=htf_demand,
+        nearest_ltf_supply_zone=ltf_supply,
+        breakout_candle_close=948.0,
+        newly_formed_ltf_demand=new_ltf_demand,
+        is_all_time_low=False,
+    )
+    assert plan.is_confirmed is False
+    assert plan.is_supply_eliminated_by_close is False
+    assert "failed to close above" in plan.status_message
+
+
+def test_episode_14_all_time_low_long_prohibition_and_bottom_out_criteria():
+    """
+    Episode 14 Rule: All-Time Low (ATL) Protocol.
+    - Long trades are strictly forbidden at All-Time Lows (no historical buying support).
+    - Requires at least 2 consecutive supply zones eliminated to qualify bottom-out.
+    """
+    engine = DemandSupplyEngine()
+    demand_opens = np.array([200.0, 212.0, 215.0])
+    demand_highs = np.array([202.0, 218.0, 230.0])
+    demand_lows = np.array([198.0, 205.0, 214.0])
+    demand_closes = np.array([211.0, 215.0, 229.0])
+
+    supply_opens = np.array([180.0, 205.0, 200.0])
+    supply_highs = np.array([185.0, 210.0, 201.0])
+    supply_lows = np.array([179.0, 198.0, 180.0])
+    supply_closes = np.array([205.0, 200.0, 182.0])
+
+    htf_demand = engine.scan_for_zones(demand_opens, demand_highs, demand_lows, demand_closes)[0]
+    htf_demand.proximal_line = 100.0
+    htf_demand.distal_line = 50.0
+
+    ltf_supply = engine.scan_for_zones(supply_opens, supply_highs, supply_lows, supply_closes)[0]
+    ltf_supply.distal_line = 70.0
+
+    new_ltf_demand = engine.scan_for_zones(demand_opens, demand_highs, demand_lows, demand_closes)[0]
+    new_ltf_demand.proximal_line = 72.0
+    new_ltf_demand.distal_line = 68.0
+
+    # 1. At ATL with 1 supply breach -> Blocked!
+    plan_atl = DemandSupplyEngine.evaluate_trading_against_the_trend_confirmation(
+        htf_demand_zone=htf_demand,
+        nearest_ltf_supply_zone=ltf_supply,
+        breakout_candle_close=75.0,
+        newly_formed_ltf_demand=new_ltf_demand,
+        is_all_time_low=True,
+        consecutive_supply_breaches_count=1,
+    )
+    assert plan_atl.is_confirmed is False
+    assert "All-Time Low Protection" in plan_atl.status_message
+
+    # 2. At ATL with 2 consecutive supply breaches -> Bottom-out qualified
+    is_qualified, msg = DemandSupplyEngine.validate_all_time_low_bottom_out(
+        is_at_all_time_low=True,
+        consecutive_supply_breaches=2,
+    )
+    assert is_qualified is True
+    assert "ATL Bottom-Out Qualified" in msg
+
+
+def test_episode_14_wit_125m_confirmation_entry():
+    """
+    Episode 14 Application: Weekly Income Trade (WIT) on 125m execution chart.
+    Daily trend is down, price hits Weekly Demand, 125m supply breached, enter on 125m demand.
+    """
+    engine = DemandSupplyEngine()
+    demand_opens = np.array([200.0, 212.0, 215.0])
+    demand_highs = np.array([202.0, 218.0, 230.0])
+    demand_lows = np.array([198.0, 205.0, 214.0])
+    demand_closes = np.array([211.0, 215.0, 229.0])
+
+    supply_opens = np.array([180.0, 205.0, 200.0])
+    supply_highs = np.array([185.0, 210.0, 201.0])
+    supply_lows = np.array([179.0, 198.0, 180.0])
+    supply_closes = np.array([205.0, 200.0, 182.0])
+
+    htf_weekly_demand = engine.scan_for_zones(demand_opens, demand_highs, demand_lows, demand_closes)[0]
+    htf_weekly_demand.timeframe = TimeframeTier.WEEKLY
+    htf_weekly_demand.proximal_line = 1000.0
+    htf_weekly_demand.distal_line = 920.0  # Macro risk = 80.0
+
+    ltf_125m_supply = engine.scan_for_zones(supply_opens, supply_highs, supply_lows, supply_closes)[0]
+    ltf_125m_supply.timeframe = TimeframeTier.M125
+    ltf_125m_supply.proximal_line = 960.0
+    ltf_125m_supply.distal_line = 970.0
+
+    new_125m_demand = engine.scan_for_zones(demand_opens, demand_highs, demand_lows, demand_closes)[0]
+    new_125m_demand.timeframe = TimeframeTier.M125
+    new_125m_demand.proximal_line = 968.0
+    new_125m_demand.distal_line = 952.0  # Compressed risk = 16.0
+
+    plan_wit = DemandSupplyEngine.evaluate_trading_against_the_trend_confirmation(
+        htf_demand_zone=htf_weekly_demand,
+        nearest_ltf_supply_zone=ltf_125m_supply,
+        breakout_candle_close=975.0,
+        newly_formed_ltf_demand=new_125m_demand,
+        is_all_time_low=False,
+        macro_opposing_supply_target=1032.0,  # Target distance = 1032 - 968 = 64
+    )
+    assert plan_wit.is_confirmed is True
+    assert plan_wit.macro_risk_per_share == 80.0
+    assert plan_wit.compressed_risk_per_share == 16.0
+    assert plan_wit.risk_compression_ratio == 5.0  # 80 / 16 = 5.0x
+    assert plan_wit.realized_target_rrr == 4.0      # 64 / 16 = 4.0:1
