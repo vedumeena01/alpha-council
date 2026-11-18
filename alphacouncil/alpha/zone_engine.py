@@ -135,6 +135,8 @@ class TradeScoreBreakdown:
     sector_support_bonus: int = 0      # 0 or 2 points from Episode 16 (The Supreme Add-on)
     sector_confluence_level: str = ""  # Level 1, Level 2, or Level 3 Rocket Move
     candlestick_pattern_bonus: int = 0 # 0 or 1 point from Episode 17 (Post-Entry Confidence Booster)
+    gap_confluence_bonus: int = 0      # 0, 1, or 2 points from Episode 18 (Gap Theory)
+    gap_application: str = ""          # Application 1, 2, 3, or 4
 
 
 class EntryType(str, Enum):
@@ -302,6 +304,11 @@ class IdentifiedZone:
     trading_stance: TradingStance = TradingStance.CONSERVATIVE
     has_proven_achievement: bool = False       # True if zone closed beyond opposing HTF zone
     anchored_htf_stoploss: Optional[float] = None # Stoploss anchored to Shri Krishna (HTF Distal Line)
+
+    # Gap Theory & Window Gap Mechanics (Episode 18)
+    is_pro_gap_origin: bool = False             # Zone formed via institutional Pro Gap departure
+    window_gap_level: Optional[float] = None    # Level of window gap (lowest wick for demand, highest wick for supply)
+    window_gap_decision: Optional[str] = None   # WINDOW_GAP_ELEVATED or WINDOW_GAP_DISCIPLINED_BASE
 
 
 class DemandSupplyEngine:
@@ -2522,6 +2529,10 @@ class DemandSupplyEngine:
         is_sector_in_free_fall: bool = False,
         candlestick_pattern: Optional[str] = None,
         is_pattern_in_mid_air_isolation: bool = False,
+        gap_application_report: Optional[Any] = None,
+        is_window_gap_present: bool = False,
+        window_gap_decision: Optional[str] = None,
+        window_gap_elevated_entry: Optional[float] = None,
     ) -> MasterRevisionAuditReport:
         """
         Episode 15 Master Revision Class: The 14-Point Comprehensive Top-Down Institutional Auditor.
@@ -2670,6 +2681,35 @@ class DemandSupplyEngine:
                     f"confirmed at Demand Zone, visually verifying institutional absorption."
                 )
 
+        # Episode 18: Gap Theory & Institutional Applications
+        if gap_application_report is not None:
+            gap_bonus = gap_application_report.trade_score_bonus
+            if gap_bonus > 0:
+                total_score = min(11.0, total_score + gap_bonus)
+                audit_checks_passed.append(
+                    f"Gap Confluence (+{gap_bonus} Bonus): {gap_application_report.application_type.value} "
+                    f"verified ({gap_application_report.probability_rating})."
+                )
+            if gap_application_report.disappearing_gap_detected:
+                audit_checks_passed.append(
+                    "Disappearing Gap Verified: Completed daily candle masks the morning opening void, "
+                    "but true order-flow imbalance confirmed at 9:15 AM open."
+                )
+
+        # Episode 18: Window Gap Execution Rule
+        if is_window_gap_present and window_gap_decision is not None:
+            if window_gap_decision == "WINDOW_GAP_ELEVATED":
+                elevated_str = f" to ₹{window_gap_elevated_entry:.2f}" if window_gap_elevated_entry else ""
+                audit_checks_passed.append(
+                    f"Window Gap Execution: Entry elevated{elevated_str} due to tight risk inflation. "
+                    "Stop-loss strictly maintained below distal line."
+                )
+            elif window_gap_decision == "WINDOW_GAP_DISCIPLINED_BASE":
+                audit_checks_passed.append(
+                    "Window Gap Execution: Maintained disciplined entry at Base Proximal line. "
+                    "No-Chase rule enforced to prevent inflated stop-loss risk."
+                )
+
         if base_score < 6.0 and not is_parent_sector_in_demand:
             rejection_reasons.append(f"Trade Score: Base score {base_score:.1f}/7.0 is below institutional minimum threshold of 6.0/7.0.")
         else:
@@ -2696,8 +2736,13 @@ class DemandSupplyEngine:
         else:
             audit_checks_passed.append("100-Trade Directive: Trading style complies with professional developmental rule.")
 
-        # 11. Mathematical Position Sizing & Rupee-Risk Invariance (Ep 10)
-        risk_per_share = abs(execution_zone.entry_price - execution_zone.stop_loss)
+        # 11. Mathematical Position Sizing & Rupee-Risk Invariance (Ep 10 & Ep 18 Window Gap Entry)
+        effective_entry = (
+            window_gap_elevated_entry
+            if (is_window_gap_present and window_gap_decision == "WINDOW_GAP_ELEVATED" and window_gap_elevated_entry)
+            else execution_zone.entry_price
+        )
+        risk_per_share = abs(effective_entry - execution_zone.stop_loss)
         if risk_per_share <= 0:
             risk_per_share = abs(execution_zone.proximal_line - execution_zone.distal_line)
 
@@ -2870,3 +2915,54 @@ class DemandSupplyEngine:
                 )
 
         return False, 0, "No candlestick pattern confluence detected."
+
+    @classmethod
+    def evaluate_gap_confluence_bonus(
+        cls,
+        zone: IdentifiedZone,
+        gap_report: Any,
+    ) -> Tuple[bool, int, str]:
+        """
+        Episode 18 GTF Rule: Gap Confluence as an Extra Trade Score Bonus:
+        - Application 1 (Novice Gap into Zone): +1 Point
+        - Application 2 (Novice Gap into Pro Gap Origin): +2 Points
+        - Application 4 (Master Setup: Novice In + Pro Out): +2 Points
+        - Application 3 (Pro Gap departing from Zone): Post-entry confirmation (extended targets)
+        """
+        bonus = gap_report.trade_score_bonus
+        if zone.trade_score is not None and bonus > 0:
+            zone.trade_score.gap_confluence_bonus = bonus
+            zone.trade_score.gap_application = gap_report.application_type.value
+            zone.trade_score.total_score += bonus
+        return (bonus > 0, bonus, gap_report.advisory_message)
+
+    @classmethod
+    def evaluate_window_gap_execution(
+        cls,
+        zone: IdentifiedZone,
+        legout_open: float,
+        legout_extreme_wick: float,
+        max_risk_inflation_threshold: float = 0.35,
+    ) -> Any:
+        """
+        Episode 18 GTF Rule: Window Gap Execution Analysis.
+        - Identifies whether an explosive leg-out gapped away from the base candle.
+        - Evaluates risk inflation:
+          - If close to base (<= 35% risk inflation): WINDOW_GAP_ELEVATED (elevate entry, anchor SL below distal).
+          - If far from base (> 35% risk inflation): WINDOW_GAP_DISCIPLINED_BASE (No-Chase Rule).
+        """
+        from alphacouncil.alpha.gap_engine import GapTheoryEngine, WindowGapDecision
+
+        analysis = GapTheoryEngine.analyze_window_gap(
+            base_proximal=zone.proximal_line,
+            distal=zone.distal_line,
+            legout_open=legout_open,
+            legout_extreme_wick=legout_extreme_wick,
+            is_demand_zone=zone.is_demand,
+            max_risk_inflation_threshold=max_risk_inflation_threshold,
+        )
+        zone.window_gap_level = analysis.window_gap_level
+        zone.window_gap_decision = analysis.decision.value
+        if analysis.decision == WindowGapDecision.WINDOW_GAP_ELEVATED:
+            zone.entry_price = analysis.window_gap_level
+        return analysis

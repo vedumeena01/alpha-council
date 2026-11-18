@@ -25,16 +25,17 @@
 | **15** | Revision Class & Master Top-Down Audit Engine (The "1% Club") | 5 | **100%** (5/5) | 0.39s | 2.5h Milestone Synthesis, The Half-Yearly Macro Supply Wall (The Macro Trap), Pristine Origin vs. Shallow Basing, 8:1 to 10:1+ RRR Target Expansion, 14-Point Master Top-Down Auditor | [`EPISODE_15_TEST_RESULTS.md`](EPISODE_15_TEST_RESULTS.md) |
 | **16** | Sectoral Analysis & The Confluence Multiplier (+2 Supreme Add-on) | 6 | **100%** (6/6) | 0.38s | +2 Supreme Sector Support Trade Score, Missing Support Filter, Level 3 Triad Alignment (Rocket Move), >50% Heavyweight Concentration Rule, Sector Rotation ("Sectors Cannot Go to Zero"), Portfolio Construction (12-15 Stocks) | [`EPISODE_16_TEST_RESULTS.md`](EPISODE_16_TEST_RESULTS.md) |
 | **17** | Candlestick Patterns and their Truth (The Absorption Law & +1 Booster) | 6 | **100%** (6/6) | 0.19s | 50/50 Coin-Toss Reality, The Whipsaw Trap, Institutional Absorption Law (Bearish in Demand Fails / Bear Trap), Rejection Law (Bullish in Supply Fails / Bull Trap), Structural Equivalence (Morning Star == DBR), +1 Post-Entry Confidence Booster | [`EPISODE_17_TEST_RESULTS.md`](EPISODE_17_TEST_RESULTS.md) |
-| **Total** | **All Episodes (Cumulative)** | **81** | **100%** (81/81) | **0.80s** | **Full GTF Price Action, Risk, Execution Stances, Confirmation Reversal, 14-Point Master Revision, Sectoral & Candlestick Pattern Truth Architecture (`zone_engine.py` + `sector_engine.py` + `pattern_engine.py` + `gtf_risk.py`)** | - |
+| **18** | Gap Theory (Structural & Behavioral, 4 Applications, Disappearing & Window Gap) | 7 | **100%** (7/7) | 0.41s | Inside vs. Outside Gap, Novice vs. Pro Gap, App 1 (Novice in Zone, +1 Score), App 2 (Novice in Pro Gap, +2 Score), App 3 (Pro Out Confirm), App 4 (Master Setup), Window Gap (Elevated vs. Disciplined Base), Disappearing Gap & Myth Debunking | [`EPISODE_18_TEST_RESULTS.md`](EPISODE_18_TEST_RESULTS.md) |
+| **Total** | **All Episodes (Cumulative)** | **88** | **100%** (88/88) | **0.94s** | **Full GTF Price Action, Risk, Execution Stances, Confirmation Reversal, 14-Point Master Revision, Sectoral, Candlestick Pattern Truth & Gap Theory Architecture (`zone_engine.py` + `sector_engine.py` + `pattern_engine.py` + `gap_engine.py` + `gtf_risk.py`)** | - |
 
 ---
 
 ## 🔬 System Health & Test Coverage Progress
 
 ```text
-Modules: alphacouncil/alpha/zone_engine.py + alphacouncil/alpha/sector_engine.py + alphacouncil/alpha/pattern_engine.py + alphacouncil/risk/gtf_risk.py
-Total Suite Tests: 100 (100% Passed)
-Cumulative Zone, Sector & Pattern Tests: 81 (100% Passed)
+Modules: alphacouncil/alpha/zone_engine.py + alphacouncil/alpha/sector_engine.py + alphacouncil/alpha/pattern_engine.py + alphacouncil/alpha/gap_engine.py + alphacouncil/risk/gtf_risk.py
+Total Suite Tests: 107 (100% Passed)
+Cumulative Zone, Sector, Pattern & Gap Tests: 88 (100% Passed)
 Linter Status: Ruff 0 errors, 0 warnings
 CI Status: GitHub Actions 100% Green (Python 3.11 & 3.12)
 ```
@@ -59,6 +60,7 @@ CI Status: GitHub Actions 100% Green (Python 3.11 & 3.12)
 - [`EPISODE_15_TEST_RESULTS.md`](EPISODE_15_TEST_RESULTS.md) - Milestone revision class & 14-point master top-down auditor.
 - [`EPISODE_16_TEST_RESULTS.md`](EPISODE_16_TEST_RESULTS.md) - Sectoral analysis, +2 sector score & heavyweight concentration.
 - [`EPISODE_17_TEST_RESULTS.md`](EPISODE_17_TEST_RESULTS.md) - Candlestick patterns truth, absorption law & +1 confidence booster.
+- [`EPISODE_18_TEST_RESULTS.md`](EPISODE_18_TEST_RESULTS.md) - Gap theory, 4 core applications, disappearing gaps & window gap mechanics.
 - [`EPISODE_04_TEST_RESULTS.md`](EPISODE_04_TEST_RESULTS.md) - Exceptional marking & trade execution.
 - [`EPISODE_05_TEST_RESULTS.md`](EPISODE_05_TEST_RESULTS.md) - Trading psychology, wick-to-wick, direct reversals & news traps.
 - [`EPISODE_06_TEST_RESULTS.md`](EPISODE_06_TEST_RESULTS.md) - The Closing concept, Gap+Base exciting, LOTL stacking, origin pivot & garbage filter.

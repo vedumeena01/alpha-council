@@ -5,21 +5,24 @@
 - [3. Point-in-Time Corporate Calendar & LODR 29 (alphacouncil/data/calendar.py)](#3-point-in-time-corporate-calendar--lodr-29)
 - [4. Demand & Supply Zone Core Engine (GTF Model) (alphacouncil/alpha/zone_engine.py)](#4-demand--supply-zone-core-engine-gtf-model)
 - [5. Deterministic Liquidity Sweep Detector (H1) (alphacouncil/alpha/sweep_detector.py)](#5-deterministic-liquidity-sweep-detector-h1)
-- [6. López de Prado Triple Barrier & OU Half-Life (alphacouncil/alpha/triple_barrier.py)](#6-lópez-de-prado-triple-barrier--ou-half-life)
+- [6. López de Prado Triple Barrier & OU Half-Life (alphacouncil/alpha/triple_barrier.py)](#6-lopez-de-prado-triple-barrier--ou-half-life)
 - [7. FinBERT Sentiment & Binomial Audit (H2) (alphacouncil/alpha/sentiment_nlp.py)](#7-finbert-sentiment--binomial-audit-h2)
-- [8. Pre-Trade Risk Engine & Concentration Limits (alphacouncil/risk/pre_trade.py)](#8-pre-trade-risk-engine--concentration-limits)
-- [9. Position Sizing & Kelly Calibration (alphacouncil/risk/sizing.py)](#9-position-sizing--kelly-calibration)
-- [10. López de Prado Meta-Labeler Downscaler (alphacouncil/risk/meta_labeler.py)](#10-lópez-de-prado-meta-labeler-downscaler)
-- [11. Intraday Kill-Switch & Monthly Session Halt (alphacouncil/risk/kill_switch.py)](#11-intraday-kill-switch--monthly-session-halt)
-- [12. Direction-Aware Circuit Band Guard (alphacouncil/risk/circuits.py)](#12-direction-aware-circuit-band-guard)
-- [13. Statutory Indian Market Friction Model (SEBI Oct 2024) (alphacouncil/execution/friction.py)](#13-statutory-indian-market-friction-model-sebi-oct-2024)
-- [14. Idempotent OMS & Broker GTT Bracket Sync (alphacouncil/execution/oms.py)](#14-idempotent-oms--broker-gtt-bracket-sync)
-- [15. Purged Walk-Forward Backtesting Engine (alphacouncil/backtest/engine.py)](#15-purged-walk-forward-backtesting-engine)
-- [16. Deflated Sharpe Ratio (DSR) & Quant Metrics (alphacouncil/backtest/metrics.py)](#16-deflated-sharpe-ratio-dsr--quant-metrics)
-- [17. 7-Model Orthogonal Ablation Suite (alphacouncil/backtest/ablation.py)](#17-7-model-orthogonal-ablation-suite)
-- [18. Interactive Bloomberg Dashboard UI (alphacouncil/ui/dashboard.py)](#18-interactive-bloomberg-dashboard-ui)
-- [19. Master Research Demo Runner (alphacouncil/run_council.py)](#19-master-research-demo-runner)
-- [20. GTF Risk Management & Capital Protection Engine (alphacouncil/risk/gtf_risk.py)](#20-gtf-risk-management--capital-protection-engine)
+- [8. Sectoral Analysis Engine (Episode 16) (alphacouncil/alpha/sector_engine.py)](#8-sectoral-analysis-engine-episode-16)
+- [9. Candlestick Patterns Truth Engine (Episode 17) (alphacouncil/alpha/pattern_engine.py)](#9-candlestick-patterns-truth-engine-episode-17)
+- [10. Gap Theory Engine (Episode 18) (alphacouncil/alpha/gap_engine.py)](#10-gap-theory-engine-episode-18)
+- [11. Pre-Trade Risk Engine & Concentration Limits (alphacouncil/risk/pre_trade.py)](#11-pre-trade-risk-engine--concentration-limits)
+- [12. Position Sizing & Kelly Calibration (alphacouncil/risk/sizing.py)](#12-position-sizing--kelly-calibration)
+- [13. López de Prado Meta-Labeler Downscaler (alphacouncil/risk/meta_labeler.py)](#13-lopez-de-prado-meta-labeler-downscaler)
+- [14. Intraday Kill-Switch & Monthly Session Halt (alphacouncil/risk/kill_switch.py)](#14-intraday-kill-switch--monthly-session-halt)
+- [15. Direction-Aware Circuit Band Guard (alphacouncil/risk/circuits.py)](#15-direction-aware-circuit-band-guard)
+- [16. GTF Risk Management & Capital Protection Engine (alphacouncil/risk/gtf_risk.py)](#16-gtf-risk-management--capital-protection-engine)
+- [17. Statutory Indian Market Friction Model (SEBI Oct 2024) (alphacouncil/execution/friction.py)](#17-statutory-indian-market-friction-model-sebi-oct-2024)
+- [18. Idempotent OMS & Broker GTT Bracket Sync (alphacouncil/execution/oms.py)](#18-idempotent-oms--broker-gtt-bracket-sync)
+- [19. Purged Walk-Forward Backtesting Engine (alphacouncil/backtest/engine.py)](#19-purged-walk-forward-backtesting-engine)
+- [20. Deflated Sharpe Ratio (DSR) & Quant Metrics (alphacouncil/backtest/metrics.py)](#20-deflated-sharpe-ratio-dsr--quant-metrics)
+- [21. 7-Model Orthogonal Ablation Suite (alphacouncil/backtest/ablation.py)](#21-7-model-orthogonal-ablation-suite)
+- [22. Interactive Bloomberg Dashboard UI (alphacouncil/ui/dashboard.py)](#22-interactive-bloomberg-dashboard-ui)
+- [23. Master Research Demo Runner (alphacouncil/run_council.py)](#23-master-research-demo-runner)
 
 ---
 
@@ -84,6 +87,7 @@ class AlphaCouncilConfig(BaseModel):
 
 # Global default configuration instance
 DEFAULT_CONFIG = AlphaCouncilConfig()
+
 `
 
 ---
@@ -253,6 +257,7 @@ class MarketDataFeed:
             px = base_prices.get(sym, 1000.0)
             dataset[sym] = self.generate_series(symbol=sym, n_bars=n_bars, initial_price=px)
         return dataset
+
 `
 
 ---
@@ -332,6 +337,7 @@ class PointInTimeCalendar:
         self._ensure_symbol_events(symbol)
         events = self.events.get(symbol, [])
         return events[0] if events else None
+
 `
 
 ---
@@ -339,7 +345,7 @@ class PointInTimeCalendar:
 ### 4. Demand & Supply Zone Core Engine (GTF Model)
 **File:** [alphacouncil/alpha/zone_engine.py](alphacouncil/alpha/zone_engine.py)
 
-```python
+`python
 """
 Demand & Supply Core Engine (Trading in the Zone / GTF Methodology).
 Codifies institutional order-matching mechanics, Exciting vs Base candle classification,
@@ -477,6 +483,8 @@ class TradeScoreBreakdown:
     sector_support_bonus: int = 0      # 0 or 2 points from Episode 16 (The Supreme Add-on)
     sector_confluence_level: str = ""  # Level 1, Level 2, or Level 3 Rocket Move
     candlestick_pattern_bonus: int = 0 # 0 or 1 point from Episode 17 (Post-Entry Confidence Booster)
+    gap_confluence_bonus: int = 0      # 0, 1, or 2 points from Episode 18 (Gap Theory)
+    gap_application: str = ""          # Application 1, 2, 3, or 4
 
 
 class EntryType(str, Enum):
@@ -644,6 +652,11 @@ class IdentifiedZone:
     trading_stance: TradingStance = TradingStance.CONSERVATIVE
     has_proven_achievement: bool = False       # True if zone closed beyond opposing HTF zone
     anchored_htf_stoploss: Optional[float] = None # Stoploss anchored to Shri Krishna (HTF Distal Line)
+
+    # Gap Theory & Window Gap Mechanics (Episode 18)
+    is_pro_gap_origin: bool = False             # Zone formed via institutional Pro Gap departure
+    window_gap_level: Optional[float] = None    # Level of window gap (lowest wick for demand, highest wick for supply)
+    window_gap_decision: Optional[str] = None   # WINDOW_GAP_ELEVATED or WINDOW_GAP_DISCIPLINED_BASE
 
 
 class DemandSupplyEngine:
@@ -2864,6 +2877,10 @@ class DemandSupplyEngine:
         is_sector_in_free_fall: bool = False,
         candlestick_pattern: Optional[str] = None,
         is_pattern_in_mid_air_isolation: bool = False,
+        gap_application_report: Optional[Any] = None,
+        is_window_gap_present: bool = False,
+        window_gap_decision: Optional[str] = None,
+        window_gap_elevated_entry: Optional[float] = None,
     ) -> MasterRevisionAuditReport:
         """
         Episode 15 Master Revision Class: The 14-Point Comprehensive Top-Down Institutional Auditor.
@@ -3012,6 +3029,35 @@ class DemandSupplyEngine:
                     f"confirmed at Demand Zone, visually verifying institutional absorption."
                 )
 
+        # Episode 18: Gap Theory & Institutional Applications
+        if gap_application_report is not None:
+            gap_bonus = gap_application_report.trade_score_bonus
+            if gap_bonus > 0:
+                total_score = min(11.0, total_score + gap_bonus)
+                audit_checks_passed.append(
+                    f"Gap Confluence (+{gap_bonus} Bonus): {gap_application_report.application_type.value} "
+                    f"verified ({gap_application_report.probability_rating})."
+                )
+            if gap_application_report.disappearing_gap_detected:
+                audit_checks_passed.append(
+                    "Disappearing Gap Verified: Completed daily candle masks the morning opening void, "
+                    "but true order-flow imbalance confirmed at 9:15 AM open."
+                )
+
+        # Episode 18: Window Gap Execution Rule
+        if is_window_gap_present and window_gap_decision is not None:
+            if window_gap_decision == "WINDOW_GAP_ELEVATED":
+                elevated_str = f" to ₹{window_gap_elevated_entry:.2f}" if window_gap_elevated_entry else ""
+                audit_checks_passed.append(
+                    f"Window Gap Execution: Entry elevated{elevated_str} due to tight risk inflation. "
+                    "Stop-loss strictly maintained below distal line."
+                )
+            elif window_gap_decision == "WINDOW_GAP_DISCIPLINED_BASE":
+                audit_checks_passed.append(
+                    "Window Gap Execution: Maintained disciplined entry at Base Proximal line. "
+                    "No-Chase rule enforced to prevent inflated stop-loss risk."
+                )
+
         if base_score < 6.0 and not is_parent_sector_in_demand:
             rejection_reasons.append(f"Trade Score: Base score {base_score:.1f}/7.0 is below institutional minimum threshold of 6.0/7.0.")
         else:
@@ -3038,8 +3084,13 @@ class DemandSupplyEngine:
         else:
             audit_checks_passed.append("100-Trade Directive: Trading style complies with professional developmental rule.")
 
-        # 11. Mathematical Position Sizing & Rupee-Risk Invariance (Ep 10)
-        risk_per_share = abs(execution_zone.entry_price - execution_zone.stop_loss)
+        # 11. Mathematical Position Sizing & Rupee-Risk Invariance (Ep 10 & Ep 18 Window Gap Entry)
+        effective_entry = (
+            window_gap_elevated_entry
+            if (is_window_gap_present and window_gap_decision == "WINDOW_GAP_ELEVATED" and window_gap_elevated_entry)
+            else execution_zone.entry_price
+        )
+        risk_per_share = abs(effective_entry - execution_zone.stop_loss)
         if risk_per_share <= 0:
             risk_per_share = abs(execution_zone.proximal_line - execution_zone.distal_line)
 
@@ -3213,7 +3264,58 @@ class DemandSupplyEngine:
 
         return False, 0, "No candlestick pattern confluence detected."
 
-```
+    @classmethod
+    def evaluate_gap_confluence_bonus(
+        cls,
+        zone: IdentifiedZone,
+        gap_report: Any,
+    ) -> Tuple[bool, int, str]:
+        """
+        Episode 18 GTF Rule: Gap Confluence as an Extra Trade Score Bonus:
+        - Application 1 (Novice Gap into Zone): +1 Point
+        - Application 2 (Novice Gap into Pro Gap Origin): +2 Points
+        - Application 4 (Master Setup: Novice In + Pro Out): +2 Points
+        - Application 3 (Pro Gap departing from Zone): Post-entry confirmation (extended targets)
+        """
+        bonus = gap_report.trade_score_bonus
+        if zone.trade_score is not None and bonus > 0:
+            zone.trade_score.gap_confluence_bonus = bonus
+            zone.trade_score.gap_application = gap_report.application_type.value
+            zone.trade_score.total_score += bonus
+        return (bonus > 0, bonus, gap_report.advisory_message)
+
+    @classmethod
+    def evaluate_window_gap_execution(
+        cls,
+        zone: IdentifiedZone,
+        legout_open: float,
+        legout_extreme_wick: float,
+        max_risk_inflation_threshold: float = 0.35,
+    ) -> Any:
+        """
+        Episode 18 GTF Rule: Window Gap Execution Analysis.
+        - Identifies whether an explosive leg-out gapped away from the base candle.
+        - Evaluates risk inflation:
+          - If close to base (<= 35% risk inflation): WINDOW_GAP_ELEVATED (elevate entry, anchor SL below distal).
+          - If far from base (> 35% risk inflation): WINDOW_GAP_DISCIPLINED_BASE (No-Chase Rule).
+        """
+        from alphacouncil.alpha.gap_engine import GapTheoryEngine, WindowGapDecision
+
+        analysis = GapTheoryEngine.analyze_window_gap(
+            base_proximal=zone.proximal_line,
+            distal=zone.distal_line,
+            legout_open=legout_open,
+            legout_extreme_wick=legout_extreme_wick,
+            is_demand_zone=zone.is_demand,
+            max_risk_inflation_threshold=max_risk_inflation_threshold,
+        )
+        zone.window_gap_level = analysis.window_gap_level
+        zone.window_gap_decision = analysis.decision.value
+        if analysis.decision == WindowGapDecision.WINDOW_GAP_ELEVATED:
+            zone.entry_price = analysis.window_gap_level
+        return analysis
+
+`
 
 ---
 
@@ -3341,6 +3443,7 @@ class LiquiditySweepDetector:
             if sig and sig.signal == 1:
                 signals.append(sig)
         return signals
+
 `
 
 ---
@@ -3473,6 +3576,7 @@ class TripleBarrierLabeler:
             holding_period_days=limit,
             is_success=(ret > 0.0),
         )
+
 `
 
 ---
@@ -3602,11 +3706,1285 @@ class FinBertSentimentExtractor:
         normalized_indices = list(range(len(dates)))
         rebased_prices = [round((p / prices[0]) * 100.0, 2) for p in prices]
         return synthetic_symbol, normalized_indices, rebased_prices
+
 `
 
 ---
 
-### 8. Pre-Trade Risk Engine & Concentration Limits
+### 8. Sectoral Analysis Engine (Episode 16)
+**File:** [alphacouncil/alpha/sector_engine.py](alphacouncil/alpha/sector_engine.py)
+
+`python
+"""
+Sectoral Analysis Core Engine (Trading in the Zone / GTF Methodology).
+Codifies Episode 16 principles:
+1. The +2 Extra Trade Score for Sector Support (The Supreme Add-on).
+2. Nifty 50 as the Universal Umbrella Benchmark.
+3. Sector Weightings & Heavyweight Concentration (>50% Rule).
+4. Simultaneous Zone Alignment (The Confluence Multiplier / Rocket Move):
+   - Level 1: Only Nifty in Demand Zone (+0.5 modest push).
+   - Level 2: Only Stock in Demand Zone (+0.0 independent bounce).
+   - Level 3: Stock + Sector + Nifty ALL in Demand Zones simultaneously (+2.0 Rocket Move!).
+5. The Missing Support Filter (Blocks longs when sector is in free fall).
+6. Sector Rotation Dynamics & "Sectors Cannot Go to Zero" Axiom.
+7. Portfolio Construction Rules (12-15 stocks max, 2-4 per sector, 40-40-20 rule).
+"""
+
+from dataclasses import dataclass, field
+from enum import Enum
+from typing import Dict, List, Optional, Tuple
+
+
+class SectorName(str, Enum):
+    NIFTY_50 = "NIFTY_50"
+    NIFTY_BANK = "NIFTY_BANK"
+    NIFTY_FIN_SERVICES = "NIFTY_FIN_SERVICES"
+    NIFTY_AUTO = "NIFTY_AUTO"
+    NIFTY_IT = "NIFTY_IT"
+    NIFTY_METAL = "NIFTY_METAL"
+    NIFTY_REALTY = "NIFTY_REALTY"
+    NIFTY_PHARMA = "NIFTY_PHARMA"
+    NIFTY_FMCG = "NIFTY_FMCG"
+    NIFTY_ENERGY = "NIFTY_ENERGY"
+    NIFTY_PSU_BANK = "NIFTY_PSU_BANK"
+    NIFTY_PVT_BANK = "NIFTY_PVT_BANK"
+    NIFTY_MEDIA = "NIFTY_MEDIA"
+    NIFTY_INFRA = "NIFTY_INFRA"
+
+
+class SectorConfluenceLevel(str, Enum):
+    LEVEL_1_NIFTY_ONLY = "LEVEL_1_NIFTY_ONLY"    # Modest macro push (+0.5)
+    LEVEL_2_STOCK_ONLY = "LEVEL_2_STOCK_ONLY"    # Stock bounces independently (+0.0)
+    LEVEL_3_ROCKET_MOVE = "LEVEL_3_ROCKET_MOVE"  # Stock + Sector + Nifty ALL in Demand (+2.0 Rocket Move)
+    SECTOR_SUPPORTED = "SECTOR_SUPPORTED"        # Stock + Sector in Demand (+2.0)
+    MISSING_SUPPORT = "MISSING_SUPPORT"          # Stock in Demand, but Sector in free fall (Veto/Halt)
+
+
+class SectorRotationPhase(str, Enum):
+    ACCUMULATION_AT_CYCLE_LOW = "ACCUMULATION_AT_CYCLE_LOW"  # Multi-year low / macro origin (Sectors Cannot Go to Zero)
+    EARLY_EXPANSION = "EARLY_EXPANSION"                      # Breakout from base through tested supply trendline
+    PEAK_AT_ALL_TIME_HIGH = "PEAK_AT_ALL_TIME_HIGH"          # Distribution at ATH; rotate to lagging constituents
+    DISTRIBUTION_AT_SUPPLY = "DISTRIBUTION_AT_SUPPLY"        # Multi-month selling pressure from macro supply
+    CORRECTION_WITH_TESTED_SUPPLY = "CORRECTION_WITH_TESTED_SUPPLY" # Relief rallies testing and consuming supply
+
+
+# =====================================================================
+# OFFICIAL NSE SECTOR WEIGHTINGS REGISTRY (FACT SHEET GROUNDING)
+# =====================================================================
+
+NSE_SECTOR_WEIGHTINGS: Dict[SectorName, Dict[str, float]] = {
+    SectorName.NIFTY_AUTO: {
+        "M&M": 20.0,
+        "MARUTI": 19.0,
+        "TATAMOTORS": 12.0,  # Top 3 account for 51.0% (>50%)
+        "BAJAJ-AUTO": 9.0,
+        "EICHERMOT": 7.0,
+        "HEROMOTOCO": 6.0,
+        "TVSMOTOR": 5.0,
+        "BHARATFORG": 4.0,
+        "ASHOKLEY": 4.0,
+        "BALKRISIND": 3.0,
+        "MOTHERSON": 3.0,
+        "BOSCHLTD": 2.5,
+        "APOLLOTYRE": 2.0,
+        "MRF": 1.5,
+        "TIINDIA": 1.0,
+    },
+    SectorName.NIFTY_IT: {
+        "TCS": 28.0,
+        "INFY": 26.0,  # Top 2 account for 54.0% (>50%)
+        "HCLTECH": 10.0,
+        "WIPRO": 8.0,
+        "TECHM": 7.0,
+        "LTIM": 6.0,
+        "PERSISTENT": 5.0,
+        "COFORGE": 4.0,
+        "MPHASIS": 3.0,
+        "LTTS": 3.0,
+    },
+    SectorName.NIFTY_FIN_SERVICES: {
+        "HDFCBANK": 29.0,
+        "ICICIBANK": 22.0,  # Top 2 account for 51.0% (>50%)
+        "KOTAKBANK": 10.0,
+        "AXISBANK": 10.0,
+        "SBIN": 9.0,
+        "BAJFINANCE": 8.0,
+        "BAJAJFINSV": 4.0,
+        "CHOLAFIN": 3.0,
+        "SHRIRAMFIN": 2.5,
+        "HDFCLIFE": 2.5,
+    },
+    SectorName.NIFTY_BANK: {
+        "HDFCBANK": 29.0,
+        "ICICIBANK": 23.0,  # Top 2 account for 52.0% (>50%)
+        "AXISBANK": 11.0,
+        "KOTAKBANK": 10.0,
+        "SBIN": 9.0,
+        "INDUSINDBK": 6.0,
+        "BANKBARODA": 3.5,
+        "PNB": 2.5,
+        "CANBK": 2.0,
+        "FEDERALBNK": 1.5,
+        "IDFCFIRSTB": 1.5,
+        "AUBANK": 1.0,
+    },
+    SectorName.NIFTY_METAL: {
+        "JSWSTEEL": 22.0,
+        "TATASTEEL": 20.0,
+        "HINDALCO": 18.0,  # Top 3 account for 60.0% (>50%)
+        "ADANIENT": 15.0,
+        "VEDL": 8.0,
+        "JINDALSTEL": 6.0,
+        "SAIL": 4.0,
+        "NATIONALUM": 3.0,
+        "NMDC": 2.5,
+        "HINDZINC": 1.5,
+    },
+    SectorName.NIFTY_REALTY: {
+        "DLF": 30.0,
+        "GODREJPROP": 20.0,  # Top 2 account for 50.0%
+        "OBEROIRLTY": 15.0,
+        "PHOENIXLTD": 11.0,
+        "PRESTIGE": 9.0,
+        "BRIGADE": 5.0,
+        "SOBHA": 4.0,
+        "MAHLIFE": 3.0,
+        "SUNTECK": 2.0,
+        "IBREALEST": 1.0,
+    },
+    SectorName.NIFTY_PSU_BANK: {
+        "SBIN": 38.0,
+        "BANKBARODA": 16.0,  # Top 2 account for 54.0%
+        "PNB": 14.0,
+        "CANBK": 12.0,
+        "UNIONBANK": 7.0,
+        "INDIANB": 5.0,
+        "BANKINDIA": 3.0,
+        "CENTRALBK": 2.0,
+        "IOB": 1.5,
+        "UCOBANK": 1.5,
+    },
+}
+
+# Reverse lookup mapping from ticker symbol to primary SectorName
+STOCK_TO_SECTOR_LOOKUP: Dict[str, SectorName] = {
+    # Auto
+    "M&M": SectorName.NIFTY_AUTO,
+    "MARUTI": SectorName.NIFTY_AUTO,
+    "TATAMOTORS": SectorName.NIFTY_AUTO,
+    "BAJAJ-AUTO": SectorName.NIFTY_AUTO,
+    "EICHERMOT": SectorName.NIFTY_AUTO,
+    "HEROMOTOCO": SectorName.NIFTY_AUTO,
+    "TVSMOTOR": SectorName.NIFTY_AUTO,
+    "ASHOKLEY": SectorName.NIFTY_AUTO,
+    "BALKRISIND": SectorName.NIFTY_AUTO,
+    # IT
+    "TCS": SectorName.NIFTY_IT,
+    "INFY": SectorName.NIFTY_IT,
+    "HCLTECH": SectorName.NIFTY_IT,
+    "WIPRO": SectorName.NIFTY_IT,
+    "TECHM": SectorName.NIFTY_IT,
+    "LTIM": SectorName.NIFTY_IT,
+    # Banking & Finance
+    "HDFCBANK": SectorName.NIFTY_BANK,
+    "ICICIBANK": SectorName.NIFTY_BANK,
+    "AXISBANK": SectorName.NIFTY_BANK,
+    "KOTAKBANK": SectorName.NIFTY_BANK,
+    "SBIN": SectorName.NIFTY_BANK,
+    "BANKBARODA": SectorName.NIFTY_BANK,
+    "CANBK": SectorName.NIFTY_BANK,
+    "BAJFINANCE": SectorName.NIFTY_FIN_SERVICES,
+    "BAJAJFINSV": SectorName.NIFTY_FIN_SERVICES,
+    # Metal
+    "JSWSTEEL": SectorName.NIFTY_METAL,
+    "TATASTEEL": SectorName.NIFTY_METAL,
+    "HINDALCO": SectorName.NIFTY_METAL,
+    "ADANIENT": SectorName.NIFTY_METAL,
+    "VEDL": SectorName.NIFTY_METAL,
+    "SAIL": SectorName.NIFTY_METAL,
+    "NATIONALUM": SectorName.NIFTY_METAL,
+    # Realty
+    "DLF": SectorName.NIFTY_REALTY,
+    "GODREJPROP": SectorName.NIFTY_REALTY,
+    "OBEROIRLTY": SectorName.NIFTY_REALTY,
+}
+
+
+@dataclass
+class SectorConfluenceResult:
+    confluence_level: SectorConfluenceLevel
+    is_stock_in_demand: bool
+    is_sector_in_demand: bool
+    is_nifty_in_demand: bool
+    bonus_points: float
+    is_rocket_move: bool
+    missing_support_warning: bool
+    status_message: str
+
+
+@dataclass
+class HeavyweightStatusReport:
+    sector: SectorName
+    top_heavyweights: List[str]
+    heavyweight_combined_weight_pct: float
+    heavyweights_in_demand: List[str]
+    heavyweights_in_supply: List[str]
+    is_heavyweight_momentum_bullish: bool
+    explanation: str
+
+
+@dataclass
+class PortfolioSectorAllocationReport:
+    is_allocation_valid: bool
+    total_stocks_count: int
+    sectors_represented: List[SectorName]
+    stocks_per_sector: Dict[str, int]
+    rotation_arbitrage_candidates: List[str] = field(default_factory=list)
+    rejection_reasons: List[str] = field(default_factory=list)
+    advisory: str = ""
+
+
+class SectorAnalysisEngine:
+    """
+    Episode 16 Quantitative Sector Engine:
+    Manages Sector Weightings, Heavyweight Concentration, Simultaneous Confluence,
+    Sector Rotation Cycles, and Portfolio Allocation.
+    """
+
+    @staticmethod
+    def get_parent_sector(stock_symbol: str) -> SectorName:
+        """
+        Universal Rule: Returns the primary SectorName for an equity.
+        If the sector is ambiguous or unlisted, defaults to Nifty 50 (Universal Umbrella).
+        """
+        clean_sym = stock_symbol.strip().upper()
+        return STOCK_TO_SECTOR_LOOKUP.get(clean_sym, SectorName.NIFTY_50)
+
+    @staticmethod
+    def evaluate_heavyweight_concentration(
+        sector: SectorName,
+        stock_zone_states: Dict[str, str],  # Symbol -> "DEMAND", "SUPPLY", "NEUTRAL"
+    ) -> HeavyweightStatusReport:
+        """
+        Episode 16: The >50% Heavyweight Concentration Rule.
+        Evaluates whether the 2-3 stocks driving over 50% of the index are in
+        Demand Zones (bullish index propel) or Supply Zones (bearish index drag).
+        """
+        weights = NSE_SECTOR_WEIGHTINGS.get(sector, {})
+        if not weights:
+            return HeavyweightStatusReport(
+                sector=sector,
+                top_heavyweights=[],
+                heavyweight_combined_weight_pct=0.0,
+                heavyweights_in_demand=[],
+                heavyweights_in_supply=[],
+                is_heavyweight_momentum_bullish=False,
+                explanation=f"No granular weighting data registered for {sector.value}; evaluating via Nifty 50 umbrella.",
+            )
+
+        # Sort constituents by weight descending
+        sorted_constituents = sorted(weights.items(), key=lambda x: x[1], reverse=True)
+
+        # Select top heavyweights until combined weight crosses 50.0%
+        top_hw: List[str] = []
+        cum_weight = 0.0
+        for sym, wt in sorted_constituents:
+            top_hw.append(sym)
+            cum_weight += wt
+            if cum_weight >= 50.0:
+                break
+
+        in_demand: List[str] = []
+        in_supply: List[str] = []
+
+        for sym in top_hw:
+            state = stock_zone_states.get(sym, "NEUTRAL").upper()
+            if state == "DEMAND":
+                in_demand.append(sym)
+            elif state == "SUPPLY":
+                in_supply.append(sym)
+
+        # Heavyweight momentum is bullish if majority of top heavyweights are in Demand
+        is_bullish = len(in_demand) >= (len(top_hw) / 2.0) and len(in_demand) > len(in_supply)
+
+        if is_bullish:
+            expl = (
+                f"Bullish Heavyweight Momentum in {sector.value}: Top heavyweights "
+                f"({', '.join(in_demand)}) controlling {cum_weight:.1f}% index weight are in Demand Zones. "
+                f"Sector index will propel upward, creating tailwinds for individual constituents."
+            )
+        elif len(in_supply) > 0:
+            expl = (
+                f"Bearish Heavyweight Drag in {sector.value}: Heavyweights ({', '.join(in_supply)}) "
+                f"are in Supply Zones. Even if low-weight constituents bounce, sector index will face heavy drag."
+            )
+        else:
+            expl = (
+                f"Neutral Heavyweight State in {sector.value}: Heavyweights controlling {cum_weight:.1f}% "
+                f"are in consolidation without clear zone triggers."
+            )
+
+        return HeavyweightStatusReport(
+            sector=sector,
+            top_heavyweights=top_hw,
+            heavyweight_combined_weight_pct=cum_weight,
+            heavyweights_in_demand=in_demand,
+            heavyweights_in_supply=in_supply,
+            is_heavyweight_momentum_bullish=is_bullish,
+            explanation=expl,
+        )
+
+    @staticmethod
+    def evaluate_simultaneous_confluence(
+        is_stock_in_demand: bool,
+        is_sector_in_demand: bool,
+        is_nifty_in_demand: bool,
+        is_sector_in_free_fall: bool = False,
+    ) -> SectorConfluenceResult:
+        """
+        Episode 16: The Three Levels of Sector Confluence & Missing Support Filter.
+        - Level 1: Only Nifty in Demand Zone -> +0.5 points (Modest macro push).
+        - Level 2: Only Stock in Demand Zone -> +0.0 points (Independent bounce).
+        - Level 3: Stock + Sector + Nifty ALL in Demand Zones -> +2.0 points (EXPLOSIVE ROCKET MOVE!).
+        - Stock + Sector in Demand -> +2.0 points (Supreme Sector Support Add-on).
+        - The Missing Support Filter: If stock is in Demand but Sector/Nifty are in free fall,
+          flag warning and block long execution.
+        """
+        # 1. The Missing Support Filter (Episode 16 Rule)
+        if is_stock_in_demand and is_sector_in_free_fall:
+            return SectorConfluenceResult(
+                confluence_level=SectorConfluenceLevel.MISSING_SUPPORT,
+                is_stock_in_demand=True,
+                is_sector_in_demand=False,
+                is_nifty_in_demand=is_nifty_in_demand,
+                bonus_points=0.0,
+                is_rocket_move=False,
+                missing_support_warning=True,
+                status_message=(
+                    "The Missing Support Trap Detected: Stock is in Demand Zone, but parent sector is in free fall. "
+                    "Long execution must be halted; wait for the parent sector to reach historical support."
+                ),
+            )
+
+        # 2. Level 3: Simultaneous Triad Alignment (Rocket Move)
+        if is_stock_in_demand and is_sector_in_demand and is_nifty_in_demand:
+            return SectorConfluenceResult(
+                confluence_level=SectorConfluenceLevel.LEVEL_3_ROCKET_MOVE,
+                is_stock_in_demand=True,
+                is_sector_in_demand=True,
+                is_nifty_in_demand=True,
+                bonus_points=2.0,
+                is_rocket_move=True,
+                missing_support_warning=False,
+                status_message=(
+                    "Level 3 Confluence (Explosive Rocket Move!): Stock, Parent Sector, and Nifty 50 are ALL in "
+                    "institutional Demand Zones simultaneously. +2 Extra Trade Score awarded. Exceptional statistical edge."
+                ),
+            )
+
+        # 3. Stock + Sector in Demand (Standard Supreme Add-on)
+        if is_stock_in_demand and is_sector_in_demand:
+            return SectorConfluenceResult(
+                confluence_level=SectorConfluenceLevel.SECTOR_SUPPORTED,
+                is_stock_in_demand=True,
+                is_sector_in_demand=True,
+                is_nifty_in_demand=False,
+                bonus_points=2.0,
+                is_rocket_move=False,
+                missing_support_warning=False,
+                status_message=(
+                    "Sector Supported (+2 Extra Trade Score): Parent sector is in Demand Zone. "
+                    "Macro institutional order flow provides powerful tailwind for individual stock setup."
+                ),
+            )
+
+        # 4. Level 1: Only Nifty in Demand Zone
+        if not is_stock_in_demand and not is_sector_in_demand and is_nifty_in_demand:
+            return SectorConfluenceResult(
+                confluence_level=SectorConfluenceLevel.LEVEL_1_NIFTY_ONLY,
+                is_stock_in_demand=False,
+                is_sector_in_demand=False,
+                is_nifty_in_demand=True,
+                bonus_points=0.5,
+                is_rocket_move=False,
+                missing_support_warning=False,
+                status_message="Level 1 Confluence: Only Nifty 50 is in Demand Zone. Modest broader market push.",
+            )
+
+        # 5. Level 2: Only Stock in Demand Zone
+        return SectorConfluenceResult(
+            confluence_level=SectorConfluenceLevel.LEVEL_2_STOCK_ONLY,
+            is_stock_in_demand=is_stock_in_demand,
+            is_sector_in_demand=is_sector_in_demand,
+            is_nifty_in_demand=is_nifty_in_demand,
+            bonus_points=0.0,
+            is_rocket_move=False,
+            missing_support_warning=False,
+            status_message="Level 2 Confluence: Only Stock is in Demand Zone. Stock must bounce independently.",
+        )
+
+    @staticmethod
+    def evaluate_sector_rotation(
+        sector: SectorName,
+        current_index_level: float,
+        macro_demand_zone: Optional[Tuple[float, float]] = None,
+        macro_supply_zone: Optional[Tuple[float, float]] = None,
+        tested_overhead_supply_count: int = 0,
+        is_at_all_time_high: bool = False,
+    ) -> Tuple[SectorRotationPhase, str]:
+        """
+        Episode 16: Sector Rotation Dynamics.
+        - "Sectors Cannot Go to Zero": A national sector index (Metal, PSU Bank, IT) cannot go bankrupt.
+          When reaching multi-year lows or historical demand origins, it is a prime institutional accumulation zone.
+        - Tested Supply Trendline: Relief rallies testing and exhausting overhead supply clear the runway
+          for explosive breakouts once the macro demand base is touched.
+        - Peak at ATH: Rotate capital out of 5x run leaders into lagging quality constituents or bottoming sectors.
+        """
+        if is_at_all_time_high:
+            return (
+                SectorRotationPhase.PEAK_AT_ALL_TIME_HIGH,
+                f"{sector.value} is at All-Time High. Avoid chasing 5x run leaders; "
+                f"rotate capital into lagging quality constituents or bottoming sectors (GTF 40-40-20 rule).",
+            )
+
+        if macro_demand_zone:
+            pl, dl = macro_demand_zone
+            if dl <= current_index_level <= pl * 1.05:
+                trendline_str = (
+                    f" Overhead supply trendline exhausted with {tested_overhead_supply_count} tested supply zones; "
+                    f"runway clear for explosive bull run."
+                    if tested_overhead_supply_count >= 2
+                    else ""
+                )
+                return (
+                    SectorRotationPhase.ACCUMULATION_AT_CYCLE_LOW,
+                    f"{sector.value} at Macro Institutional Demand Origin [{dl:.1f} - {pl:.1f}]. "
+                    f"Sectors cannot go to zero; prime generational accumulation phase.{trendline_str}",
+                )
+
+        if macro_supply_zone:
+            pl, dl = macro_supply_zone
+            if pl <= current_index_level <= dl:
+                return (
+                    SectorRotationPhase.DISTRIBUTION_AT_SUPPLY,
+                    f"{sector.value} is testing Macro Supply Zone [{pl:.1f} - {dl:.1f}]. "
+                    f"Multi-month distribution pressure expected; tighten trailing stops.",
+                )
+
+        if tested_overhead_supply_count >= 2:
+            return (
+                SectorRotationPhase.CORRECTION_WITH_TESTED_SUPPLY,
+                f"{sector.value} correcting with {tested_overhead_supply_count} tested overhead supply zones. "
+                f"Sellers are depleting inventory on relief bounces.",
+            )
+
+        return (
+            SectorRotationPhase.EARLY_EXPANSION,
+            f"{sector.value} in intermediate expansion phase.",
+        )
+
+    @classmethod
+    def audit_portfolio_construction(
+        cls,
+        stock_list: List[str],
+        sector_lookup: Optional[Dict[str, SectorName]] = None,
+    ) -> PortfolioSectorAllocationReport:
+        """
+        Episode 16: Long-Term Portfolio Construction Blueprint.
+        Rules:
+        1. Portfolio Size Limit: Maintain 12 to 15 stocks maximum (dilution beyond 15 creates index-like drag).
+        2. Sector Allocation: Hold 2 to 4 stocks across different sectors (prevent industry over-concentration).
+        3. Rotation Arbitrage: Identifies lagging quality constituents in high-momentum sectors.
+        """
+        total_stocks = len(stock_list)
+        rejection_reasons: List[str] = []
+
+        if total_stocks < 12:
+            rejection_reasons.append(
+                f"Under-diversified Portfolio: Contains {total_stocks} stocks (Minimum 12 required to prevent single-stock operational catastrophe)."
+            )
+        elif total_stocks > 15:
+            rejection_reasons.append(
+                f"Over-diversified Portfolio: Contains {total_stocks} stocks (Maximum 15 allowable; over-diversification dilutes returns into index performance)."
+            )
+
+        # Count stocks per sector
+        stocks_per_sec: Dict[str, int] = {}
+        sectors_set = set()
+
+        for sym in stock_list:
+            clean_sym = sym.strip().upper()
+            sec = sector_lookup.get(clean_sym) if sector_lookup else cls.get_parent_sector(clean_sym)
+            sec_name = sec.value
+            sectors_set.add(sec)
+            stocks_per_sec[sec_name] = stocks_per_sec.get(sec_name, 0) + 1
+
+        # Check for over-concentration (>4 stocks in one sector)
+        for sec_name, count in stocks_per_sec.items():
+            if count > 4:
+                rejection_reasons.append(
+                    f"Sector Over-concentration: {sec_name} holds {count} stocks (Maximum allowable is 2 to 4 stocks per sector)."
+                )
+
+        is_valid = len(rejection_reasons) == 0
+
+        if is_valid:
+            advisory = (
+                f"Optimal Portfolio Allocation: {total_stocks} stocks diversified across "
+                f"{len(sectors_set)} sectors with 2-4 stocks per industry (GTF 40-40-20 Compliant)."
+            )
+        else:
+            advisory = f"Portfolio Allocation Non-Compliant: {'; '.join(rejection_reasons)}"
+
+        return PortfolioSectorAllocationReport(
+            is_allocation_valid=is_valid,
+            total_stocks_count=total_stocks,
+            sectors_represented=list(sectors_set),
+            stocks_per_sector=stocks_per_sec,
+            rejection_reasons=rejection_reasons,
+            advisory=advisory,
+        )
+
+`
+
+---
+
+### 9. Candlestick Patterns Truth Engine (Episode 17)
+**File:** [alphacouncil/alpha/pattern_engine.py](alphacouncil/alpha/pattern_engine.py)
+
+`python
+"""
+Candlestick Patterns & Truth Core Engine (Trading in the Zone / GTF Methodology).
+Codifies Episode 17 principles:
+1. The 50/50 Coin-Toss Reality of Conventional Candlestick Formations in Isolation.
+2. The Whipsaw Trap (Why retail traders flip long/short and bleed capital).
+3. The Institutional Absorption Law:
+   - Bearish Pattern inside Demand Zone -> FAILS (Institutional Buying Absorbs It / Bear Trap).
+   - Bullish Pattern inside Supply Zone -> FAILS (Institutional Selling Rejects It / Bull Trap).
+4. Structural Equivalence:
+   - Morning Star == Drop-Base-Rally (DBR) Reversal Demand Zone.
+   - Evening Star == Rally-Base-Drop (RBD) Reversal Supply Zone.
+   - Hammer == Institutional Order Absorption at Proximal Line.
+   - Shooting Star == Institutional Order Rejection at Distal/Proximal Line.
+5. Candlestick Patterns in Trade Scoring:
+   - Standalone use: NEVER trade candlestick patterns on their own (Score: 0 / Prohibited).
+   - After-the-fact utility: +1 Post-Entry Confidence Booster when confluent with zone.
+6. The Social Media 'Pattern Seller' Trap Filter.
+"""
+
+from dataclasses import dataclass
+from enum import Enum
+from typing import Optional, Tuple
+import numpy as np
+
+
+class ConventionalPatternType(str, Enum):
+    BULLISH_ENGULFING = "BULLISH_ENGULFING"
+    BEARISH_ENGULFING = "BEARISH_ENGULFING"
+    MORNING_STAR = "MORNING_STAR"
+    EVENING_STAR = "EVENING_STAR"
+    HAMMER = "HAMMER"
+    INVERTED_HAMMER = "INVERTED_HAMMER"
+    SHOOTING_STAR = "SHOOTING_STAR"
+    BULLISH_HARAMI = "BULLISH_HARAMI"
+    BEARISH_HARAMI = "BEARISH_HARAMI"
+    NO_PATTERN = "NO_PATTERN"
+
+
+class PatternZoneInteraction(str, Enum):
+    ABSORBED_BY_DEMAND = "ABSORBED_BY_DEMAND"        # Bearish pattern inside Demand Zone -> FAILS (Absorption Law / Bear Trap)
+    REJECTED_BY_SUPPLY = "REJECTED_BY_SUPPLY"        # Bullish pattern inside Supply Zone -> FAILS (Rejection Law / Bull Trap)
+    CONFLUENT_DEMAND_BOOST = "CONFLUENT_DEMAND_BOOST" # Bullish pattern at Demand Zone -> +1 Post-entry Confidence Booster
+    CONFLUENT_SUPPLY_BOOST = "CONFLUENT_SUPPLY_BOOST" # Bearish pattern at Supply Zone -> +1 Post-entry Confidence Booster
+    MID_AIR_COIN_TOSS = "MID_AIR_COIN_TOSS"          # Pattern formed in isolation without zone backing -> 50/50 Whipsaw Trap
+
+
+@dataclass
+class PatternEvaluationReport:
+    pattern_type: ConventionalPatternType
+    is_bullish_pattern: bool
+    is_bearish_pattern: bool
+    zone_interaction: PatternZoneInteraction
+    standalone_accuracy_pct: float = 50.0
+    effective_accuracy_pct: float = 50.0
+    is_tradeable_standalone: bool = False  # Strictly False in GTF methodology
+    post_entry_confidence_bonus: int = 0   # 0 or 1 point
+    gtf_structural_equivalent: str = ""
+    advisory_message: str = ""
+
+
+class CandlestickPatternTruthEngine:
+    """
+    Episode 17 Quantitative Pattern Truth Engine:
+    Detects conventional patterns, translates them to GTF structural equivalents,
+    and analyzes institutional order-flow absorption vs. rejection.
+    """
+
+    @staticmethod
+    def detect_candlestick_pattern(
+        opens: np.ndarray,
+        highs: np.ndarray,
+        lows: np.ndarray,
+        closes: np.ndarray,
+        prior_trend: str = "DOWNTREND",
+    ) -> Tuple[ConventionalPatternType, bool, bool]:
+        """
+        Detects standard Japanese candlestick patterns on recent price action.
+        Returns: (PatternType, is_bullish, is_bearish).
+        """
+        n = len(closes)
+        if n < 2:
+            return ConventionalPatternType.NO_PATTERN, False, False
+
+        o1, h1, l1, c1 = opens[-1], highs[-1], lows[-1], closes[-1]
+        o2, _, _, c2 = opens[-2], highs[-2], lows[-2], closes[-2]
+
+        body1 = abs(c1 - o1)
+        body2 = abs(c2 - o2)
+
+        # 1. Hammer & Inverted Hammer / Shooting Star (Single Candle)
+        lower_shadow1 = min(o1, c1) - l1
+        upper_shadow1 = h1 - max(o1, c1)
+
+        # Hammer: small body near top, lower shadow >= 2x body, tiny upper shadow
+        if body1 > 0 and lower_shadow1 >= 2.0 * body1 and upper_shadow1 <= 0.3 * body1:
+            return ConventionalPatternType.HAMMER, True, False
+
+        # Inverted Hammer / Shooting Star: small body near bottom, upper shadow >= 2x body
+        if body1 > 0 and upper_shadow1 >= 2.0 * body1 and lower_shadow1 <= 0.3 * body1:
+            if prior_trend.upper() == "UPTREND":
+                return ConventionalPatternType.SHOOTING_STAR, False, True
+            return ConventionalPatternType.INVERTED_HAMMER, True, False
+
+        # 2. Bullish & Bearish Engulfing (Two Candles)
+        # Bullish Engulfing: Candle 2 is Red, Candle 1 is Green and body engulfs Candle 2 body
+        if c2 < o2 and c1 > o1:
+            if o1 <= c2 + 1e-4 and c1 >= o2 - 1e-4 and body1 > body2:
+                return ConventionalPatternType.BULLISH_ENGULFING, True, False
+
+        # Bearish Engulfing: Candle 2 is Green, Candle 1 is Red and body engulfs Candle 2 body
+        if c2 > o2 and c1 < o1:
+            if o1 >= c2 - 1e-4 and c1 <= o2 + 1e-4 and body1 > body2:
+                return ConventionalPatternType.BEARISH_ENGULFING, False, True
+
+        # 3. Bullish & Bearish Harami (Mother-Baby inside candle)
+        # Bullish Harami: Candle 2 is large Red, Candle 1 is small Green inside Candle 2 body
+        if c2 < o2 and c1 > o1:
+            if o1 >= c2 and c1 <= o2 and body1 < body2 * 0.7:
+                return ConventionalPatternType.BULLISH_HARAMI, True, False
+
+        # Bearish Harami: Candle 2 is large Green, Candle 1 is small Red inside Candle 2 body
+        if c2 > o2 and c1 < o1:
+            if o1 <= c2 and c1 >= o2 and body1 < body2 * 0.7:
+                return ConventionalPatternType.BEARISH_HARAMI, False, True
+
+        # 4. Morning Star & Evening Star (Three Candles)
+        if n >= 3:
+            o3, h3, l3, c3 = opens[-3], highs[-3], lows[-3], closes[-3]
+            body3 = abs(c3 - o3)
+            range3 = h3 - l3 if h3 > l3 else 1e-4
+
+            # Morning Star: Red -> Base -> Green recovering >= 50%
+            if c3 < o3 and (body3 / range3) >= 0.45:  # Candle 3 is Red exciting
+                if body2 < body3 * 0.5:              # Candle 2 is Base / Star
+                    if c1 > o1 and c1 >= (o3 + c3) / 2.0:  # Candle 1 is Green recovering >= 50%
+                        return ConventionalPatternType.MORNING_STAR, True, False
+
+            # Evening Star: Green -> Base -> Red dropping >= 50%
+            if c3 > o3 and (body3 / range3) >= 0.45:  # Candle 3 is Green exciting
+                if body2 < body3 * 0.5:              # Candle 2 is Base / Star
+                    if c1 < o1 and c1 <= (o3 + c3) / 2.0:  # Candle 1 is Red dropping >= 50%
+                        return ConventionalPatternType.EVENING_STAR, False, True
+
+        return ConventionalPatternType.NO_PATTERN, False, False
+
+    @classmethod
+    def evaluate_pattern_zone_interaction(
+        cls,
+        pattern: ConventionalPatternType,
+        is_bullish: bool,
+        is_bearish: bool,
+        cmp: float,
+        nearby_demand_zone_boundaries: Optional[Tuple[float, float]] = None,  # (PL, DL)
+        nearby_supply_zone_boundaries: Optional[Tuple[float, float]] = None,  # (PL, DL)
+    ) -> PatternEvaluationReport:
+        """
+        Episode 17 Institutional Analysis:
+        Evaluates the pattern through the lens of institutional Supply & Demand.
+        Applies the Absorption Law and assigns effective statistical probabilities.
+        """
+        gtf_equiv = cls.translate_pattern_to_gtf_structure(pattern)
+
+        # Check proximity to Demand Zone
+        is_at_demand = False
+        if nearby_demand_zone_boundaries:
+            pl_d, dl_d = nearby_demand_zone_boundaries
+            # If CMP is inside or within 2% above proximal line
+            if dl_d * 0.99 <= cmp <= pl_d * 1.02:
+                is_at_demand = True
+
+        # Check proximity to Supply Zone
+        is_at_supply = False
+        if nearby_supply_zone_boundaries:
+            pl_s, dl_s = nearby_supply_zone_boundaries
+            # If CMP is inside or within 2% below proximal line
+            if pl_s * 0.98 <= cmp <= dl_s * 1.01:
+                is_at_supply = True
+
+        # CASE 1: Bearish Pattern inside Demand Zone -> Absorption Law (FAILS / Bear Trap)
+        if is_bearish and is_at_demand:
+            return PatternEvaluationReport(
+                pattern_type=pattern,
+                is_bullish_pattern=False,
+                is_bearish_pattern=True,
+                zone_interaction=PatternZoneInteraction.ABSORBED_BY_DEMAND,
+                standalone_accuracy_pct=50.0,
+                effective_accuracy_pct=15.0,  # Fails 85% of the time for short sellers
+                is_tradeable_standalone=False,
+                post_entry_confidence_bonus=0,
+                gtf_structural_equivalent=gtf_equiv,
+                advisory_message=(
+                    f"Institutional Absorption Trap: {pattern.value} formed directly inside Demand Zone. "
+                    f"Institutional limit buy orders absorb retail selling volume. Pattern will fail and trap short sellers (Bear Trap). "
+                    f"Long reversal highly favored."
+                ),
+            )
+
+        # CASE 2: Bullish Pattern inside Supply Zone -> Rejection Law (FAILS / Bull Trap)
+        if is_bullish and is_at_supply:
+            return PatternEvaluationReport(
+                pattern_type=pattern,
+                is_bullish_pattern=True,
+                is_bearish_pattern=False,
+                zone_interaction=PatternZoneInteraction.REJECTED_BY_SUPPLY,
+                standalone_accuracy_pct=50.0,
+                effective_accuracy_pct=15.0,  # Fails 85% of the time for long buyers
+                is_tradeable_standalone=False,
+                post_entry_confidence_bonus=0,
+                gtf_structural_equivalent=gtf_equiv,
+                advisory_message=(
+                    f"Institutional Rejection Trap: {pattern.value} formed directly inside Supply Zone. "
+                    f"Resting institutional sell orders reject buying volume. Pattern will fail and trap long buyers (Bull Trap). "
+                    f"Short reversal highly favored."
+                ),
+            )
+
+        # CASE 3: Bullish Pattern at Demand Zone -> +1 Post-Entry Confidence Booster
+        if is_bullish and is_at_demand:
+            return PatternEvaluationReport(
+                pattern_type=pattern,
+                is_bullish_pattern=True,
+                is_bearish_pattern=False,
+                zone_interaction=PatternZoneInteraction.CONFLUENT_DEMAND_BOOST,
+                standalone_accuracy_pct=50.0,
+                effective_accuracy_pct=85.0,
+                is_tradeable_standalone=False,
+                post_entry_confidence_bonus=1,
+                gtf_structural_equivalent=gtf_equiv,
+                advisory_message=(
+                    f"Post-Entry Confidence Booster (+1 Bonus): {pattern.value} confirmed at Demand Zone. "
+                    f"Visual confirmation that buyers have stepped in at the proximal line. Baseline setup verified."
+                ),
+            )
+
+        # CASE 4: Bearish Pattern at Supply Zone -> +1 Post-Entry Confidence Booster
+        if is_bearish and is_at_supply:
+            return PatternEvaluationReport(
+                pattern_type=pattern,
+                is_bullish_pattern=False,
+                is_bearish_pattern=True,
+                zone_interaction=PatternZoneInteraction.CONFLUENT_SUPPLY_BOOST,
+                standalone_accuracy_pct=50.0,
+                effective_accuracy_pct=85.0,
+                is_tradeable_standalone=False,
+                post_entry_confidence_bonus=1,
+                gtf_structural_equivalent=gtf_equiv,
+                advisory_message=(
+                    f"Post-Entry Confidence Booster (+1 Bonus): {pattern.value} confirmed at Supply Zone. "
+                    f"Visual confirmation that sellers have stepped in at the proximal line."
+                ),
+            )
+
+        # CASE 5: Mid-Air Isolation (The 50/50 Whipsaw Trap)
+        return PatternEvaluationReport(
+            pattern_type=pattern,
+            is_bullish_pattern=is_bullish,
+            is_bearish_pattern=is_bearish,
+            zone_interaction=PatternZoneInteraction.MID_AIR_COIN_TOSS,
+            standalone_accuracy_pct=50.0,
+            effective_accuracy_pct=50.0,
+            is_tradeable_standalone=False,
+            post_entry_confidence_bonus=0,
+            gtf_structural_equivalent=gtf_equiv,
+            advisory_message=(
+                f"The Whipsaw Trap: {pattern.value} formed in mid-air chart space without institutional zone support. "
+                f"Statistical accuracy is 50/50 (coin toss). Standalone trading is strictly prohibited."
+            ),
+        )
+
+    @staticmethod
+    def translate_pattern_to_gtf_structure(pattern: ConventionalPatternType) -> str:
+        """
+        Translates Japanese Candlestick Patterns into GTF Institutional Demand & Supply Mechanics.
+        """
+        translations = {
+            ConventionalPatternType.MORNING_STAR: (
+                "Drop-Base-Rally (DBR) Reversal Demand Zone. GTF enforces the Closing Concept "
+                "(green candle must close above red candle open) and executes at the Proximal Line "
+                "with tight risk, rather than buying high on the candle 3 close."
+            ),
+            ConventionalPatternType.EVENING_STAR: (
+                "Rally-Base-Drop (RBD) Reversal Supply Zone. GTF enforces the Closing Concept "
+                "and executes short limit orders at the Proximal Line with tight risk."
+            ),
+            ConventionalPatternType.HAMMER: (
+                "Single-candle institutional order absorption at Proximal Line. Extended lower wick "
+                "reflects pending limit orders consuming aggressive sellers."
+            ),
+            ConventionalPatternType.SHOOTING_STAR: (
+                "Single-candle institutional order rejection at Supply Line. Extended upper wick "
+                "reflects resting sell orders rejecting aggressive buyers."
+            ),
+            ConventionalPatternType.INVERTED_HAMMER: (
+                "Failed intraday buying attempt. Becomes valid only when forming inside a tested demand zone."
+            ),
+            ConventionalPatternType.BULLISH_ENGULFING: (
+                "Multi-candle order imbalance shift. Functions as a reliable leg-out only when anchored "
+                "to an underlying DBR/RBR base."
+            ),
+            ConventionalPatternType.BEARISH_ENGULFING: (
+                "Multi-candle supply expansion. Readily absorbed and invalidated if the lower wick taps "
+                "an unbreached higher-timeframe demand zone."
+            ),
+            ConventionalPatternType.BULLISH_HARAMI: (
+                "Inside-candle consolidation following a drop. Easily overpowered if formed beneath overhead supply."
+            ),
+            ConventionalPatternType.BEARISH_HARAMI: (
+                "Inside-candle consolidation following a rally. Readily overpowered by institutional demand support."
+            ),
+            ConventionalPatternType.NO_PATTERN: "Standard order flow without textbook candlestick formation.",
+        }
+        return translations.get(pattern, "Standard price action.")
+
+`
+
+---
+
+### 10. Gap Theory Engine (Episode 18)
+**File:** [alphacouncil/alpha/gap_engine.py](alphacouncil/alpha/gap_engine.py)
+
+`python
+"""
+Gap Theory & Institutional Imbalance Engine (Trading in the Zone / GTF Methodology).
+Codifies Episode 18 principles:
+1. Mathematical Definition of Gaps (Real Gaps in Indian Cash Markets vs. Fake Gaps).
+2. Structural Classifications:
+   - Inside Gap: Open print remains within prior candle's High-Low range.
+   - Outside Gap: Open print clears prior candle's High-Low extreme range.
+   - Significance Rule: Meaningful price difference (>= 0.5% or >= 0.25 ATR).
+3. Behavioral Classifications:
+   - Novice Gap: Gap in the SAME direction as prevailing trend (Retail emotional momentum).
+   - Pro Gap: Gap in the OPPOSITE direction of prevailing trend (Institutional reversal conviction).
+   - Trend over candle color: Macro/ITF trend dictates classification, not isolated candle color.
+4. The Four Core Gap Applications in Trading:
+   - Application 1: Novice Gap INTO the Zone -> High Probability (+1 Extra Trade Score).
+   - Application 2: Novice Gap INTO a Pro Gap -> More High Probability (+2 Extra Trade Score).
+   - Application 3: Pro Gap FROM the Zone -> Post-Entry Confirmation (Hold for 3:1+ extended targets).
+   - Application 4: Novice Gap IN + Pro Gap OUT on Pro Gap Origin -> The Ultimate Master Setup.
+5. Historical Chart Reality: The "Disappearing Gap" Phenomenon (Open vs. Prev Close detection).
+6. Debunking the Gap Fill Timeline Myth (Order flow dependent; no calendar predictions).
+7. Advanced Price Action: The Window Gap Phenomenon:
+   - Elevating entry to Window Gap level when close to base (tight risk).
+   - Disciplined base entry / No-Chase Rule when gap is far (preventing inflated risk).
+"""
+
+from dataclasses import dataclass
+from enum import Enum
+from typing import Optional
+
+
+class GapType(str, Enum):
+    GAP_UP = "GAP_UP"      # Open > Prev Close
+    GAP_DOWN = "GAP_DOWN"  # Open < Prev Close
+    NO_GAP = "NO_GAP"      # Open == Prev Close
+
+
+class GapStructuralType(str, Enum):
+    INSIDE_GAP = "INSIDE_GAP"    # Open print is within [Prev Low, Prev High]
+    OUTSIDE_GAP = "OUTSIDE_GAP"  # Open print is strictly outside [Prev Low, Prev High]
+    NONE = "NONE"
+
+
+class GapBehavioralType(str, Enum):
+    NOVICE_GAP = "NOVICE_GAP"    # Gap in SAME direction as trend (Retail momentum chasing)
+    PRO_GAP = "PRO_GAP"          # Gap in OPPOSITE direction of trend (Institutional reversal conviction)
+    NEUTRAL_GAP = "NEUTRAL_GAP"  # Sideways or insignificant gap
+
+
+class GapApplicationType(str, Enum):
+    APPLICATION_1_NOVICE_GAP_INTO_ZONE = "APPLICATION_1_NOVICE_GAP_INTO_ZONE"
+    APPLICATION_2_NOVICE_GAP_INTO_PRO_GAP = "APPLICATION_2_NOVICE_GAP_INTO_PRO_GAP"
+    APPLICATION_3_PRO_GAP_FROM_ZONE = "APPLICATION_3_PRO_GAP_FROM_ZONE"
+    APPLICATION_4_NOVICE_IN_PRO_OUT_MASTER = "APPLICATION_4_NOVICE_IN_PRO_OUT_MASTER"
+    NO_GAP_APPLICATION = "NO_GAP_APPLICATION"
+
+
+class WindowGapDecision(str, Enum):
+    WINDOW_GAP_ELEVATED = "WINDOW_GAP_ELEVATED"          # Close to base: elevate entry to Window Gap level
+    WINDOW_GAP_DISCIPLINED_BASE = "WINDOW_GAP_DISCIPLINED_BASE"  # Far from base: maintain entry at base proximal line (No-Chase)
+    NO_WINDOW_GAP = "NO_WINDOW_GAP"                      # No window gap present
+
+
+@dataclass
+class GapDetectionResult:
+    gap_type: GapType
+    structural_type: GapStructuralType
+    behavioral_type: GapBehavioralType
+    gap_distance: float
+    gap_percentage: float
+    is_significant: bool
+    is_real_gap: bool = True  # True for NSE/BSE cash markets with real clearing & settlement
+    prev_close: float = 0.0
+    curr_open: float = 0.0
+    prev_high: float = 0.0
+    prev_low: float = 0.0
+
+
+@dataclass
+class GapApplicationReport:
+    application_type: GapApplicationType
+    gap_detection: GapDetectionResult
+    trade_score_bonus: int = 0  # 0, 1, or 2 points
+    probability_rating: str = "Standard"
+    disappearing_gap_detected: bool = False
+    extended_target_recommended: bool = False
+    target_multiplier: float = 2.0  # Default 2:1 RRR, can extend to 3:1 or 4:1
+    advisory_message: str = ""
+
+
+@dataclass
+class WindowGapAnalysis:
+    decision: WindowGapDecision
+    window_gap_level: float
+    base_proximal: float
+    distal: float
+    window_distance: float
+    base_risk: float
+    elevated_risk: float
+    risk_inflation_ratio: float
+    is_demand_zone: bool
+    advisory_message: str
+
+
+class GapTheoryEngine:
+    """
+    Episode 18 Quantitative Gap Theory Engine:
+    Detects, classifies, and evaluates gaps against institutional Demand & Supply Zones.
+    """
+
+    @staticmethod
+    def detect_gap(
+        prev_close: float,
+        prev_high: float,
+        prev_low: float,
+        curr_open: float,
+        trend_direction: str = "UPTREND",
+        atr: Optional[float] = None,
+        min_pct_threshold: float = 0.50,
+    ) -> GapDetectionResult:
+        """
+        Mathematical definition & dual structural/behavioral classification of gaps:
+        1. Direction: Open > Prev Close -> GAP_UP, Open < Prev Close -> GAP_DOWN.
+        2. Structural: Inside Gap (within Prev [Low, High]) vs. Outside Gap (outside extremes).
+        3. Significance: Meaningful price disparity (>= 0.5% or >= 0.25 * ATR).
+        4. Behavioral: Novice Gap (same as trend) vs. Pro Gap (opposite of trend).
+        """
+        gap_diff = curr_open - prev_close
+        abs_diff = abs(gap_diff)
+        pct_diff = (abs_diff / prev_close) * 100.0 if prev_close > 0 else 0.0
+
+        # 1. Directional Type
+        if abs_diff < 1e-4:
+            gap_type = GapType.NO_GAP
+        elif gap_diff > 0:
+            gap_type = GapType.GAP_UP
+        else:
+            gap_type = GapType.GAP_DOWN
+
+        # 2. Structural Type (Inside vs Outside)
+        if gap_type == GapType.NO_GAP:
+            structural_type = GapStructuralType.NONE
+        elif prev_low <= curr_open <= prev_high:
+            structural_type = GapStructuralType.INSIDE_GAP
+        else:
+            structural_type = GapStructuralType.OUTSIDE_GAP
+
+        # 3. Significance Check
+        # Rule of Significance: Traders must not obsess over ticks; there must be meaningful price difference
+        is_significant = False
+        if gap_type != GapType.NO_GAP:
+            if atr is not None and atr > 0:
+                is_significant = abs_diff >= (0.25 * atr) or pct_diff >= min_pct_threshold
+            else:
+                is_significant = pct_diff >= min_pct_threshold
+
+        # 4. Behavioral Type (Novice vs Pro)
+        # Novice Gap: Same direction as prevailing trend (Retail emotional chase)
+        # Pro Gap: Opposite direction of prevailing trend (Massive institutional capital reversal)
+        trend_upper = trend_direction.upper()
+        if not is_significant or gap_type == GapType.NO_GAP:
+            behavioral_type = GapBehavioralType.NEUTRAL_GAP
+        elif "UP" in trend_upper:
+            if gap_type == GapType.GAP_UP:
+                behavioral_type = GapBehavioralType.NOVICE_GAP
+            else:
+                behavioral_type = GapBehavioralType.PRO_GAP
+        elif "DOWN" in trend_upper:
+            if gap_type == GapType.GAP_DOWN:
+                behavioral_type = GapBehavioralType.NOVICE_GAP
+            else:
+                behavioral_type = GapBehavioralType.PRO_GAP
+        else:
+            # Sideways trend
+            behavioral_type = GapBehavioralType.NEUTRAL_GAP
+
+        return GapDetectionResult(
+            gap_type=gap_type,
+            structural_type=structural_type,
+            behavioral_type=behavioral_type,
+            gap_distance=round(abs_diff, 2),
+            gap_percentage=round(pct_diff, 2),
+            is_significant=is_significant,
+            is_real_gap=True,
+            prev_close=prev_close,
+            curr_open=curr_open,
+            prev_high=prev_high,
+            prev_low=prev_low,
+        )
+
+    @classmethod
+    def evaluate_gap_application(
+        cls,
+        gap_detection: GapDetectionResult,
+        zone_proximal: float,
+        zone_distal: float,
+        is_demand_zone: bool,
+        is_pro_gap_origin: bool = False,
+        subsequent_candle_gap: Optional[GapDetectionResult] = None,
+        candle_closed_opposite_of_gap: bool = False,
+    ) -> GapApplicationReport:
+        """
+        Evaluates the 4 Core Gap Applications in Trading:
+        - Application 1: Novice Gap INTO the Zone (+1 Extra Trade Score, High Probability).
+        - Application 2: Novice Gap INTO a Pro Gap (+2 Extra Trade Score, More High Probability).
+        - Application 3: Pro Gap FROM the Zone (Post-entry confirmation, hold for 3:1+).
+        - Application 4: Novice Gap IN + Pro Gap OUT on Pro Gap Origin (Ultimate Master Setup).
+        Also detects Disappearing Gaps and enforces Gap-Fill Myth debunking.
+        """
+        curr_open = gap_detection.curr_open
+
+        # Check if the gap opens into the zone
+        opens_into_zone = False
+        if is_demand_zone:
+            # For demand zone, open is at or below proximal line and above or at distal line
+            if zone_distal <= curr_open <= zone_proximal:
+                opens_into_zone = True
+        else:
+            # For supply zone, open is at or above proximal line and below or at distal line
+            if zone_proximal <= curr_open <= zone_distal:
+                opens_into_zone = True
+
+        # Check if incoming gap is a Novice Gap
+        is_novice_in = (
+            opens_into_zone
+            and gap_detection.behavioral_type == GapBehavioralType.NOVICE_GAP
+            and gap_detection.is_significant
+        )
+
+        # Check if subsequent candle has a Pro Gap departing from the zone
+        is_pro_out = False
+        if subsequent_candle_gap is not None:
+            if is_demand_zone and subsequent_candle_gap.gap_type == GapType.GAP_UP:
+                is_pro_out = subsequent_candle_gap.is_significant
+            elif not is_demand_zone and subsequent_candle_gap.gap_type == GapType.GAP_DOWN:
+                is_pro_out = subsequent_candle_gap.is_significant
+
+        # Evaluate the 4 applications
+        if is_novice_in and is_pro_gap_origin and is_pro_out:
+            # Application 4: The Ultimate Master Setup
+            app_type = GapApplicationType.APPLICATION_4_NOVICE_IN_PRO_OUT_MASTER
+            score_bonus = 2
+            prob_rating = "The Ultimate Master Setup"
+            ext_target = True
+            target_mult = 4.0
+            msg = (
+                "Application 4 (The Ultimate Master Setup): Confluence of Pro Gap origin base, "
+                "Novice Gap entry exhaustion into institutional limit orders, and Pro Gap departure out of zone. "
+                "Maximum probability setup. Hold for extended 4:1+ target. Extra Trade Score: +2."
+            )
+        elif is_novice_in and is_pro_gap_origin:
+            # Application 2: Novice Gap INTO a Pro Gap
+            app_type = GapApplicationType.APPLICATION_2_NOVICE_GAP_INTO_PRO_GAP
+            score_bonus = 2
+            prob_rating = "More High Probability"
+            ext_target = True
+            target_mult = 3.0
+            msg = (
+                "Application 2 (Novice Gap INTO a Pro Gap): Retail panic/euphoria momentum collides with "
+                "proven institutional conviction Pro Gap origin. Swift and explosive reaction expected. "
+                "Extra Trade Score: +2. Recommended target: 3:1 RRR."
+            )
+        elif is_novice_in:
+            # Application 1: Novice Gap INTO the Zone
+            app_type = GapApplicationType.APPLICATION_1_NOVICE_GAP_INTO_ZONE
+            score_bonus = 1
+            prob_rating = "High Probability"
+            ext_target = False
+            target_mult = 2.0
+            msg = (
+                "Application 1 (Novice Gap INTO the Zone): Retail crowd dumps supply/demand directly into "
+                "resting institutional limit orders inside the zone. High probability of rapid gap-fill. "
+                "Extra Trade Score: +1."
+            )
+        elif is_pro_out:
+            # Application 3: Pro Gap FROM the Zone
+            app_type = GapApplicationType.APPLICATION_3_PRO_GAP_FROM_ZONE
+            score_bonus = 0  # Post-entry confirmation does not alter pre-entry score
+            prob_rating = "High Probability Confirmation Exit"
+            ext_target = True
+            target_mult = 3.5
+            msg = (
+                "Application 3 (Pro Gap FROM the Zone): Institutional accumulation confirmed post-entry via "
+                "explosive Pro Gap departure. Hold with confidence for extended 3:1+ targets."
+            )
+        else:
+            app_type = GapApplicationType.NO_GAP_APPLICATION
+            score_bonus = 0
+            prob_rating = "Standard"
+            ext_target = False
+            target_mult = 2.0
+            msg = "No primary institutional gap application detected."
+
+        # Disappearing Gap Detection
+        # When a stock gaps down into demand at 9:15 AM and rallies immediately, the candle closes high green,
+        # visually covering the gap on historical charts. But open-vs-prior-close preserves the footprint.
+        disappearing_gap = bool(opens_into_zone and candle_closed_opposite_of_gap)
+        if disappearing_gap:
+            msg += (
+                " [Disappearing Gap Identified]: Completed candle visually masks the morning opening void, "
+                "but order-flow audit confirms genuine institutional absorption at 9:15 AM."
+            )
+
+        # Gap Fill Myth Debunking Note
+        msg += (
+            " [Institutional Fact]: Professional traders never predict gap fill timelines; "
+            "execution is governed strictly by zone order-flow dynamics."
+        )
+
+        return GapApplicationReport(
+            application_type=app_type,
+            gap_detection=gap_detection,
+            trade_score_bonus=score_bonus,
+            probability_rating=prob_rating,
+            disappearing_gap_detected=disappearing_gap,
+            extended_target_recommended=ext_target,
+            target_multiplier=target_mult,
+            advisory_message=msg,
+        )
+
+    @staticmethod
+    def analyze_window_gap(
+        base_proximal: float,
+        distal: float,
+        legout_open: float,
+        legout_extreme_wick: float,
+        is_demand_zone: bool = True,
+        max_risk_inflation_threshold: float = 0.35,
+    ) -> WindowGapAnalysis:
+        """
+        Advanced Price Action: The Window Gap Phenomenon.
+        When an explosive leg-out opens with a gap away from the base candle, it leaves a wick (or open):
+        - For Demand Zone: leg-out opens gap-up; its lowest lower wick (or open if wickless) is the Window Gap Level.
+        - For Supply Zone: leg-out opens gap-down; its highest upper wick (or open if wickless) is the Window Gap Level.
+
+        Execution Rules:
+        1. When Close to Base (distance <= threshold * base_risk):
+           - Elevate entry to Window Gap Level (WINDOW_GAP_ELEVATED) to prevent missing the trade.
+           - Stop loss MUST remain below distal line (never widen or anchor above base).
+           - Position size must be recalculated with inflated risk.
+        2. When Far Away (distance > threshold * base_risk):
+           - Maintain disciplined entry at Base Proximal Line (WINDOW_GAP_DISCIPLINED_BASE).
+           - Do NOT chase! Placing entry far up severely hurts RRR. If missed, accept with zero regret.
+        """
+        base_risk = abs(base_proximal - distal)
+        if base_risk <= 0:
+            base_risk = 1.0  # Guard against division by zero
+
+        # Determine window gap level
+        # For demand: lower shadow of gapping leg-out candle
+        # If leg-out opened higher than low, use low; else legout_open
+        if is_demand_zone:
+            window_gap_level = min(legout_open, legout_extreme_wick)
+            # Distance from base proximal to window gap level
+            window_distance = window_gap_level - base_proximal
+            elevated_risk = window_gap_level - distal
+        else:
+            # Supply zone
+            window_gap_level = max(legout_open, legout_extreme_wick)
+            window_distance = base_proximal - window_gap_level
+            elevated_risk = distal - window_gap_level
+
+        # If window distance is negative or zero, there is no window gap above/below base
+        if window_distance <= 0:
+            return WindowGapAnalysis(
+                decision=WindowGapDecision.NO_WINDOW_GAP,
+                window_gap_level=round(window_gap_level, 2),
+                base_proximal=round(base_proximal, 2),
+                distal=round(distal, 2),
+                window_distance=0.0,
+                base_risk=round(base_risk, 2),
+                elevated_risk=round(base_risk, 2),
+                risk_inflation_ratio=0.0,
+                is_demand_zone=is_demand_zone,
+                advisory_message="No window gap present between base and leg-out departure.",
+            )
+
+        risk_inflation_ratio = window_distance / base_risk
+
+        if risk_inflation_ratio <= max_risk_inflation_threshold:
+            decision = WindowGapDecision.WINDOW_GAP_ELEVATED
+            msg = (
+                f"Window Gap is CLOSE to base (inflation {risk_inflation_ratio*100:.1f}% <= {max_risk_inflation_threshold*100:.0f}% threshold). "
+                f"Elevate entry from base proximal ({base_proximal:.2f}) to Window Gap Level ({window_gap_level:.2f}) to ensure fill. "
+                f"Stop Loss remains strictly anchored to Distal Line ({distal:.2f}). Recalculate position quantity for elevated risk ({elevated_risk:.2f})."
+            )
+        else:
+            decision = WindowGapDecision.WINDOW_GAP_DISCIPLINED_BASE
+            msg = (
+                f"Window Gap is FAR from base (inflation {risk_inflation_ratio*100:.1f}% > {max_risk_inflation_threshold*100:.0f}% threshold). "
+                f"DISCIPLINE RULE: Do NOT chase entry to Window Gap Level ({window_gap_level:.2f})! "
+                f"Maintain entry strictly at Base Proximal Line ({base_proximal:.2f}) with Base Risk ({base_risk:.2f}). "
+                "If price pulls back only to window gap and departs, accept missed entry with zero regret."
+            )
+
+        return WindowGapAnalysis(
+            decision=decision,
+            window_gap_level=round(window_gap_level, 2),
+            base_proximal=round(base_proximal, 2),
+            distal=round(distal, 2),
+            window_distance=round(window_distance, 2),
+            base_risk=round(base_risk, 2),
+            elevated_risk=round(elevated_risk, 2),
+            risk_inflation_ratio=round(risk_inflation_ratio, 4),
+            is_demand_zone=is_demand_zone,
+            advisory_message=msg,
+        )
+
+`
+
+---
+
+### 11. Pre-Trade Risk Engine & Concentration Limits
 **File:** [alphacouncil/risk/pre_trade.py](alphacouncil/risk/pre_trade.py)
 
 `python
@@ -3740,11 +5118,12 @@ class PreTradeRiskEngine:
             adjusted_quantity=proposed_quantity,
             reason="PRE_TRADE_PASSED: All boundary checks green",
         )
+
 `
 
 ---
 
-### 9. Position Sizing & Kelly Calibration
+### 12. Position Sizing & Kelly Calibration
 **File:** [alphacouncil/risk/sizing.py](alphacouncil/risk/sizing.py)
 
 `python
@@ -3975,11 +5354,12 @@ class PositionSizingEngine:
             regime_mode=regime,
             rationale=msg,
         )
+
 `
 
 ---
 
-### 10. López de Prado Meta-Labeler Downscaler
+### 13. López de Prado Meta-Labeler Downscaler
 **File:** [alphacouncil/risk/meta_labeler.py](alphacouncil/risk/meta_labeler.py)
 
 `python
@@ -4089,11 +5469,12 @@ class LopezDePradoMetaLabeler:
             sentiment_score=round(sentiment_score, 4),
             reasoning=reason,
         )
+
 `
 
 ---
 
-### 11. Intraday Kill-Switch & Monthly Session Halt
+### 14. Intraday Kill-Switch & Monthly Session Halt
 **File:** [alphacouncil/risk/kill_switch.py](alphacouncil/risk/kill_switch.py)
 
 `python
@@ -4225,11 +5606,12 @@ class IntradayKillSwitch:
         """
         elapsed = time.time() - self.last_heartbeat_time
         return elapsed < max_allowed_miss_sec
+
 `
 
 ---
 
-### 12. Direction-Aware Circuit Band Guard
+### 15. Direction-Aware Circuit Band Guard
 **File:** [alphacouncil/risk/circuits.py](alphacouncil/risk/circuits.py)
 
 `python
@@ -4358,11 +5740,323 @@ class MWPLBanTracker:
             )
 
         return True, "HEDGING_NORMAL: OI within permissible limits."
+
 `
 
 ---
 
-### 13. Statutory Indian Market Friction Model (SEBI Oct 2024)
+### 16. GTF Risk Management & Capital Protection Engine
+**File:** [alphacouncil/risk/gtf_risk.py](alphacouncil/risk/gtf_risk.py)
+
+`python
+"""
+GTF Institutional Risk Management & Capital Protection Engine (Episode 10).
+Codifies the Exact Position Sizing Formula, Monetary Risk Invariance,
+The 10 Trades/Month Cap, Anti-Tampering SL Guards, The 100-Trade Journal,
+and Quantitative Excel Growth Models.
+"""
+
+from dataclasses import dataclass, field
+from enum import Enum
+from typing import Dict, List, Tuple
+import math
+
+
+class RiskTier(float, Enum):
+    """
+    Episode 10: Risk Per Trade (RPT) Hierarchy.
+    Determines maximum monetary risk percentage of total capital allocated per trade.
+    """
+    LEARNING = 0.005       # 0.5% (Early practice, absorbs early mistakes cheaply)
+    BEGINNER = 0.010       # 1.0% (First 1-3 months of live trading)
+    INTERMEDIATE = 0.015   # 1.5% (Proven consistency)
+    PRO = 0.020            # 2.0% (Absolute ceiling - never exceed)
+
+
+class ExecutionErrorType(str, Enum):
+    """
+    Episode 10 Concept 11: The 40-Mistake Rule Categories.
+    'A mistake repeated more than once is a decision.'
+    """
+    TREND_CONFLICT = "TREND_CONFLICT"
+    OVERHEAD_HTF_SUPPLY_TRAP = "OVERHEAD_HTF_SUPPLY_TRAP"
+    UNPROVEN_CANDLE_CLOSE = "UNPROVEN_CANDLE_CLOSE"
+    FO_LOT_SIZE_OVERLEVERAGE = "FO_LOT_SIZE_OVERLEVERAGE"
+    NEWS_HEADLINE_TRAP = "NEWS_HEADLINE_TRAP"
+    CHASING_MISSED_ENTRY = "CHASING_MISSED_ENTRY"
+    STOPLOSS_WIDENED_POST_ENTRY = "STOPLOSS_WIDENED_POST_ENTRY"
+    AVERAGING_DOWN = "AVERAGING_DOWN"
+    MONTHLY_TRADE_CAP_BREACH = "MONTHLY_TRADE_CAP_BREACH"
+    ARBITRARY_QUANTITY = "ARBITRARY_QUANTITY"
+
+
+@dataclass
+class SizingBreakdown:
+    """Exact mathematical position sizing breakdown."""
+    capital: float
+    risk_tier: RiskTier
+    risk_per_trade_inr: float
+    entry_price: float
+    stop_loss_price: float
+    risk_distance_points: float
+    quantity_shares: int
+    actual_monetary_risk_inr: float
+    total_capital_required_inr: float
+    is_sizing_valid: bool
+    rationale: str
+
+
+@dataclass
+class GrowthProjection:
+    """Quantitative growth projection (The Excel Growth Model)."""
+    capital: float
+    risk_tier: RiskTier
+    win_rate: float
+    target_rrr: float
+    num_trades: int
+    wins_count: int
+    losses_count: int
+    risk_per_trade: float
+    gain_per_win: float
+    total_gain: float
+    total_loss: float
+    net_monthly_profit: float
+    monthly_return_pct: float
+    annual_return_pct: float
+
+
+@dataclass
+class TradeLogEntry:
+    """Record entry for the GTF 100-Trade Journal."""
+    trade_id: int
+    date: str
+    symbol: str
+    entry_price: float
+    stop_loss: float
+    target_price: float
+    quantity: int
+    outcome: str  # "TARGET_HIT", "STOP_LOSS_HIT", "OPEN"
+    pnl_inr: float = 0.0
+    mistakes: List[ExecutionErrorType] = field(default_factory=list)
+    notes: str = ""
+
+
+class GTFTradingJournal:
+    """
+    Episode 10 Concept 6 & 11: The Mandatory 100-Trade Journal.
+    Enforces:
+    1. Maximum 10 trades per calendar month.
+    2. The 100-trade commitment before judging a strategy.
+    3. The 40-mistake elimination tracker ('never repeat the same mistake twice').
+    """
+
+    MAX_TRADES_PER_MONTH: int = 10
+    TARGET_COMMITMENT_TRADES: int = 100
+
+    def __init__(self, initial_capital: float = 100000.0):
+        self.initial_capital = initial_capital
+        self.trades: List[TradeLogEntry] = []
+        self.mistake_counts: Dict[ExecutionErrorType, int] = {e: 0 for e in ExecutionErrorType}
+
+    def log_trade(self, entry: TradeLogEntry) -> Tuple[bool, str]:
+        """
+        Logs a trade into the journal.
+        Enforces monthly cap and tracks repetitive mistakes.
+        """
+        # Count trades in the same month (extract YYYY-MM)
+        month_str = entry.date[:7] if len(entry.date) >= 7 else "CURRENT"
+        current_month_count = sum(1 for t in self.trades if t.date[:7] == month_str)
+
+        if current_month_count >= self.MAX_TRADES_PER_MONTH:
+            return (
+                False,
+                f"Monthly Cap Reached: Already executed {current_month_count}/{self.MAX_TRADES_PER_MONTH} trades for {month_str}. "
+                "Ruthlessly filter; do not overtrade.",
+            )
+
+        # Track mistakes
+        repeat_warnings = []
+        for m in entry.mistakes:
+            self.mistake_counts[m] += 1
+            if self.mistake_counts[m] > 1:
+                repeat_warnings.append(f"Repeat Mistake Detected: {m.value} logged {self.mistake_counts[m]} times!")
+
+        self.trades.append(entry)
+        msg = f"Trade #{len(self.trades)} logged successfully."
+        if repeat_warnings:
+            msg += " " + " ".join(repeat_warnings)
+        return True, msg
+
+    @property
+    def total_trades_count(self) -> int:
+        return len(self.trades)
+
+    @property
+    def is_100_trade_commitment_fulfilled(self) -> bool:
+        return len(self.trades) >= self.TARGET_COMMITMENT_TRADES
+
+
+class GTFRiskManager:
+    """
+    Core Risk Management Engine taught by Arun Singh Tanwar.
+    """
+
+    @staticmethod
+    def calculate_position_size(
+        capital: float,
+        risk_tier: RiskTier,
+        entry_price: float,
+        stop_loss: float,
+    ) -> SizingBreakdown:
+        """
+        Episode 10 Concept 3: The Exact Position Sizing Formula.
+        Quantity = floor(Risk_Per_Trade / abs(Entry - StopLoss))
+        Ensures monetary loss on an SL hit is strictly identical regardless of share price.
+        """
+        risk_distance = abs(entry_price - stop_loss)
+        if risk_distance <= 0.0:
+            return SizingBreakdown(
+                capital=capital,
+                risk_tier=risk_tier,
+                risk_per_trade_inr=0.0,
+                entry_price=entry_price,
+                stop_loss_price=stop_loss,
+                risk_distance_points=0.0,
+                quantity_shares=0,
+                actual_monetary_risk_inr=0.0,
+                total_capital_required_inr=0.0,
+                is_sizing_valid=False,
+                rationale="Invalid stop-loss distance (cannot be zero).",
+            )
+
+        rpt_inr = round(capital * risk_tier.value, 2)
+        qty = int(math.floor(rpt_inr / risk_distance))
+        actual_risk = round(qty * risk_distance, 2)
+        capital_req = round(qty * entry_price, 2)
+
+        is_valid = qty > 0
+
+        rationale = (
+            f"Capital: ₹{capital:,.2f} | Tier: {risk_tier.name} ({risk_tier.value*100:.1f}%) | "
+            f"RPT: ₹{rpt_inr:,.2f} | Risk Points: ₹{risk_distance:.2f} | "
+            f"Quantity: {qty} shares | Actual Max Loss: ₹{actual_risk:,.2f} | "
+            f"Capital Required: ₹{capital_req:,.2f}."
+        )
+
+        return SizingBreakdown(
+            capital=capital,
+            risk_tier=risk_tier,
+            risk_per_trade_inr=rpt_inr,
+            entry_price=entry_price,
+            stop_loss_price=stop_loss,
+            risk_distance_points=risk_distance,
+            quantity_shares=qty,
+            actual_monetary_risk_inr=actual_risk,
+            total_capital_required_inr=capital_req,
+            is_sizing_valid=is_valid,
+            rationale=rationale,
+        )
+
+    @staticmethod
+    def detect_anti_tamper_violations(
+        original_entry: float,
+        current_market_price: float,
+        original_sl: float,
+        new_sl: float,
+        is_demand: bool = True,
+        is_averaging_down: bool = False,
+        chase_threshold_pct: float = 0.015,
+    ) -> Tuple[bool, List[str]]:
+        """
+        Episode 10 Concept 4: Anti-Tamper & Critical Execution Error Guards.
+        1. Chasing Missed Entry: CMP already rallied significantly past entry.
+        2. Modifying/Widening Stop-Loss: Expanding SL distance post-entry.
+        3. Averaging Down: Adding to losing position.
+        """
+        violations: List[str] = []
+
+        # 1. Chasing Missed Entry
+        if is_demand:
+            if current_market_price > original_entry * (1.0 + chase_threshold_pct):
+                violations.append(
+                    f"Chasing Missed Entry Prohibited: CMP ₹{current_market_price:.2f} is "
+                    f"> {chase_threshold_pct*100:.1f}% above entry ₹{original_entry:.2f}. "
+                    "Let the trade go; missing costs ₹0."
+                )
+        else:
+            if current_market_price < original_entry * (1.0 - chase_threshold_pct):
+                violations.append(
+                    f"Chasing Missed Short Prohibited: CMP ₹{current_market_price:.2f} is "
+                    f"> {chase_threshold_pct*100:.1f}% below entry ₹{original_entry:.2f}."
+                )
+
+        # 2. Widening Stop-Loss
+        if is_demand:
+            if new_sl < original_sl:
+                violations.append(
+                    f"Stop-Loss Widening Prohibited: Moving SL down from ₹{original_sl:.2f} to ₹{new_sl:.2f} "
+                    "inflates risk exponentially. Maintain original stop."
+                )
+        else:
+            if new_sl > original_sl:
+                violations.append(
+                    f"Stop-Loss Widening Prohibited: Moving short SL up from ₹{original_sl:.2f} to ₹{new_sl:.2f}."
+                )
+
+        # 3. Averaging Down
+        if is_averaging_down:
+            violations.append(
+                "Averaging Down Trap: Adding shares to a position falling through a demand zone is strictly prohibited."
+            )
+
+        is_clean = len(violations) == 0
+        return is_clean, violations
+
+    @staticmethod
+    def project_growth(
+        capital: float = 100000.0,
+        risk_tier: RiskTier = RiskTier.BEGINNER,
+        win_rate: float = 0.50,
+        target_rrr: float = 2.0,
+        num_trades: int = 10,
+    ) -> GrowthProjection:
+        """
+        Episode 10 Concept 7: Quantitative Excel Growth Model.
+        Calculates expected returns based on 10 trades per month and Risk-to-Reward ratio.
+        """
+        wins = int(round(num_trades * win_rate))
+        losses = num_trades - wins
+        rpt = capital * risk_tier.value
+        gain_per_win = rpt * target_rrr
+
+        total_gain = wins * gain_per_win
+        total_loss = losses * rpt
+        net_profit = total_gain - total_loss
+        monthly_return_pct = round((net_profit / capital) * 100.0, 2)
+        annual_return_pct = round(monthly_return_pct * 12.0, 2)
+
+        return GrowthProjection(
+            capital=capital,
+            risk_tier=risk_tier,
+            win_rate=win_rate,
+            target_rrr=target_rrr,
+            num_trades=num_trades,
+            wins_count=wins,
+            losses_count=losses,
+            risk_per_trade=rpt,
+            gain_per_win=gain_per_win,
+            total_gain=total_gain,
+            total_loss=total_loss,
+            net_monthly_profit=net_profit,
+            monthly_return_pct=monthly_return_pct,
+            annual_return_pct=annual_return_pct,
+        )
+
+`
+
+---
+
+### 17. Statutory Indian Market Friction Model (SEBI Oct 2024)
 **File:** [alphacouncil/execution/friction.py](alphacouncil/execution/friction.py)
 
 `python
@@ -4490,11 +6184,12 @@ class IndianMarketFrictionModel:
             total_friction_inr=round(total_friction, 2),
             effective_friction_bps=round(effective_bps, 2),
         )
+
 `
 
 ---
 
-### 14. Idempotent OMS & Broker GTT Bracket Sync
+### 18. Idempotent OMS & Broker GTT Bracket Sync
 **File:** [alphacouncil/execution/oms.py](alphacouncil/execution/oms.py)
 
 `python
@@ -4744,11 +6439,12 @@ class IdempotentOMS:
             "status": "Entry order and linked stops/targets canceled cleanly",
         })
         return True
+
 `
 
 ---
 
-### 15. Purged Walk-Forward Backtesting Engine
+### 19. Purged Walk-Forward Backtesting Engine
 **File:** [alphacouncil/backtest/engine.py](alphacouncil/backtest/engine.py)
 
 `python
@@ -5142,11 +6838,12 @@ class BacktestEngine:
             signals_skipped_noise_trap=skipped_noise,
             noise_trap_skip_rate_pct=round(skip_rate, 2),
         )
+
 `
 
 ---
 
-### 16. Deflated Sharpe Ratio (DSR) & Quant Metrics
+### 20. Deflated Sharpe Ratio (DSR) & Quant Metrics
 **File:** [alphacouncil/backtest/metrics.py](alphacouncil/backtest/metrics.py)
 
 `python
@@ -5372,11 +7069,12 @@ class QuantMetricsCalculator:
             total_trades=n_trades,
             trials_logged=n_trials_logged,
         )
+
 `
 
 ---
 
-### 17. 7-Model Orthogonal Ablation Suite
+### 21. 7-Model Orthogonal Ablation Suite
 **File:** [alphacouncil/backtest/ablation.py](alphacouncil/backtest/ablation.py)
 
 `python
@@ -5514,11 +7212,12 @@ class AblationSuiteRunner:
         )
 
         return results
+
 `
 
 ---
 
-### 18. Interactive Bloomberg Dashboard UI
+### 22. Interactive Bloomberg Dashboard UI
 **File:** [alphacouncil/ui/dashboard.py](alphacouncil/ui/dashboard.py)
 
 `python
@@ -5679,11 +7378,12 @@ class AlphaCouncilDashboard:
         panel = Panel(panel_text, title="Lookahead Bias Defense", border_style="cyan")
         self.console.print(panel)
         self.console.print()
+
 `
 
 ---
 
-### 19. Master Research Demo Runner
+### 23. Master Research Demo Runner
 **File:** [alphacouncil/run_council.py](alphacouncil/run_council.py)
 
 `python
@@ -5856,326 +7556,8 @@ def run_interactive_pitch_demo():
 
 if __name__ == "__main__":
     run_interactive_pitch_demo()
+
 `
 
 ---
 
----
-
-
-
-
-
-
-
-
-### 20. GTF Risk Management & Capital Protection Engine
-**File:** [alphacouncil/risk/gtf_risk.py](alphacouncil/risk/gtf_risk.py)
-
-```python
-"""
-GTF Institutional Risk Management & Capital Protection Engine (Episode 10).
-Codifies the Exact Position Sizing Formula, Monetary Risk Invariance,
-The 10 Trades/Month Cap, Anti-Tampering SL Guards, The 100-Trade Journal,
-and Quantitative Excel Growth Models.
-"""
-
-from dataclasses import dataclass, field
-from enum import Enum
-from typing import Dict, List, Tuple
-import math
-
-
-class RiskTier(float, Enum):
-    """
-    Episode 10: Risk Per Trade (RPT) Hierarchy.
-    Determines maximum monetary risk percentage of total capital allocated per trade.
-    """
-    LEARNING = 0.005       # 0.5% (Early practice, absorbs early mistakes cheaply)
-    BEGINNER = 0.010       # 1.0% (First 1-3 months of live trading)
-    INTERMEDIATE = 0.015   # 1.5% (Proven consistency)
-    PRO = 0.020            # 2.0% (Absolute ceiling - never exceed)
-
-
-class ExecutionErrorType(str, Enum):
-    """
-    Episode 10 Concept 11: The 40-Mistake Rule Categories.
-    'A mistake repeated more than once is a decision.'
-    """
-    TREND_CONFLICT = "TREND_CONFLICT"
-    OVERHEAD_HTF_SUPPLY_TRAP = "OVERHEAD_HTF_SUPPLY_TRAP"
-    UNPROVEN_CANDLE_CLOSE = "UNPROVEN_CANDLE_CLOSE"
-    FO_LOT_SIZE_OVERLEVERAGE = "FO_LOT_SIZE_OVERLEVERAGE"
-    NEWS_HEADLINE_TRAP = "NEWS_HEADLINE_TRAP"
-    CHASING_MISSED_ENTRY = "CHASING_MISSED_ENTRY"
-    STOPLOSS_WIDENED_POST_ENTRY = "STOPLOSS_WIDENED_POST_ENTRY"
-    AVERAGING_DOWN = "AVERAGING_DOWN"
-    MONTHLY_TRADE_CAP_BREACH = "MONTHLY_TRADE_CAP_BREACH"
-    ARBITRARY_QUANTITY = "ARBITRARY_QUANTITY"
-
-
-@dataclass
-class SizingBreakdown:
-    """Exact mathematical position sizing breakdown."""
-    capital: float
-    risk_tier: RiskTier
-    risk_per_trade_inr: float
-    entry_price: float
-    stop_loss_price: float
-    risk_distance_points: float
-    quantity_shares: int
-    actual_monetary_risk_inr: float
-    total_capital_required_inr: float
-    is_sizing_valid: bool
-    rationale: str
-
-
-@dataclass
-class GrowthProjection:
-    """Quantitative growth projection (The Excel Growth Model)."""
-    capital: float
-    risk_tier: RiskTier
-    win_rate: float
-    target_rrr: float
-    num_trades: int
-    wins_count: int
-    losses_count: int
-    risk_per_trade: float
-    gain_per_win: float
-    total_gain: float
-    total_loss: float
-    net_monthly_profit: float
-    monthly_return_pct: float
-    annual_return_pct: float
-
-
-@dataclass
-class TradeLogEntry:
-    """Record entry for the GTF 100-Trade Journal."""
-    trade_id: int
-    date: str
-    symbol: str
-    entry_price: float
-    stop_loss: float
-    target_price: float
-    quantity: int
-    outcome: str  # "TARGET_HIT", "STOP_LOSS_HIT", "OPEN"
-    pnl_inr: float = 0.0
-    mistakes: List[ExecutionErrorType] = field(default_factory=list)
-    notes: str = ""
-
-
-class GTFTradingJournal:
-    """
-    Episode 10 Concept 6 & 11: The Mandatory 100-Trade Journal.
-    Enforces:
-    1. Maximum 10 trades per calendar month.
-    2. The 100-trade commitment before judging a strategy.
-    3. The 40-mistake elimination tracker ('never repeat the same mistake twice').
-    """
-
-    MAX_TRADES_PER_MONTH: int = 10
-    TARGET_COMMITMENT_TRADES: int = 100
-
-    def __init__(self, initial_capital: float = 100000.0):
-        self.initial_capital = initial_capital
-        self.trades: List[TradeLogEntry] = []
-        self.mistake_counts: Dict[ExecutionErrorType, int] = {e: 0 for e in ExecutionErrorType}
-
-    def log_trade(self, entry: TradeLogEntry) -> Tuple[bool, str]:
-        """
-        Logs a trade into the journal.
-        Enforces monthly cap and tracks repetitive mistakes.
-        """
-        # Count trades in the same month (extract YYYY-MM)
-        month_str = entry.date[:7] if len(entry.date) >= 7 else "CURRENT"
-        current_month_count = sum(1 for t in self.trades if t.date[:7] == month_str)
-
-        if current_month_count >= self.MAX_TRADES_PER_MONTH:
-            return (
-                False,
-                f"Monthly Cap Reached: Already executed {current_month_count}/{self.MAX_TRADES_PER_MONTH} trades for {month_str}. "
-                "Ruthlessly filter; do not overtrade.",
-            )
-
-        # Track mistakes
-        repeat_warnings = []
-        for m in entry.mistakes:
-            self.mistake_counts[m] += 1
-            if self.mistake_counts[m] > 1:
-                repeat_warnings.append(f"Repeat Mistake Detected: {m.value} logged {self.mistake_counts[m]} times!")
-
-        self.trades.append(entry)
-        msg = f"Trade #{len(self.trades)} logged successfully."
-        if repeat_warnings:
-            msg += " " + " ".join(repeat_warnings)
-        return True, msg
-
-    @property
-    def total_trades_count(self) -> int:
-        return len(self.trades)
-
-    @property
-    def is_100_trade_commitment_fulfilled(self) -> bool:
-        return len(self.trades) >= self.TARGET_COMMITMENT_TRADES
-
-
-class GTFRiskManager:
-    """
-    Core Risk Management Engine taught by Arun Singh Tanwar.
-    """
-
-    @staticmethod
-    def calculate_position_size(
-        capital: float,
-        risk_tier: RiskTier,
-        entry_price: float,
-        stop_loss: float,
-    ) -> SizingBreakdown:
-        """
-        Episode 10 Concept 3: The Exact Position Sizing Formula.
-        Quantity = floor(Risk_Per_Trade / abs(Entry - StopLoss))
-        Ensures monetary loss on an SL hit is strictly identical regardless of share price.
-        """
-        risk_distance = abs(entry_price - stop_loss)
-        if risk_distance <= 0.0:
-            return SizingBreakdown(
-                capital=capital,
-                risk_tier=risk_tier,
-                risk_per_trade_inr=0.0,
-                entry_price=entry_price,
-                stop_loss_price=stop_loss,
-                risk_distance_points=0.0,
-                quantity_shares=0,
-                actual_monetary_risk_inr=0.0,
-                total_capital_required_inr=0.0,
-                is_sizing_valid=False,
-                rationale="Invalid stop-loss distance (cannot be zero).",
-            )
-
-        rpt_inr = round(capital * risk_tier.value, 2)
-        qty = int(math.floor(rpt_inr / risk_distance))
-        actual_risk = round(qty * risk_distance, 2)
-        capital_req = round(qty * entry_price, 2)
-
-        is_valid = qty > 0
-
-        rationale = (
-            f"Capital: ₹{capital:,.2f} | Tier: {risk_tier.name} ({risk_tier.value*100:.1f}%) | "
-            f"RPT: ₹{rpt_inr:,.2f} | Risk Points: ₹{risk_distance:.2f} | "
-            f"Quantity: {qty} shares | Actual Max Loss: ₹{actual_risk:,.2f} | "
-            f"Capital Required: ₹{capital_req:,.2f}."
-        )
-
-        return SizingBreakdown(
-            capital=capital,
-            risk_tier=risk_tier,
-            risk_per_trade_inr=rpt_inr,
-            entry_price=entry_price,
-            stop_loss_price=stop_loss,
-            risk_distance_points=risk_distance,
-            quantity_shares=qty,
-            actual_monetary_risk_inr=actual_risk,
-            total_capital_required_inr=capital_req,
-            is_sizing_valid=is_valid,
-            rationale=rationale,
-        )
-
-    @staticmethod
-    def detect_anti_tamper_violations(
-        original_entry: float,
-        current_market_price: float,
-        original_sl: float,
-        new_sl: float,
-        is_demand: bool = True,
-        is_averaging_down: bool = False,
-        chase_threshold_pct: float = 0.015,
-    ) -> Tuple[bool, List[str]]:
-        """
-        Episode 10 Concept 4: Anti-Tamper & Critical Execution Error Guards.
-        1. Chasing Missed Entry: CMP already rallied significantly past entry.
-        2. Modifying/Widening Stop-Loss: Expanding SL distance post-entry.
-        3. Averaging Down: Adding to losing position.
-        """
-        violations: List[str] = []
-
-        # 1. Chasing Missed Entry
-        if is_demand:
-            if current_market_price > original_entry * (1.0 + chase_threshold_pct):
-                violations.append(
-                    f"Chasing Missed Entry Prohibited: CMP ₹{current_market_price:.2f} is "
-                    f"> {chase_threshold_pct*100:.1f}% above entry ₹{original_entry:.2f}. "
-                    "Let the trade go; missing costs ₹0."
-                )
-        else:
-            if current_market_price < original_entry * (1.0 - chase_threshold_pct):
-                violations.append(
-                    f"Chasing Missed Short Prohibited: CMP ₹{current_market_price:.2f} is "
-                    f"> {chase_threshold_pct*100:.1f}% below entry ₹{original_entry:.2f}."
-                )
-
-        # 2. Widening Stop-Loss
-        if is_demand:
-            if new_sl < original_sl:
-                violations.append(
-                    f"Stop-Loss Widening Prohibited: Moving SL down from ₹{original_sl:.2f} to ₹{new_sl:.2f} "
-                    "inflates risk exponentially. Maintain original stop."
-                )
-        else:
-            if new_sl > original_sl:
-                violations.append(
-                    f"Stop-Loss Widening Prohibited: Moving short SL up from ₹{original_sl:.2f} to ₹{new_sl:.2f}."
-                )
-
-        # 3. Averaging Down
-        if is_averaging_down:
-            violations.append(
-                "Averaging Down Trap: Adding shares to a position falling through a demand zone is strictly prohibited."
-            )
-
-        is_clean = len(violations) == 0
-        return is_clean, violations
-
-    @staticmethod
-    def project_growth(
-        capital: float = 100000.0,
-        risk_tier: RiskTier = RiskTier.BEGINNER,
-        win_rate: float = 0.50,
-        target_rrr: float = 2.0,
-        num_trades: int = 10,
-    ) -> GrowthProjection:
-        """
-        Episode 10 Concept 7: Quantitative Excel Growth Model.
-        Calculates expected returns based on 10 trades per month and Risk-to-Reward ratio.
-        """
-        wins = int(round(num_trades * win_rate))
-        losses = num_trades - wins
-        rpt = capital * risk_tier.value
-        gain_per_win = rpt * target_rrr
-
-        total_gain = wins * gain_per_win
-        total_loss = losses * rpt
-        net_profit = total_gain - total_loss
-        monthly_return_pct = round((net_profit / capital) * 100.0, 2)
-        annual_return_pct = round(monthly_return_pct * 12.0, 2)
-
-        return GrowthProjection(
-            capital=capital,
-            risk_tier=risk_tier,
-            win_rate=win_rate,
-            target_rrr=target_rrr,
-            num_trades=num_trades,
-            wins_count=wins,
-            losses_count=losses,
-            risk_per_trade=rpt,
-            gain_per_win=gain_per_win,
-            total_gain=total_gain,
-            total_loss=total_loss,
-            net_monthly_profit=net_profit,
-            monthly_return_pct=monthly_return_pct,
-            annual_return_pct=annual_return_pct,
-        )
-
-```
-
----

@@ -54,6 +54,15 @@ from alphacouncil.alpha.pattern_engine import (
     PatternZoneInteraction,
     PatternEvaluationReport,
 )
+from alphacouncil.alpha.gap_engine import (
+    GapApplicationType,
+    GapBehavioralType,
+    GapDetectionResult,
+    GapStructuralType,
+    GapTheoryEngine,
+    GapType,
+    WindowGapDecision,
+)
 from alphacouncil.risk.gtf_risk import (
     RiskTier,
     ExecutionErrorType,
@@ -3376,3 +3385,370 @@ def test_episode_17_master_quarterly_demand_inflection_case_study():
     assert eval_morning.zone_interaction == PatternZoneInteraction.CONFLUENT_DEMAND_BOOST
     assert eval_morning.effective_accuracy_pct == 85.0
     assert eval_morning.post_entry_confidence_bonus == 1
+
+
+# =========================================================================
+# EPISODE 18: GAP THEORY, STRUCTURAL & BEHAVIORAL CLASSIFICATION,
+# 4 CORE APPLICATIONS, DISAPPEARING GAPS & WINDOW GAP EXECUTION
+# =========================================================================
+
+
+def test_episode_18_inside_vs_outside_gap_classification():
+    """
+    Episode 18 Concept 2 & 3: Mathematical Definition & Structural Classification.
+    - Inside Gap: Open print is within prior candle's High-Low range [L_{t-1}, H_{t-1}].
+    - Outside Gap: Open print clears prior candle's High-Low extreme range.
+    - Significance Rule: Meaningful price difference (>= 0.5% or >= 0.25 * ATR).
+    """
+    prev_close = 100.0
+    prev_high = 105.0
+    prev_low = 95.0
+    atr = 4.0
+
+    # 1. Inside Gap Up (Close = 100, Open = 103 -> inside [95, 105])
+    gap_inside = GapTheoryEngine.detect_gap(
+        prev_close=prev_close,
+        prev_high=prev_high,
+        prev_low=prev_low,
+        curr_open=103.0,
+        trend_direction="UPTREND",
+        atr=atr,
+    )
+    assert gap_inside.gap_type == GapType.GAP_UP
+    assert gap_inside.structural_type == GapStructuralType.INSIDE_GAP
+    assert gap_inside.gap_distance == 3.0
+    assert gap_inside.gap_percentage == 3.0
+    assert gap_inside.is_significant is True  # 3.0 >= 0.25 * 4.0 (1.0)
+    assert gap_inside.is_real_gap is True
+
+    # 2. Insignificant Tick Inside Gap (Close = 100, Open = 100.10)
+    gap_tick = GapTheoryEngine.detect_gap(
+        prev_close=prev_close,
+        prev_high=prev_high,
+        prev_low=prev_low,
+        curr_open=100.10,
+        trend_direction="UPTREND",
+        atr=atr,
+        min_pct_threshold=0.50,
+    )
+    assert gap_tick.gap_type == GapType.GAP_UP
+    assert gap_tick.structural_type == GapStructuralType.INSIDE_GAP
+    assert gap_tick.is_significant is False  # 0.10% < 0.50% and 0.10 < 1.0 ATR
+    assert gap_tick.behavioral_type == GapBehavioralType.NEUTRAL_GAP
+
+    # 3. Outside Gap Up (Close = 100, High = 105, Open = 108 -> Above High)
+    gap_outside_up = GapTheoryEngine.detect_gap(
+        prev_close=prev_close,
+        prev_high=prev_high,
+        prev_low=prev_low,
+        curr_open=108.0,
+        trend_direction="UPTREND",
+        atr=atr,
+    )
+    assert gap_outside_up.gap_type == GapType.GAP_UP
+    assert gap_outside_up.structural_type == GapStructuralType.OUTSIDE_GAP
+    assert gap_outside_up.gap_distance == 8.0
+    assert gap_outside_up.is_significant is True
+
+    # 4. Outside Gap Down (Close = 100, Low = 95, Open = 91 -> Below Low)
+    gap_outside_down = GapTheoryEngine.detect_gap(
+        prev_close=prev_close,
+        prev_high=prev_high,
+        prev_low=prev_low,
+        curr_open=91.0,
+        trend_direction="DOWNTREND",
+        atr=atr,
+    )
+    assert gap_outside_down.gap_type == GapType.GAP_DOWN
+    assert gap_outside_down.structural_type == GapStructuralType.OUTSIDE_GAP
+    assert gap_outside_down.gap_distance == 9.0
+    assert gap_outside_down.is_significant is True
+
+
+def test_episode_18_novice_gap_vs_pro_gap_behavioral_classification():
+    """
+    Episode 18 Concept 4: Behavioral Classification (Novice Gap vs. Pro Gap).
+    - Novice Gap: SAME direction as trend (Retail crowd emotional momentum).
+      - Uptrend + Gap Up -> Novice Gap
+      - Downtrend + Gap Down -> Novice Gap
+    - Pro Gap: OPPOSITE direction of trend (Institutional reversal conviction).
+      - Downtrend + Gap Up -> Pro Gap
+      - Uptrend + Gap Down -> Pro Gap
+    - Trend Over Candle Color: Macro/ITF trend dictates classification, not isolated candle color.
+    """
+    # 1. Uptrend + Gap Up -> NOVICE GAP (Retail FOMO chasing rally)
+    gap_uptrend_up = GapTheoryEngine.detect_gap(
+        prev_close=500.0, prev_high=505.0, prev_low=495.0, curr_open=510.0, trend_direction="UPTREND"
+    )
+    assert gap_uptrend_up.behavioral_type == GapBehavioralType.NOVICE_GAP
+
+    # 2. Downtrend + Gap Down -> NOVICE GAP (Retail panic selling dump)
+    gap_downtrend_down = GapTheoryEngine.detect_gap(
+        prev_close=500.0, prev_high=505.0, prev_low=495.0, curr_open=488.0, trend_direction="DOWNTREND"
+    )
+    assert gap_downtrend_down.behavioral_type == GapBehavioralType.NOVICE_GAP
+
+    # 3. Downtrend + Gap Up -> PRO GAP (Institutional massive reversal power)
+    gap_downtrend_up = GapTheoryEngine.detect_gap(
+        prev_close=500.0, prev_high=505.0, prev_low=495.0, curr_open=512.0, trend_direction="DOWNTREND"
+    )
+    assert gap_downtrend_up.behavioral_type == GapBehavioralType.PRO_GAP
+
+    # 4. Uptrend + Gap Down -> PRO GAP (Institutional distribution reversal)
+    gap_uptrend_down = GapTheoryEngine.detect_gap(
+        prev_close=500.0, prev_high=505.0, prev_low=495.0, curr_open=488.0, trend_direction="UPTREND"
+    )
+    assert gap_uptrend_down.behavioral_type == GapBehavioralType.PRO_GAP
+
+
+def test_episode_18_application_1_novice_gap_into_demand_zone_plus_one_bonus():
+    """
+    Episode 18 Concept 5: Application 1 - A Novice Gap INTO the Zone.
+    - Downtrend price action opens with Gap Down (Novice Gap) directly into fresh Demand Zone.
+    - Retail panic supply is absorbed by institutional limit buy orders.
+    - Awards +1 Extra Trade Score Bonus and predicts high probability rapid gap fill.
+    """
+    demand_pl = 450.0
+    demand_dl = 430.0
+
+    # Stock was in downtrend at 470, gaps down to 445 (inside [430, 450] demand zone)
+    novice_gap = GapTheoryEngine.detect_gap(
+        prev_close=470.0,
+        prev_high=475.0,
+        prev_low=465.0,
+        curr_open=445.0,
+        trend_direction="DOWNTREND",
+    )
+    assert novice_gap.behavioral_type == GapBehavioralType.NOVICE_GAP
+
+    app_report = GapTheoryEngine.evaluate_gap_application(
+        gap_detection=novice_gap,
+        zone_proximal=demand_pl,
+        zone_distal=demand_dl,
+        is_demand_zone=True,
+        is_pro_gap_origin=False,
+    )
+
+    assert app_report.application_type == GapApplicationType.APPLICATION_1_NOVICE_GAP_INTO_ZONE
+    assert app_report.trade_score_bonus == 1
+    assert app_report.probability_rating == "High Probability"
+    assert "rapid gap-fill" in app_report.advisory_message
+
+    # Test integration with DemandSupplyEngine zone scoring
+    engine = DemandSupplyEngine()
+    zone = engine.scan_for_zones(
+        opens=np.array([480.0, 445.0, 455.0]),
+        highs=np.array([482.0, 448.0, 470.0]),
+        lows=np.array([475.0, 435.0, 445.0]),
+        closes=np.array([476.0, 446.0, 468.0]),
+        timeframe=TimeframeTier.DAILY,
+    )[0]
+    zone.trade_score = TradeScoreBreakdown(
+        freshness_score=3.0,
+        strength_score=2.0,
+        time_at_base_score=2.0,
+        total_score=7.0,
+        quality=TradeScoreQuality.PRISTINE,
+        alignment=ZoneAlignmentType.COINCIDING,
+        is_best_setup=True,
+    )
+
+    has_bonus, bonus_pts, _ = DemandSupplyEngine.evaluate_gap_confluence_bonus(zone, app_report)
+    assert has_bonus is True
+    assert bonus_pts == 1
+    assert zone.trade_score.gap_confluence_bonus == 1
+    assert zone.trade_score.total_score == 8.0  # 7.0 + 1.0
+
+
+def test_episode_18_application_2_novice_gap_into_pro_gap_origin_plus_two_bonus():
+    """
+    Episode 18 Concept 5: Application 2 - Novice Gap INTO a Pro Gap Origin.
+    - Demand Zone was originally created by an institutional Pro Gap (is_pro_gap_origin = True).
+    - Incoming pullback enters via a Novice Gap down.
+    - Collision of retail panic into proven institutional conviction zone yields explosive reaction.
+    - Awards +2 Extra Trade Score Bonus and recommends at least 3:1 RRR.
+    """
+    demand_pl = 1200.0
+    demand_dl = 1150.0
+
+    # Stock descending from 1250, gaps down to 1180 directly into Demand Zone
+    novice_gap = GapTheoryEngine.detect_gap(
+        prev_close=1250.0,
+        prev_high=1260.0,
+        prev_low=1240.0,
+        curr_open=1180.0,
+        trend_direction="DOWNTREND",
+    )
+    assert novice_gap.behavioral_type == GapBehavioralType.NOVICE_GAP
+
+    app_report = GapTheoryEngine.evaluate_gap_application(
+        gap_detection=novice_gap,
+        zone_proximal=demand_pl,
+        zone_distal=demand_dl,
+        is_demand_zone=True,
+        is_pro_gap_origin=True,  # Origin zone created by institutional Pro Gap
+    )
+
+    assert app_report.application_type == GapApplicationType.APPLICATION_2_NOVICE_GAP_INTO_PRO_GAP
+    assert app_report.trade_score_bonus == 2
+    assert app_report.probability_rating == "More High Probability"
+    assert app_report.extended_target_recommended is True
+    assert app_report.target_multiplier == 3.0
+    assert "Extra Trade Score: +2" in app_report.advisory_message
+
+
+def test_episode_18_application_3_pro_gap_from_zone_and_application_4_master_setup():
+    """
+    Episode 18 Concept 5: Application 3 & 4.
+    - Application 3: Pro Gap departing from zone post-entry (post-entry confirmation to hold for 3:1+).
+    - Application 4 (The Ultimate Master Setup): Pro Gap Origin + Novice Gap In + Pro Gap Out.
+    """
+    demand_pl = 800.0
+    demand_dl = 760.0
+
+    # 1. Application 3: Standard entry, then next candle gaps up with Pro Gap
+    subsequent_pro_gap = GapDetectionResult(
+        gap_type=GapType.GAP_UP,
+        structural_type=GapStructuralType.OUTSIDE_GAP,
+        behavioral_type=GapBehavioralType.PRO_GAP,
+        gap_distance=25.0,
+        gap_percentage=3.1,
+        is_significant=True,
+        curr_open=815.0,
+    )
+    std_gap = GapDetectionResult(
+        gap_type=GapType.NO_GAP,
+        structural_type=GapStructuralType.NONE,
+        behavioral_type=GapBehavioralType.NEUTRAL_GAP,
+        gap_distance=0.0,
+        gap_percentage=0.0,
+        is_significant=False,
+        curr_open=790.0,  # inside zone
+    )
+
+    app_3_report = GapTheoryEngine.evaluate_gap_application(
+        gap_detection=std_gap,
+        zone_proximal=demand_pl,
+        zone_distal=demand_dl,
+        is_demand_zone=True,
+        is_pro_gap_origin=False,
+        subsequent_candle_gap=subsequent_pro_gap,
+    )
+    assert app_3_report.application_type == GapApplicationType.APPLICATION_3_PRO_GAP_FROM_ZONE
+    assert app_3_report.extended_target_recommended is True
+    assert app_3_report.trade_score_bonus == 0  # Post-entry confirmation does not alter pre-entry score
+
+    # 2. Application 4: The Ultimate Master Setup
+    novice_in = GapDetectionResult(
+        gap_type=GapType.GAP_DOWN,
+        structural_type=GapStructuralType.OUTSIDE_GAP,
+        behavioral_type=GapBehavioralType.NOVICE_GAP,
+        gap_distance=20.0,
+        gap_percentage=2.5,
+        is_significant=True,
+        curr_open=785.0,  # inside demand zone
+    )
+
+    app_4_report = GapTheoryEngine.evaluate_gap_application(
+        gap_detection=novice_in,
+        zone_proximal=demand_pl,
+        zone_distal=demand_dl,
+        is_demand_zone=True,
+        is_pro_gap_origin=True,  # Origin was a Pro Gap
+        subsequent_candle_gap=subsequent_pro_gap,  # Departure is a Pro Gap
+    )
+    assert app_4_report.application_type == GapApplicationType.APPLICATION_4_NOVICE_IN_PRO_OUT_MASTER
+    assert app_4_report.trade_score_bonus == 2
+    assert app_4_report.probability_rating == "The Ultimate Master Setup"
+    assert app_4_report.target_multiplier == 4.0
+
+
+def test_episode_18_window_gap_elevated_vs_disciplined_base_no_chase_rule():
+    """
+    Episode 18 Concept 8: Advanced Price Action - The Window Gap Phenomenon.
+    - Base Candle Proximal = 200, Distal = 190 (Base Risk = 10 pts).
+    - Leg-out candle opens with gap-up, leaves lower wick.
+    - Case A: Lower wick at 203 (Distance = 3 pts <= 35% of 10 = 3.5 pts).
+      -> Elevate entry to 203 (WINDOW_GAP_ELEVATED). SL remains at 190. Recalculate quantity for 13 pts risk.
+    - Case B: Leg-out gap-up lower wick at 215 (Distance = 15 pts > 35%).
+      -> DISCIPLINED BASE (No-Chase Rule). Entry stays at 200. Zero regret if missed.
+    - Case C: Wickless Leg-out (O = L): Window level placed on open price.
+    """
+    base_pl = 200.0
+    distal = 190.0
+
+    # Case A: Close to base (3.0 pts inflation on 10 pts risk = 30% <= 35%)
+    analysis_close = GapTheoryEngine.analyze_window_gap(
+        base_proximal=base_pl,
+        distal=distal,
+        legout_open=205.0,
+        legout_extreme_wick=203.0,
+        is_demand_zone=True,
+        max_risk_inflation_threshold=0.35,
+    )
+    assert analysis_close.decision == WindowGapDecision.WINDOW_GAP_ELEVATED
+    assert analysis_close.window_gap_level == 203.0
+    assert analysis_close.base_risk == 10.0
+    assert analysis_close.elevated_risk == 13.0
+    assert analysis_close.risk_inflation_ratio == 0.30
+    assert "Elevate entry" in analysis_close.advisory_message
+
+    # Case B: Far from base (15.0 pts inflation on 10 pts risk = 150% > 35%)
+    analysis_far = GapTheoryEngine.analyze_window_gap(
+        base_proximal=base_pl,
+        distal=distal,
+        legout_open=220.0,
+        legout_extreme_wick=215.0,
+        is_demand_zone=True,
+        max_risk_inflation_threshold=0.35,
+    )
+    assert analysis_far.decision == WindowGapDecision.WINDOW_GAP_DISCIPLINED_BASE
+    assert analysis_far.window_gap_level == 215.0
+    assert analysis_far.risk_inflation_ratio == 1.50
+    assert "DISCIPLINE RULE: Do NOT chase entry" in analysis_far.advisory_message
+
+    # Case C: Wickless Leg-out (Open == Low at 202.50)
+    analysis_wickless = GapTheoryEngine.analyze_window_gap(
+        base_proximal=base_pl,
+        distal=distal,
+        legout_open=202.50,
+        legout_extreme_wick=202.50,
+        is_demand_zone=True,
+    )
+    assert analysis_wickless.window_gap_level == 202.50
+    assert analysis_wickless.decision == WindowGapDecision.WINDOW_GAP_ELEVATED
+
+
+def test_episode_18_historical_disappearing_gap_detection_and_myth_debunking():
+    """
+    Episode 18 Concept 6 & 7: The "Disappearing Gap" Phenomenon & Myth Debunking.
+    - At 9:15 AM: Stock opens at 97 (Gap Down into Demand Zone from prior close 100).
+    - During session: Rallies aggressively and closes at 104 (solid green candle).
+    - Historical chart displays solid green candle from 97 to 104, visually masking the opening void.
+    - Engine detects disappearing gap via Open vs. Prev Close.
+    - Myth Debunking: Engine rejects calendar gap fill predictions, confirming order-flow primacy.
+    """
+    demand_pl = 98.0
+    demand_dl = 92.0
+
+    gap_down = GapTheoryEngine.detect_gap(
+        prev_close=100.0,
+        prev_high=102.0,
+        prev_low=98.5,
+        curr_open=97.0,  # inside demand zone
+        trend_direction="DOWNTREND",
+    )
+    assert gap_down.behavioral_type == GapBehavioralType.NOVICE_GAP
+
+    # Candle rallied all day to 104, closing opposite of gap (green candle)
+    report = GapTheoryEngine.evaluate_gap_application(
+        gap_detection=gap_down,
+        zone_proximal=demand_pl,
+        zone_distal=demand_dl,
+        is_demand_zone=True,
+        candle_closed_opposite_of_gap=True,
+    )
+
+    assert report.disappearing_gap_detected is True
+    assert "Disappearing Gap Identified" in report.advisory_message
+    assert "Professional traders never predict gap fill timelines" in report.advisory_message

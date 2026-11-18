@@ -25,5 +25,6 @@
 | **15** | **Revision Class & Master Top-Down Audit Engine (The 1% Club)** | ✅ **Codified & Trained** | [`training/EPISODE_15_REVISION_CLASS_AND_MASTER_TOP_DOWN_AUDIT.md`](EPISODE_15_REVISION_CLASS_AND_MASTER_TOP_DOWN_AUDIT.md) |
 | **16** | **Sectoral Analysis (+2 Sector Score, Heavyweight Concentration & Rotation)** | ✅ **Codified & Trained** | [`training/EPISODE_16_SECTORAL_ANALYSIS.md`](EPISODE_16_SECTORAL_ANALYSIS.md) |
 | **17** | **Candlestick Patterns & their Truth (50/50 Coin Toss, Absorption Law & +1 Confidence Booster)** | ✅ **Codified & Trained** | [`training/EPISODE_17_CANDLESTICK_PATTERNS_AND_THEIR_TRUTH.md`](EPISODE_17_CANDLESTICK_PATTERNS_AND_THEIR_TRUTH.md) |
-| **18** | **Upcoming...** | ⏳ Pending | - |
+| **18** | **Gap Theory (Inside/Outside, Novice vs Pro, 4 Applications, Disappearing Gaps & Window Gap)** | ✅ **Codified & Trained** | [`training/EPISODE_18_GAP_THEORY.md`](EPISODE_18_GAP_THEORY.md) |
+| **19** | **Upcoming...** | ⏳ Pending | - |
 | **...**| *Episodes 19 - 20* | ⏳ Pending | - |
