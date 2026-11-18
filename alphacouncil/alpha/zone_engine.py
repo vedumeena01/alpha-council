@@ -137,6 +137,9 @@ class TradeScoreBreakdown:
     candlestick_pattern_bonus: int = 0 # 0 or 1 point from Episode 17 (Post-Entry Confidence Booster)
     gap_confluence_bonus: int = 0      # 0, 1, or 2 points from Episode 18 (Gap Theory)
     gap_application: str = ""          # Application 1, 2, 3, or 4
+    indicator_confluence_bonus: int = 0 # 0 or 1 point from Episode 19 (RSI/Stochastic Confluence)
+    lotl_entry_mode: str = ""          # AGGRESSIVE, CONSERVATIVE, or BALANCED_MIDDLE
+    is_lotl_zone: bool = False         # True if part of Level on Top of the Level setup
 
 
 class EntryType(str, Enum):
@@ -309,6 +312,12 @@ class IdentifiedZone:
     is_pro_gap_origin: bool = False             # Zone formed via institutional Pro Gap departure
     window_gap_level: Optional[float] = None    # Level of window gap (lowest wick for demand, highest wick for supply)
     window_gap_decision: Optional[str] = None   # WINDOW_GAP_ELEVATED or WINDOW_GAP_DISCIPLINED_BASE
+
+    # LOTL & Market Traps Mechanics (Episode 19)
+    is_lotl_origin: bool = False                # True if lower demand or upper supply origin in LOTL
+    is_lotl_cushion: bool = False               # True if upper demand or lower supply cushion in LOTL
+    lotl_merged_entry: Optional[float] = None   # Middle or selected entry price
+    lotl_merged_stoploss: Optional[float] = None # Lower distal (demand) or upper distal (supply)
 
 
 class DemandSupplyEngine:
@@ -2533,6 +2542,13 @@ class DemandSupplyEngine:
         is_window_gap_present: bool = False,
         window_gap_decision: Optional[str] = None,
         window_gap_elevated_entry: Optional[float] = None,
+        is_lotl_setup: bool = False,
+        lotl_entry_mode: Optional[str] = None,
+        lotl_merged_entry: Optional[float] = None,
+        lotl_lower_distal_sl: Optional[float] = None,
+        is_breakout_trade: bool = False,
+        breakout_price: Optional[float] = None,
+        rsi_value: Optional[float] = None,
     ) -> MasterRevisionAuditReport:
         """
         Episode 15 Master Revision Class: The 14-Point Comprehensive Top-Down Institutional Auditor.
@@ -2710,6 +2726,43 @@ class DemandSupplyEngine:
                     "No-Chase rule enforced to prevent inflated stop-loss risk."
                 )
 
+        # Episode 19: Indicator Confluence (RSI Reality Check)
+        if rsi_value is not None:
+            if execution_zone.is_demand and rsi_value <= 30.0:
+                total_score = min(12.0, total_score + 1.0)
+                audit_checks_passed.append(
+                    f"Indicator Confluence Bonus (+1 Point): Qualified Demand Zone backed by Oversold RSI ({rsi_value:.1f})."
+                )
+            elif not execution_zone.is_demand and rsi_value >= 70.0:
+                total_score = min(12.0, total_score + 1.0)
+                audit_checks_passed.append(
+                    f"Indicator Confluence Bonus (+1 Point): Qualified Supply Zone backed by Overbought RSI ({rsi_value:.1f})."
+                )
+            elif itf_trend == TrendDirection.UPTREND and rsi_value >= 70.0:
+                audit_checks_passed.append(
+                    f"Indicator Myth Avoided: RSI is {rsi_value:.1f} (Overbought) in Uptrend. "
+                    "Assets remain overbought for months; shorting prohibited, trend strength confirmed."
+                )
+
+        # Episode 19: Market Trap Detection (Bull Traps & Bear Traps)
+        if is_breakout_trade and breakout_price is not None:
+            if macro_supply_zones:
+                for m_sz in macro_supply_zones:
+                    if m_sz.proximal_line <= breakout_price <= m_sz.distal_line or abs(breakout_price - m_sz.proximal_line) <= (0.01 * m_sz.proximal_line):
+                        rejection_reasons.append(
+                            f"BULL TRAP DETECTED: Attempted to buy breakout at ₹{breakout_price:.2f} directly into "
+                            f"Higher Timeframe Supply Zone [₹{m_sz.proximal_line:.2f} - ₹{m_sz.distal_line:.2f}]. "
+                            "Institutions use retail breakout buying as exit liquidity; price collapse imminent."
+                        )
+                        break
+            if not execution_zone.is_demand and htf_zone and htf_zone.is_demand:
+                if htf_zone.distal_line <= breakout_price <= htf_zone.proximal_line or abs(breakout_price - htf_zone.proximal_line) <= (0.01 * htf_zone.proximal_line):
+                    rejection_reasons.append(
+                        f"BEAR TRAP DETECTED: Attempted to short breakdown at ₹{breakout_price:.2f} directly into "
+                        f"Higher Timeframe Demand Zone [₹{htf_zone.distal_line:.2f} - ₹{htf_zone.proximal_line:.2f}]. "
+                        "Institutions absorb breakdown selling; violent upward reversal expected."
+                    )
+
         if base_score < 6.0 and not is_parent_sector_in_demand:
             rejection_reasons.append(f"Trade Score: Base score {base_score:.1f}/7.0 is below institutional minimum threshold of 6.0/7.0.")
         else:
@@ -2736,13 +2789,23 @@ class DemandSupplyEngine:
         else:
             audit_checks_passed.append("100-Trade Directive: Trading style complies with professional developmental rule.")
 
-        # 11. Mathematical Position Sizing & Rupee-Risk Invariance (Ep 10 & Ep 18 Window Gap Entry)
-        effective_entry = (
-            window_gap_elevated_entry
-            if (is_window_gap_present and window_gap_decision == "WINDOW_GAP_ELEVATED" and window_gap_elevated_entry)
-            else execution_zone.entry_price
-        )
-        risk_per_share = abs(effective_entry - execution_zone.stop_loss)
+        # 11. Mathematical Position Sizing & Rupee-Risk Invariance (Ep 10, Ep 18 Window Gap, Ep 19 LOTL)
+        if is_lotl_setup and lotl_merged_entry is not None and lotl_lower_distal_sl is not None:
+            effective_entry = lotl_merged_entry
+            effective_stoploss = lotl_lower_distal_sl
+            audit_checks_passed.append(
+                f"LOTL Execution ({lotl_entry_mode or 'BALANCED_MIDDLE'}): Entry at ₹{effective_entry:.2f}. "
+                f"Stop-Loss Mandate enforced strictly below Lower Origin Distal Line at ₹{effective_stoploss:.2f}."
+            )
+        else:
+            effective_stoploss = execution_zone.stop_loss
+            effective_entry = (
+                window_gap_elevated_entry
+                if (is_window_gap_present and window_gap_decision == "WINDOW_GAP_ELEVATED" and window_gap_elevated_entry)
+                else execution_zone.entry_price
+            )
+
+        risk_per_share = abs(effective_entry - effective_stoploss)
         if risk_per_share <= 0:
             risk_per_share = abs(execution_zone.proximal_line - execution_zone.distal_line)
 
@@ -2966,3 +3029,73 @@ class DemandSupplyEngine:
         if analysis.decision == WindowGapDecision.WINDOW_GAP_ELEVATED:
             zone.entry_price = analysis.window_gap_level
         return analysis
+
+    @classmethod
+    def merge_lotl_zones(
+        cls,
+        zones: List[IdentifiedZone],
+        entry_option: Any = None,  # LOTLEntryOption.BALANCED_MIDDLE
+        is_cross_wave: bool = False,
+    ) -> Any:
+        """
+        Episode 19 GTF Rule: Level on Top of the Level (LOTL) Merging.
+        - Stop-Loss Mandate: SL is ALWAYS anchored below the Lower Distal Line (Demand) or above Upper Distal (Supply).
+        - Stacking Limit (3+ Rule): Discards upper bases when >= 3 levels form to avoid Garbage Areas.
+        - Entry Options: AGGRESSIVE (Upper PL), CONSERVATIVE (Lower PL), BALANCED_MIDDLE (Ideal Sweet Spot).
+        """
+        from alphacouncil.alpha.trap_and_pattern_engine import (
+            LOTLEntryOption,
+            MarketTrapsAndPatternTruthEngine,
+        )
+
+        opt = entry_option or LOTLEntryOption.BALANCED_MIDDLE
+        merged = MarketTrapsAndPatternTruthEngine.merge_lotl_zones(
+            zones=zones,
+            entry_option=opt,
+            is_cross_wave=is_cross_wave,
+        )
+
+        for z in zones:
+            z.is_lotl_origin = (z == merged.origin_zone)
+            z.is_lotl_cushion = (z == merged.cushion_zone)
+            z.lotl_merged_entry = merged.entry_price
+            z.lotl_merged_stoploss = merged.stop_loss
+            if z.trade_score is not None:
+                z.trade_score.is_lotl_zone = True
+                z.trade_score.lotl_entry_mode = opt.value
+
+        return merged
+
+    @classmethod
+    def evaluate_indicator_confluence_bonus(
+        cls,
+        zone: IdentifiedZone,
+        rsi_value: float,
+        itf_trend: str = "UPTREND",
+    ) -> Any:
+        """
+        Episode 19 GTF Rule: Indicator Reality Check (RSI in GTF Trading).
+        - Standalone Indicator Fallacy: Strong uptrends stay RSI > 70 for months. Never short overbought in an uptrend!
+        - GTF Confluence: When an independently qualified Demand Zone coincides with Oversold RSI (<= 30),
+          award +1 Extra Trade Score Bonus.
+        """
+        from alphacouncil.alpha.trap_and_pattern_engine import (
+            IndicatorConfluenceType,
+            MarketTrapsAndPatternTruthEngine,
+        )
+
+        report = MarketTrapsAndPatternTruthEngine.evaluate_indicator_confluence(
+            zone_is_demand=zone.is_demand,
+            rsi_value=rsi_value,
+            itf_trend=itf_trend,
+        )
+
+        if zone.trade_score is not None:
+            if report.confluence_type in (
+                IndicatorConfluenceType.OVERSOLD_DEMAND_BOOST,
+                IndicatorConfluenceType.OVERBOUGHT_SUPPLY_BOOST,
+            ):
+                zone.trade_score.indicator_confluence_bonus = 1
+                zone.trade_score.total_score += 1.0
+
+        return report

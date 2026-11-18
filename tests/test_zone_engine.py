@@ -15,6 +15,7 @@ Verifies:
 import numpy as np
 from alphacouncil.alpha.zone_engine import (
     DemandSupplyEngine,
+    IdentifiedZone,
     CandleType,
     ZoneType,
     MarkingMode,
@@ -62,6 +63,13 @@ from alphacouncil.alpha.gap_engine import (
     GapTheoryEngine,
     GapType,
     WindowGapDecision,
+)
+from alphacouncil.alpha.trap_and_pattern_engine import (
+    ConventionalChartPatternType,
+    IndicatorConfluenceType,
+    LOTLEntryOption,
+    MarketTrapsAndPatternTruthEngine,
+    MarketTrapType,
 )
 from alphacouncil.risk.gtf_risk import (
     RiskTier,
@@ -3752,3 +3760,326 @@ def test_episode_18_historical_disappearing_gap_detection_and_myth_debunking():
     assert report.disappearing_gap_detected is True
     assert "Disappearing Gap Identified" in report.advisory_message
     assert "Professional traders never predict gap fill timelines" in report.advisory_message
+
+
+# =========================================================================
+# EPISODE 19: MARKET TRAPS, LEVEL ON TOP OF THE LEVEL (LOTL),
+# CONVENTIONAL CHART PATTERNS TRUTH & INDICATOR REALITY CHECK
+# =========================================================================
+
+
+def test_episode_19_lotl_merging_and_stoploss_mandate():
+    """
+    Episode 19 Module 1: LOTL Merging & The Stop-Loss Mandate.
+    - Two Demand Zones:
+      - Lower Origin Base: Proximal = 400.0, Distal = 380.0
+      - Upper Cushion Base: Proximal = 415.0, Distal = 405.0
+    - The Stop-Loss Mandate: SL is ALWAYS anchored strictly below Lower Origin Distal (380.0).
+    - Entry Options:
+      - Aggressive: Upper PL (415.0) -> Risk = 35.0 pts
+      - Conservative: Lower PL (400.0) -> Risk = 20.0 pts
+      - Balanced Middle: (415 + 400) / 2 = 407.50 -> Risk = 27.50 pts (The GTF Ideal Sweet Spot)
+    """
+    zone_lower = IdentifiedZone(
+        zone_type=ZoneType.DEMAND_DBR,
+        is_demand=True,
+        is_reversal=True,
+        base_start_idx=1,
+        base_end_idx=1,
+        base_candles_count=1,
+        first_leg_out_idx=2,
+        proximal_line=400.0,
+        distal_line=380.0,
+        entry_price=400.0,
+        stop_loss=380.0,
+    )
+    zone_upper = IdentifiedZone(
+        zone_type=ZoneType.DEMAND_RBR,
+        is_demand=True,
+        is_reversal=False,
+        base_start_idx=3,
+        base_end_idx=3,
+        base_candles_count=1,
+        first_leg_out_idx=4,
+        proximal_line=415.0,
+        distal_line=405.0,
+        entry_price=415.0,
+        stop_loss=405.0,
+    )
+
+    # 1. Balanced Middle Entry (Default GTF Sweet Spot)
+    merged_mid = MarketTrapsAndPatternTruthEngine.merge_lotl_zones(
+        zones=[zone_lower, zone_upper],
+        entry_option=LOTLEntryOption.BALANCED_MIDDLE,
+    )
+    assert merged_mid.entry_option == LOTLEntryOption.BALANCED_MIDDLE
+    assert merged_mid.entry_price == 407.50
+    assert merged_mid.stop_loss == 380.0
+    assert merged_mid.risk_per_share == 27.50
+
+    # 2. Aggressive Entry (Upper Proximal)
+    merged_agg = MarketTrapsAndPatternTruthEngine.merge_lotl_zones(
+        zones=[zone_lower, zone_upper],
+        entry_option=LOTLEntryOption.AGGRESSIVE,
+    )
+    assert merged_agg.entry_price == 415.0
+    assert merged_agg.stop_loss == 380.0
+    assert merged_agg.risk_per_share == 35.0
+
+    # 3. Conservative Entry (Lower Proximal)
+    merged_cons = MarketTrapsAndPatternTruthEngine.merge_lotl_zones(
+        zones=[zone_lower, zone_upper],
+        entry_option=LOTLEntryOption.CONSERVATIVE,
+    )
+    assert merged_cons.entry_price == 400.0
+    assert merged_cons.stop_loss == 380.0
+    assert merged_cons.risk_per_share == 20.0
+
+
+def test_episode_19_lotl_stacking_limits_3_plus_rule_and_cross_wave():
+    """
+    Episode 19 Module 1C & 1D: Stacking Limits (3+ Rule) & Cross-Wave LOTL.
+    - If >= 3 basing levels form: Do NOT merge all three (avoids Garbage Area). Discard top levels, merge bottom 2 origin levels.
+    - Cross-Wave LOTL: Merging unmitigated origin base from prior price waves to prevent stop-hunt sweeps.
+    """
+    z1 = IdentifiedZone(
+        zone_type=ZoneType.DEMAND_DBR,
+        is_demand=True,
+        is_reversal=True,
+        base_start_idx=1,
+        base_end_idx=1,
+        base_candles_count=1,
+        first_leg_out_idx=2,
+        proximal_line=100.0,
+        distal_line=90.0,
+        entry_price=100.0,
+        stop_loss=90.0,
+    )
+    z2 = IdentifiedZone(
+        zone_type=ZoneType.DEMAND_RBR,
+        is_demand=True,
+        is_reversal=False,
+        base_start_idx=3,
+        base_end_idx=3,
+        base_candles_count=1,
+        first_leg_out_idx=4,
+        proximal_line=110.0,
+        distal_line=102.0,
+        entry_price=110.0,
+        stop_loss=102.0,
+    )
+    z3 = IdentifiedZone(
+        zone_type=ZoneType.DEMAND_RBR,
+        is_demand=True,
+        is_reversal=False,
+        base_start_idx=5,
+        base_end_idx=5,
+        base_candles_count=1,
+        first_leg_out_idx=6,
+        proximal_line=120.0,
+        distal_line=112.0,
+        entry_price=120.0,
+        stop_loss=112.0,
+    )
+
+    # 1. 3+ Stacking Limit: Engine trims z3, keeping only z1 and z2
+    merged = MarketTrapsAndPatternTruthEngine.merge_lotl_zones(
+        zones=[z1, z2, z3],
+        entry_option=LOTLEntryOption.BALANCED_MIDDLE,
+    )
+    assert merged.is_3_plus_cluster_trimmed is True
+    assert merged.origin_zone == z1
+    assert merged.cushion_zone == z2
+    assert merged.stop_loss == 90.0
+    assert merged.entry_price == 105.0
+    assert "3+ Stack Limit Enforced" in merged.advisory_message
+
+    # 2. Cross-Wave LOTL
+    merged_cw = MarketTrapsAndPatternTruthEngine.merge_lotl_zones(
+        zones=[z1, z2],
+        entry_option=LOTLEntryOption.BALANCED_MIDDLE,
+        is_cross_wave=True,
+    )
+    assert merged_cw.is_cross_wave_lotl is True
+    assert "Cross-Wave LOTL" in merged_cw.advisory_message
+
+
+def test_episode_19_bull_trap_detection_breakout_into_htf_supply():
+    """
+    Episode 19 Module 2: Market Traps - Bull Trap Detection.
+    - Price consolidates and breaks out above resistance at 510.0.
+    - Higher Timeframe Supply Zone sits at [508.0 - 525.0].
+    - Engine detects BULL_TRAP: Retail buys top, institutions sell into breakout volume; price collapses.
+    """
+    report = MarketTrapsAndPatternTruthEngine.detect_market_trap(
+        breakout_price=510.0,
+        breakout_type="RESISTANCE_BREAKOUT",
+        htf_supply_zone=(508.0, 525.0),
+    )
+    assert report.trap_type == MarketTrapType.BULL_TRAP
+    assert report.is_trap_confirmed is True
+    assert report.expected_reversal_direction == "SHARP_DOWNWARD_REVERSAL"
+    assert "BULL TRAP DETECTED" in report.advisory_message
+    assert "Buying prohibited" in report.advisory_message
+
+
+def test_episode_19_bear_trap_detection_breakdown_into_htf_demand():
+    """
+    Episode 19 Module 2: Market Traps - Bear Trap Detection.
+    - Price breaks down below support at 295.0.
+    - Higher Timeframe Demand Zone sits at [280.0 - 298.0].
+    - Engine detects BEAR_TRAP: Retail shorts bottom, institutions absorb selling volume; price surges up.
+    """
+    report = MarketTrapsAndPatternTruthEngine.detect_market_trap(
+        breakout_price=295.0,
+        breakout_type="SUPPORT_BREAKDOWN",
+        htf_demand_zone=(280.0, 298.0),
+    )
+    assert report.trap_type == MarketTrapType.BEAR_TRAP
+    assert report.is_trap_confirmed is True
+    assert report.expected_reversal_direction == "VIOLENT_UPWARD_REVERSAL"
+    assert "BEAR TRAP DETECTED" in report.advisory_message
+    assert "Shorting prohibited" in report.advisory_message
+
+
+def test_episode_19_conventional_chart_patterns_truth_translation():
+    """
+    Episode 19 Module 3: Truth Behind Conventional Chart Patterns.
+    - Head & Shoulders: Breakdown plunges into HTF demand -> Bear Trap.
+    - Inverse Head & Shoulders (BEL Case Study): Head low hits Quarterly demand origin; enter at origin, not neckline.
+    - Double/Triple Bottom (Colpal Case Study): Tested demand absorption.
+    - Cup & Handle: Handle breakout into HTF supply fails.
+    - Flag/Channel (Ashok Leyland Case Study): Channel breakdown into Monthly demand = multi-year rally.
+    """
+    # 1. Head & Shoulders
+    hs_report = MarketTrapsAndPatternTruthEngine.translate_conventional_chart_pattern(
+        pattern_type=ConventionalChartPatternType.HEAD_AND_SHOULDERS,
+        neckline_or_boundary_price=500.0,
+        htf_zone_level=498.0,
+        is_htf_demand=True,
+    )
+    assert hs_report.is_trap_risk_high is True
+    assert "Bear Trap" in hs_report.advisory_message
+    assert "Head formed at HTF Supply" in hs_report.underlying_gtf_driver
+
+    # 2. Inverse Head & Shoulders (BEL Case Study)
+    ihs_report = MarketTrapsAndPatternTruthEngine.translate_conventional_chart_pattern(
+        pattern_type=ConventionalChartPatternType.INVERSE_HEAD_AND_SHOULDERS,
+        neckline_or_boundary_price=300.0,
+        htf_zone_level=260.0,
+        is_htf_demand=True,
+    )
+    assert "Quarterly/Monthly Demand origin" in ihs_report.underlying_gtf_driver
+    assert "Enter at the Head origin" in ihs_report.advisory_message
+
+    # 3. Cup & Handle Trap
+    cup_report = MarketTrapsAndPatternTruthEngine.translate_conventional_chart_pattern(
+        pattern_type=ConventionalChartPatternType.CUP_AND_HANDLE,
+        neckline_or_boundary_price=750.0,
+        htf_zone_level=755.0,
+        is_htf_demand=False,
+    )
+    assert cup_report.is_trap_risk_high is True
+    assert "overhead space" in cup_report.advisory_message.lower()
+
+    # 4. Channel Breakout (Ashok Leyland Case Study)
+    channel_report = MarketTrapsAndPatternTruthEngine.translate_conventional_chart_pattern(
+        pattern_type=ConventionalChartPatternType.CHANNEL_BREAKOUT,
+        neckline_or_boundary_price=120.0,
+        htf_zone_level=118.0,
+        is_htf_demand=True,
+    )
+    assert channel_report.is_trap_risk_high is True
+    assert "Ashok Leyland Case Study" in channel_report.underlying_gtf_driver
+
+
+def test_episode_19_indicators_reality_check_rsi_myth_and_bonus():
+    """
+    Episode 19 Module 4: Indicators Reality Check (RSI & Stochastics in GTF Trading).
+    - Myth: RSI > 70 is overbought, sell! Reality: In strong uptrends, RSI can stay > 70 for months. Never short!
+    - Confluence Bonus: Demand Zone + RSI <= 30 (Oversold) -> +1 Extra Trade Score Bonus.
+    - Confluence Bonus: Supply Zone + RSI >= 70 (Overbought) -> +1 Extra Trade Score Bonus.
+    """
+    # 1. Overbought Uptrend Trap Avoided
+    ob_uptrend = MarketTrapsAndPatternTruthEngine.evaluate_indicator_confluence(
+        zone_is_demand=True,
+        rsi_value=78.5,
+        itf_trend="UPTREND",
+    )
+    assert ob_uptrend.confluence_type == IndicatorConfluenceType.OVERBOUGHT_UPTREND_TRAP
+    assert ob_uptrend.trade_score_bonus == 0
+    assert "Shorting strictly prohibited" in ob_uptrend.advisory_message
+
+    # 2. Oversold Demand Zone Confluence (+1 Bonus)
+    os_demand = MarketTrapsAndPatternTruthEngine.evaluate_indicator_confluence(
+        zone_is_demand=True,
+        rsi_value=24.0,
+        itf_trend="DOWNTREND",
+    )
+    assert os_demand.confluence_type == IndicatorConfluenceType.OVERSOLD_DEMAND_BOOST
+    assert os_demand.trade_score_bonus == 1
+    assert "Indicator Confluence Bonus (+1 Point)" in os_demand.advisory_message
+
+    # 3. Overbought Supply Zone Confluence (+1 Bonus)
+    ob_supply = MarketTrapsAndPatternTruthEngine.evaluate_indicator_confluence(
+        zone_is_demand=False,
+        rsi_value=76.0,
+        itf_trend="DOWNTREND",
+    )
+    assert ob_supply.confluence_type == IndicatorConfluenceType.OVERBOUGHT_SUPPLY_BOOST
+    assert ob_supply.trade_score_bonus == 1
+
+
+def test_episode_19_top_down_auditor_lotl_and_market_trap_integration():
+    """
+    Episode 19 Master Integration Test with 14-Point Top-Down Auditor:
+    - Case A: Qualified LOTL setup with Balanced Middle Entry and Lower Distal SL -> APPROVED.
+    - Case B: Breakout trade directly into Higher Timeframe Supply Wall -> REJECTED (Bull Trap).
+    """
+    engine = DemandSupplyEngine()
+    zone = engine.scan_for_zones(
+        opens=np.array([120.0, 95.0, 105.0]),
+        highs=np.array([122.0, 100.0, 115.0]),
+        lows=np.array([110.0, 90.0, 98.0]),
+        closes=np.array([115.0, 98.0, 112.0]),
+        timeframe=TimeframeTier.DAILY,
+    )[0]
+    zone.proximal_line = 100.0
+    zone.distal_line = 90.0
+
+    # Case A: LOTL execution with Middle Entry (105.0) and Lower Distal SL (90.0) -> Approved
+    report_lotl = engine.audit_comprehensive_top_down_setup(
+        execution_zone=zone,
+        cmp=106.0,
+        is_lotl_setup=True,
+        lotl_entry_mode="BALANCED_MIDDLE",
+        lotl_merged_entry=105.0,
+        lotl_lower_distal_sl=90.0,
+        rsi_value=28.0,
+        capital=100000.0,
+        risk_per_trade_pct=1.0,
+    )
+    assert report_lotl.is_approved is True
+    assert any("LOTL Execution (BALANCED_MIDDLE)" in check for check in report_lotl.audit_checks_passed)
+    assert any("Indicator Confluence Bonus" in check for check in report_lotl.audit_checks_passed)
+
+    # Case B: Attempting to buy breakout into Higher Timeframe Supply Zone (Bull Trap) -> Rejected
+    macro_supply = engine.scan_for_zones(
+        opens=np.array([110.0, 130.0, 120.0]),
+        highs=np.array([115.0, 135.0, 122.0]),
+        lows=np.array([108.0, 128.0, 105.0]),
+        closes=np.array([112.0, 132.0, 108.0]),
+        timeframe=TimeframeTier.MONTHLY,
+    )[0]
+    macro_supply.proximal_line = 130.0
+    macro_supply.distal_line = 140.0
+
+    report_trap = engine.audit_comprehensive_top_down_setup(
+        execution_zone=zone,
+        cmp=131.0,
+        macro_supply_zones=[macro_supply],
+        is_breakout_trade=True,
+        breakout_price=132.0,
+    )
+    assert report_trap.is_approved is False
+    assert any("BULL TRAP DETECTED" in rej for rej in report_trap.rejection_reasons)

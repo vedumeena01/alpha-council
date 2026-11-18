@@ -10,19 +10,20 @@
 - [8. Sectoral Analysis Engine (Episode 16) (alphacouncil/alpha/sector_engine.py)](#8-sectoral-analysis-engine-episode-16)
 - [9. Candlestick Patterns Truth Engine (Episode 17) (alphacouncil/alpha/pattern_engine.py)](#9-candlestick-patterns-truth-engine-episode-17)
 - [10. Gap Theory Engine (Episode 18) (alphacouncil/alpha/gap_engine.py)](#10-gap-theory-engine-episode-18)
-- [11. Pre-Trade Risk Engine & Concentration Limits (alphacouncil/risk/pre_trade.py)](#11-pre-trade-risk-engine--concentration-limits)
-- [12. Position Sizing & Kelly Calibration (alphacouncil/risk/sizing.py)](#12-position-sizing--kelly-calibration)
-- [13. López de Prado Meta-Labeler Downscaler (alphacouncil/risk/meta_labeler.py)](#13-lopez-de-prado-meta-labeler-downscaler)
-- [14. Intraday Kill-Switch & Monthly Session Halt (alphacouncil/risk/kill_switch.py)](#14-intraday-kill-switch--monthly-session-halt)
-- [15. Direction-Aware Circuit Band Guard (alphacouncil/risk/circuits.py)](#15-direction-aware-circuit-band-guard)
-- [16. GTF Risk Management & Capital Protection Engine (alphacouncil/risk/gtf_risk.py)](#16-gtf-risk-management--capital-protection-engine)
-- [17. Statutory Indian Market Friction Model (SEBI Oct 2024) (alphacouncil/execution/friction.py)](#17-statutory-indian-market-friction-model-sebi-oct-2024)
-- [18. Idempotent OMS & Broker GTT Bracket Sync (alphacouncil/execution/oms.py)](#18-idempotent-oms--broker-gtt-bracket-sync)
-- [19. Purged Walk-Forward Backtesting Engine (alphacouncil/backtest/engine.py)](#19-purged-walk-forward-backtesting-engine)
-- [20. Deflated Sharpe Ratio (DSR) & Quant Metrics (alphacouncil/backtest/metrics.py)](#20-deflated-sharpe-ratio-dsr--quant-metrics)
-- [21. 7-Model Orthogonal Ablation Suite (alphacouncil/backtest/ablation.py)](#21-7-model-orthogonal-ablation-suite)
-- [22. Interactive Bloomberg Dashboard UI (alphacouncil/ui/dashboard.py)](#22-interactive-bloomberg-dashboard-ui)
-- [23. Master Research Demo Runner (alphacouncil/run_council.py)](#23-master-research-demo-runner)
+- [11. Market Traps & LOTL Engine (Episode 19) (alphacouncil/alpha/trap_and_pattern_engine.py)](#11-market-traps--lotl-engine-episode-19)
+- [12. Pre-Trade Risk Engine & Concentration Limits (alphacouncil/risk/pre_trade.py)](#12-pre-trade-risk-engine--concentration-limits)
+- [13. Position Sizing & Kelly Calibration (alphacouncil/risk/sizing.py)](#13-position-sizing--kelly-calibration)
+- [14. López de Prado Meta-Labeler Downscaler (alphacouncil/risk/meta_labeler.py)](#14-lopez-de-prado-meta-labeler-downscaler)
+- [15. Intraday Kill-Switch & Monthly Session Halt (alphacouncil/risk/kill_switch.py)](#15-intraday-kill-switch--monthly-session-halt)
+- [16. Direction-Aware Circuit Band Guard (alphacouncil/risk/circuits.py)](#16-direction-aware-circuit-band-guard)
+- [17. GTF Risk Management & Capital Protection Engine (alphacouncil/risk/gtf_risk.py)](#17-gtf-risk-management--capital-protection-engine)
+- [18. Statutory Indian Market Friction Model (SEBI Oct 2024) (alphacouncil/execution/friction.py)](#18-statutory-indian-market-friction-model-sebi-oct-2024)
+- [19. Idempotent OMS & Broker GTT Bracket Sync (alphacouncil/execution/oms.py)](#19-idempotent-oms--broker-gtt-bracket-sync)
+- [20. Purged Walk-Forward Backtesting Engine (alphacouncil/backtest/engine.py)](#20-purged-walk-forward-backtesting-engine)
+- [21. Deflated Sharpe Ratio (DSR) & Quant Metrics (alphacouncil/backtest/metrics.py)](#21-deflated-sharpe-ratio-dsr--quant-metrics)
+- [22. 7-Model Orthogonal Ablation Suite (alphacouncil/backtest/ablation.py)](#22-7-model-orthogonal-ablation-suite)
+- [23. Interactive Bloomberg Dashboard UI (alphacouncil/ui/dashboard.py)](#23-interactive-bloomberg-dashboard-ui)
+- [24. Master Research Demo Runner (alphacouncil/run_council.py)](#24-master-research-demo-runner)
 
 ---
 
@@ -485,6 +486,9 @@ class TradeScoreBreakdown:
     candlestick_pattern_bonus: int = 0 # 0 or 1 point from Episode 17 (Post-Entry Confidence Booster)
     gap_confluence_bonus: int = 0      # 0, 1, or 2 points from Episode 18 (Gap Theory)
     gap_application: str = ""          # Application 1, 2, 3, or 4
+    indicator_confluence_bonus: int = 0 # 0 or 1 point from Episode 19 (RSI/Stochastic Confluence)
+    lotl_entry_mode: str = ""          # AGGRESSIVE, CONSERVATIVE, or BALANCED_MIDDLE
+    is_lotl_zone: bool = False         # True if part of Level on Top of the Level setup
 
 
 class EntryType(str, Enum):
@@ -657,6 +661,12 @@ class IdentifiedZone:
     is_pro_gap_origin: bool = False             # Zone formed via institutional Pro Gap departure
     window_gap_level: Optional[float] = None    # Level of window gap (lowest wick for demand, highest wick for supply)
     window_gap_decision: Optional[str] = None   # WINDOW_GAP_ELEVATED or WINDOW_GAP_DISCIPLINED_BASE
+
+    # LOTL & Market Traps Mechanics (Episode 19)
+    is_lotl_origin: bool = False                # True if lower demand or upper supply origin in LOTL
+    is_lotl_cushion: bool = False               # True if upper demand or lower supply cushion in LOTL
+    lotl_merged_entry: Optional[float] = None   # Middle or selected entry price
+    lotl_merged_stoploss: Optional[float] = None # Lower distal (demand) or upper distal (supply)
 
 
 class DemandSupplyEngine:
@@ -2881,6 +2891,13 @@ class DemandSupplyEngine:
         is_window_gap_present: bool = False,
         window_gap_decision: Optional[str] = None,
         window_gap_elevated_entry: Optional[float] = None,
+        is_lotl_setup: bool = False,
+        lotl_entry_mode: Optional[str] = None,
+        lotl_merged_entry: Optional[float] = None,
+        lotl_lower_distal_sl: Optional[float] = None,
+        is_breakout_trade: bool = False,
+        breakout_price: Optional[float] = None,
+        rsi_value: Optional[float] = None,
     ) -> MasterRevisionAuditReport:
         """
         Episode 15 Master Revision Class: The 14-Point Comprehensive Top-Down Institutional Auditor.
@@ -3058,6 +3075,43 @@ class DemandSupplyEngine:
                     "No-Chase rule enforced to prevent inflated stop-loss risk."
                 )
 
+        # Episode 19: Indicator Confluence (RSI Reality Check)
+        if rsi_value is not None:
+            if execution_zone.is_demand and rsi_value <= 30.0:
+                total_score = min(12.0, total_score + 1.0)
+                audit_checks_passed.append(
+                    f"Indicator Confluence Bonus (+1 Point): Qualified Demand Zone backed by Oversold RSI ({rsi_value:.1f})."
+                )
+            elif not execution_zone.is_demand and rsi_value >= 70.0:
+                total_score = min(12.0, total_score + 1.0)
+                audit_checks_passed.append(
+                    f"Indicator Confluence Bonus (+1 Point): Qualified Supply Zone backed by Overbought RSI ({rsi_value:.1f})."
+                )
+            elif itf_trend == TrendDirection.UPTREND and rsi_value >= 70.0:
+                audit_checks_passed.append(
+                    f"Indicator Myth Avoided: RSI is {rsi_value:.1f} (Overbought) in Uptrend. "
+                    "Assets remain overbought for months; shorting prohibited, trend strength confirmed."
+                )
+
+        # Episode 19: Market Trap Detection (Bull Traps & Bear Traps)
+        if is_breakout_trade and breakout_price is not None:
+            if macro_supply_zones:
+                for m_sz in macro_supply_zones:
+                    if m_sz.proximal_line <= breakout_price <= m_sz.distal_line or abs(breakout_price - m_sz.proximal_line) <= (0.01 * m_sz.proximal_line):
+                        rejection_reasons.append(
+                            f"BULL TRAP DETECTED: Attempted to buy breakout at ₹{breakout_price:.2f} directly into "
+                            f"Higher Timeframe Supply Zone [₹{m_sz.proximal_line:.2f} - ₹{m_sz.distal_line:.2f}]. "
+                            "Institutions use retail breakout buying as exit liquidity; price collapse imminent."
+                        )
+                        break
+            if not execution_zone.is_demand and htf_zone and htf_zone.is_demand:
+                if htf_zone.distal_line <= breakout_price <= htf_zone.proximal_line or abs(breakout_price - htf_zone.proximal_line) <= (0.01 * htf_zone.proximal_line):
+                    rejection_reasons.append(
+                        f"BEAR TRAP DETECTED: Attempted to short breakdown at ₹{breakout_price:.2f} directly into "
+                        f"Higher Timeframe Demand Zone [₹{htf_zone.distal_line:.2f} - ₹{htf_zone.proximal_line:.2f}]. "
+                        "Institutions absorb breakdown selling; violent upward reversal expected."
+                    )
+
         if base_score < 6.0 and not is_parent_sector_in_demand:
             rejection_reasons.append(f"Trade Score: Base score {base_score:.1f}/7.0 is below institutional minimum threshold of 6.0/7.0.")
         else:
@@ -3084,13 +3138,23 @@ class DemandSupplyEngine:
         else:
             audit_checks_passed.append("100-Trade Directive: Trading style complies with professional developmental rule.")
 
-        # 11. Mathematical Position Sizing & Rupee-Risk Invariance (Ep 10 & Ep 18 Window Gap Entry)
-        effective_entry = (
-            window_gap_elevated_entry
-            if (is_window_gap_present and window_gap_decision == "WINDOW_GAP_ELEVATED" and window_gap_elevated_entry)
-            else execution_zone.entry_price
-        )
-        risk_per_share = abs(effective_entry - execution_zone.stop_loss)
+        # 11. Mathematical Position Sizing & Rupee-Risk Invariance (Ep 10, Ep 18 Window Gap, Ep 19 LOTL)
+        if is_lotl_setup and lotl_merged_entry is not None and lotl_lower_distal_sl is not None:
+            effective_entry = lotl_merged_entry
+            effective_stoploss = lotl_lower_distal_sl
+            audit_checks_passed.append(
+                f"LOTL Execution ({lotl_entry_mode or 'BALANCED_MIDDLE'}): Entry at ₹{effective_entry:.2f}. "
+                f"Stop-Loss Mandate enforced strictly below Lower Origin Distal Line at ₹{effective_stoploss:.2f}."
+            )
+        else:
+            effective_stoploss = execution_zone.stop_loss
+            effective_entry = (
+                window_gap_elevated_entry
+                if (is_window_gap_present and window_gap_decision == "WINDOW_GAP_ELEVATED" and window_gap_elevated_entry)
+                else execution_zone.entry_price
+            )
+
+        risk_per_share = abs(effective_entry - effective_stoploss)
         if risk_per_share <= 0:
             risk_per_share = abs(execution_zone.proximal_line - execution_zone.distal_line)
 
@@ -3314,6 +3378,76 @@ class DemandSupplyEngine:
         if analysis.decision == WindowGapDecision.WINDOW_GAP_ELEVATED:
             zone.entry_price = analysis.window_gap_level
         return analysis
+
+    @classmethod
+    def merge_lotl_zones(
+        cls,
+        zones: List[IdentifiedZone],
+        entry_option: Any = None,  # LOTLEntryOption.BALANCED_MIDDLE
+        is_cross_wave: bool = False,
+    ) -> Any:
+        """
+        Episode 19 GTF Rule: Level on Top of the Level (LOTL) Merging.
+        - Stop-Loss Mandate: SL is ALWAYS anchored below the Lower Distal Line (Demand) or above Upper Distal (Supply).
+        - Stacking Limit (3+ Rule): Discards upper bases when >= 3 levels form to avoid Garbage Areas.
+        - Entry Options: AGGRESSIVE (Upper PL), CONSERVATIVE (Lower PL), BALANCED_MIDDLE (Ideal Sweet Spot).
+        """
+        from alphacouncil.alpha.trap_and_pattern_engine import (
+            LOTLEntryOption,
+            MarketTrapsAndPatternTruthEngine,
+        )
+
+        opt = entry_option or LOTLEntryOption.BALANCED_MIDDLE
+        merged = MarketTrapsAndPatternTruthEngine.merge_lotl_zones(
+            zones=zones,
+            entry_option=opt,
+            is_cross_wave=is_cross_wave,
+        )
+
+        for z in zones:
+            z.is_lotl_origin = (z == merged.origin_zone)
+            z.is_lotl_cushion = (z == merged.cushion_zone)
+            z.lotl_merged_entry = merged.entry_price
+            z.lotl_merged_stoploss = merged.stop_loss
+            if z.trade_score is not None:
+                z.trade_score.is_lotl_zone = True
+                z.trade_score.lotl_entry_mode = opt.value
+
+        return merged
+
+    @classmethod
+    def evaluate_indicator_confluence_bonus(
+        cls,
+        zone: IdentifiedZone,
+        rsi_value: float,
+        itf_trend: str = "UPTREND",
+    ) -> Any:
+        """
+        Episode 19 GTF Rule: Indicator Reality Check (RSI in GTF Trading).
+        - Standalone Indicator Fallacy: Strong uptrends stay RSI > 70 for months. Never short overbought in an uptrend!
+        - GTF Confluence: When an independently qualified Demand Zone coincides with Oversold RSI (<= 30),
+          award +1 Extra Trade Score Bonus.
+        """
+        from alphacouncil.alpha.trap_and_pattern_engine import (
+            IndicatorConfluenceType,
+            MarketTrapsAndPatternTruthEngine,
+        )
+
+        report = MarketTrapsAndPatternTruthEngine.evaluate_indicator_confluence(
+            zone_is_demand=zone.is_demand,
+            rsi_value=rsi_value,
+            itf_trend=itf_trend,
+        )
+
+        if zone.trade_score is not None:
+            if report.confluence_type in (
+                IndicatorConfluenceType.OVERSOLD_DEMAND_BOOST,
+                IndicatorConfluenceType.OVERBOUGHT_SUPPLY_BOOST,
+            ):
+                zone.trade_score.indicator_confluence_bonus = 1
+                zone.trade_score.total_score += 1.0
+
+        return report
 
 `
 
@@ -4984,7 +5118,491 @@ class GapTheoryEngine:
 
 ---
 
-### 11. Pre-Trade Risk Engine & Concentration Limits
+### 11. Market Traps & LOTL Engine (Episode 19)
+**File:** [alphacouncil/alpha/trap_and_pattern_engine.py](alphacouncil/alpha/trap_and_pattern_engine.py)
+
+`python
+"""
+Market Traps, LOTL Merging & Conventional Chart Patterns Truth Engine (Trading in the Zone / GTF Methodology).
+Codifies Episode 19 principles:
+1. Level Over the Level / Level on Top of the Level (LOTL):
+   - Formation mechanics: DBR + RBR, DBR + DBR, DBD + DBD.
+   - The Stop-Loss Mandate: SL is ALWAYS placed below the Distal Line of the LOWER (Origin) Level.
+   - Three Entry Options:
+     * Aggressive: Upper Proximal Line (minimizes missed fill, wider risk).
+     * Conservative: Lower Proximal Line (tight risk, high RRR, risk of missed fill).
+     * Balanced / Middle: Halfway between upper and lower bases (The GTF Ideal Sweet Spot).
+   - Stacking Limits: If 3 or more basing levels form, do NOT merge all three (avoids Garbage Areas). Discard top levels and focus strictly on the bottom two origin levels.
+   - Cross-Wave LOTL: Merging unmitigated origin bases from prior waves to prevent sweep stop-outs.
+2. Market Traps (Bull Traps & Bear Traps):
+   - Bull Trap: Retail buys breakout of resistance/neckline directly into a Higher Timeframe Supply Zone.
+   - Bear Trap: Retail shorts breakdown of support/neckline directly into a Higher Timeframe Demand Zone.
+   - Root Cause: Higher Timeframe Zones provide institutional liquidity to trap retail breakout traders.
+3. The Truth Behind Conventional Chart Patterns:
+   - Head & Shoulders: Head hits HTF Supply; neckline breakdown plunges into HTF Demand (Bear Trap).
+   - Inverse Head & Shoulders: Head low hits HTF Demand (Quarterly/Monthly origin); advance driven by institutional orders, not neckline breakout.
+   - Double Top / Bottom & Triple Top / Bottom: Visual artifacts of tested institutional supply/demand zones.
+   - Cup & Handle: Bottom is HTF Demand sweep; handle breakout directly into HTF Supply traps retail.
+   - Flags & Pennants: Consolidation between opposing zones; channel breakdown into HTF demand causes multi-year rallies (Ashok Leyland case study).
+4. Indicators Reality Check (RSI & Stochastic in GTF Trading):
+   - Standalone Indicator Fallacy: Strong institutional trends can remain "Overbought" (RSI > 70) for months while price surges 100%+. Shorting solely on indicator leads to ruin.
+   - The GTF Role (+1 Bonus Only): An independently qualified Demand Zone coinciding with Oversold RSI (<= 30) receives a +1 Extra Trade Score Bonus.
+"""
+
+from dataclasses import dataclass
+from enum import Enum
+from typing import Any, List, Optional, Tuple
+
+
+class LOTLEntryOption(str, Enum):
+    AGGRESSIVE = "AGGRESSIVE"              # Upper Proximal Line (Max fill probability, wider risk)
+    CONSERVATIVE = "CONSERVATIVE"          # Lower Proximal Line / Origin (Tight risk, high RRR, may miss trade)
+    BALANCED_MIDDLE = "BALANCED_MIDDLE"    # Halfway between upper and lower levels (GTF Ideal Sweet Spot)
+
+
+class MarketTrapType(str, Enum):
+    BULL_TRAP = "BULL_TRAP"                # Retail buys breakout into Higher Timeframe Supply Zone -> Trapped
+    BEAR_TRAP = "BEAR_TRAP"                # Retail shorts breakdown into Higher Timeframe Demand Zone -> Trapped
+    NO_TRAP = "NO_TRAP"
+
+
+class ConventionalChartPatternType(str, Enum):
+    HEAD_AND_SHOULDERS = "HEAD_AND_SHOULDERS"
+    INVERSE_HEAD_AND_SHOULDERS = "INVERSE_HEAD_AND_SHOULDERS"
+    DOUBLE_TOP = "DOUBLE_TOP"
+    DOUBLE_BOTTOM = "DOUBLE_BOTTOM"
+    TRIPLE_TOP = "TRIPLE_TOP"
+    TRIPLE_BOTTOM = "TRIPLE_BOTTOM"
+    CUP_AND_HANDLE = "CUP_AND_HANDLE"
+    FLAG_AND_PENNANT = "FLAG_AND_PENNANT"
+    CHANNEL_BREAKOUT = "CHANNEL_BREAKOUT"
+    NO_PATTERN = "NO_PATTERN"
+
+
+class IndicatorConfluenceType(str, Enum):
+    OVERSOLD_DEMAND_BOOST = "OVERSOLD_DEMAND_BOOST"      # RSI <= 30 at Demand Zone -> +1 Bonus
+    OVERBOUGHT_SUPPLY_BOOST = "OVERBOUGHT_SUPPLY_BOOST"  # RSI >= 70 at Supply Zone -> +1 Bonus
+    OVERBOUGHT_UPTREND_TRAP = "OVERBOUGHT_UPTREND_TRAP"  # RSI > 70 in institutional uptrend -> Shorting strictly prohibited!
+    OVERSOLD_DOWNTREND_TRAP = "OVERSOLD_DOWNTREND_TRAP"  # RSI < 30 in institutional downtrend -> Buying without zone prohibited!
+    NEUTRAL_INDICATOR = "NEUTRAL_INDICATOR"
+
+
+@dataclass
+class MergedLOTLZone:
+    origin_zone: Any
+    cushion_zone: Any
+    entry_option: LOTLEntryOption
+    entry_price: float
+    stop_loss: float
+    risk_per_share: float
+    is_3_plus_cluster_trimmed: bool = False
+    is_cross_wave_lotl: bool = False
+    advisory_message: str = ""
+
+
+@dataclass
+class MarketTrapReport:
+    trap_type: MarketTrapType
+    trigger_price: float
+    htf_zone_price_range: Tuple[float, float]
+    is_trap_confirmed: bool
+    breakout_direction: str
+    expected_reversal_direction: str
+    advisory_message: str
+
+
+@dataclass
+class ChartPatternTruthReport:
+    pattern_type: ConventionalChartPatternType
+    underlying_gtf_driver: str
+    neckline_or_boundary_price: float
+    htf_inflection_zone_level: float
+    retail_expectation: str
+    institutional_reality: str
+    is_trap_risk_high: bool
+    advisory_message: str
+
+
+@dataclass
+class IndicatorConfluenceReport:
+    confluence_type: IndicatorConfluenceType
+    rsi_value: float
+    is_standalone_tradeable: bool = False
+    trade_score_bonus: int = 0
+    advisory_message: str = ""
+
+
+class MarketTrapsAndPatternTruthEngine:
+    """
+    Episode 19 Quantitative Engine:
+    LOTL Level Merging, Institutional Bull/Bear Trap Detection,
+    Conventional Chart Pattern Translation, and Indicator Reality Check.
+    """
+
+    @classmethod
+    def merge_lotl_zones(
+        cls,
+        zones: List[Any],
+        entry_option: LOTLEntryOption = LOTLEntryOption.BALANCED_MIDDLE,
+        is_cross_wave: bool = False,
+    ) -> MergedLOTLZone:
+        """
+        Module 1: Level Over the Level (LOTL) Merging Engine.
+        - Stop-Loss Mandate: Fixed strictly below Lower Distal Line (Demand) or above Upper Distal Line (Supply).
+        - Stacking Limit (3+ Rule): If 3 or more levels form, discard upper levels and merge strictly bottom two.
+        - Entry Options: Aggressive (Upper PL), Conservative (Lower PL), Balanced Middle (Average of PLs).
+        """
+        if not zones:
+            raise ValueError("LOTL merging requires at least one zone.")
+
+        is_demand = zones[0].is_demand
+
+        # Sort zones by price level:
+        # For Demand: lowest proximal line is the lower origin base
+        # For Supply: highest proximal line is the upper origin base
+        if is_demand:
+            sorted_zones = sorted(zones, key=lambda z: z.proximal_line)
+        else:
+            sorted_zones = sorted(zones, key=lambda z: z.proximal_line, reverse=True)
+
+        is_trimmed = False
+        # Stacking Limit: If 3 or more levels form, do not merge all three (avoids Garbage Area)
+        # Discard top levels and focus strictly on bottom two (origin) levels
+        if len(sorted_zones) >= 3:
+            is_trimmed = True
+            active_pair = sorted_zones[:2]
+        elif len(sorted_zones) == 2:
+            active_pair = sorted_zones
+        else:
+            # Single zone fallback
+            z = sorted_zones[0]
+            risk = abs(z.entry_price - z.stop_loss)
+            return MergedLOTLZone(
+                origin_zone=z,
+                cushion_zone=z,
+                entry_option=entry_option,
+                entry_price=round(z.entry_price, 2),
+                stop_loss=round(z.stop_loss, 2),
+                risk_per_share=round(risk, 2),
+                is_3_plus_cluster_trimmed=False,
+                is_cross_wave_lotl=is_cross_wave,
+                advisory_message="Single zone provided; no LOTL stacking present.",
+            )
+
+        origin_level = active_pair[0]   # Lower level for demand, Upper level for supply
+        cushion_level = active_pair[1]  # Upper level for demand, Lower level for supply
+
+        if is_demand:
+            # Demand LOTL:
+            # Origin Level is lower (true structural turning point)
+            # Stop-loss is ALWAYS below the Distal Line of the LOWER (Origin) Level
+            stop_loss = origin_level.distal_line
+            lower_pl = origin_level.proximal_line
+            upper_pl = cushion_level.proximal_line
+
+            if entry_option == LOTLEntryOption.AGGRESSIVE:
+                entry_price = upper_pl
+            elif entry_option == LOTLEntryOption.CONSERVATIVE:
+                entry_price = lower_pl
+            else:
+                # Balanced / Middle Entry: Ideal Sweet Spot
+                entry_price = (upper_pl + lower_pl) / 2.0
+
+            risk_per_share = entry_price - stop_loss
+            advisory = (
+                f"Demand LOTL Merged: Entry ({entry_option.value}) at ₹{entry_price:.2f}. "
+                f"Stop-Loss strictly anchored below Lower Origin Distal Line at ₹{stop_loss:.2f} (Risk: ₹{risk_per_share:.2f})."
+            )
+        else:
+            # Supply LOTL:
+            # Origin Level is upper (highest resistance)
+            # Stop-loss is ALWAYS above the Distal Line of the UPPER (Origin) Level
+            stop_loss = origin_level.distal_line
+            upper_pl = origin_level.proximal_line
+            lower_pl = cushion_level.proximal_line
+
+            if entry_option == LOTLEntryOption.AGGRESSIVE:
+                entry_price = lower_pl
+            elif entry_option == LOTLEntryOption.CONSERVATIVE:
+                entry_price = upper_pl
+            else:
+                entry_price = (upper_pl + lower_pl) / 2.0
+
+            risk_per_share = stop_loss - entry_price
+            advisory = (
+                f"Supply LOTL Merged: Entry ({entry_option.value}) at ₹{entry_price:.2f}. "
+                f"Stop-Loss strictly anchored above Upper Origin Distal Line at ₹{stop_loss:.2f} (Risk: ₹{risk_per_share:.2f})."
+            )
+
+        if is_trimmed:
+            advisory += " [3+ Stack Limit Enforced]: Discarded excessive upper basing to prevent Garbage Area range inflation."
+
+        if is_cross_wave:
+            advisory += " [Cross-Wave LOTL]: Merged with unmitigated origin base from prior wave, preventing stop-hunt sweep."
+
+        return MergedLOTLZone(
+            origin_zone=origin_level,
+            cushion_zone=cushion_level,
+            entry_option=entry_option,
+            entry_price=round(entry_price, 2),
+            stop_loss=round(stop_loss, 2),
+            risk_per_share=round(risk_per_share, 2),
+            is_3_plus_cluster_trimmed=is_trimmed,
+            is_cross_wave_lotl=is_cross_wave,
+            advisory_message=advisory,
+        )
+
+    @staticmethod
+    def detect_market_trap(
+        breakout_price: float,
+        breakout_type: str,  # "RESISTANCE_BREAKOUT" or "SUPPORT_BREAKDOWN"
+        htf_demand_zone: Optional[Tuple[float, float]] = None,  # (distal, proximal)
+        htf_supply_zone: Optional[Tuple[float, float]] = None,  # (proximal, distal)
+    ) -> MarketTrapReport:
+        """
+        Module 2: Market Traps (Bull Traps & Bear Traps) Detector.
+        - Bull Trap: Price breaks out above horizontal resistance directly into HTF Supply Zone.
+        - Bear Trap: Price breaks down below horizontal support directly into HTF Demand Zone.
+        """
+        breakout_upper = breakout_type.upper()
+
+        # 1. Bull Trap Check
+        if "RESISTANCE" in breakout_upper or "BREAKOUT" in breakout_upper:
+            if htf_supply_zone is not None:
+                pl_supply, dl_supply = htf_supply_zone
+                # If breakout price is inside or entering HTF supply zone
+                if pl_supply <= breakout_price <= dl_supply or abs(breakout_price - pl_supply) <= (0.01 * pl_supply):
+                    return MarketTrapReport(
+                        trap_type=MarketTrapType.BULL_TRAP,
+                        trigger_price=breakout_price,
+                        htf_zone_price_range=(pl_supply, dl_supply),
+                        is_trap_confirmed=True,
+                        breakout_direction="UPWARD_BREAKOUT",
+                        expected_reversal_direction="SHARP_DOWNWARD_REVERSAL",
+                        advisory_message=(
+                            f"BULL TRAP DETECTED: Price broke out at ₹{breakout_price:.2f} directly into "
+                            f"Higher Timeframe Supply Zone [₹{pl_supply:.2f} - ₹{dl_supply:.2f}]. "
+                            "Retail breakout buyers will provide exit liquidity for institutions. "
+                            "Buying prohibited; expect sharp downward reversal."
+                        ),
+                    )
+
+        # 2. Bear Trap Check
+        if "SUPPORT" in breakout_upper or "BREAKDOWN" in breakout_upper:
+            if htf_demand_zone is not None:
+                dl_demand, pl_demand = htf_demand_zone
+                # If breakdown price is inside or entering HTF demand zone
+                if dl_demand <= breakout_price <= pl_demand or abs(breakout_price - pl_demand) <= (0.01 * pl_demand):
+                    return MarketTrapReport(
+                        trap_type=MarketTrapType.BEAR_TRAP,
+                        trigger_price=breakout_price,
+                        htf_zone_price_range=(dl_demand, pl_demand),
+                        is_trap_confirmed=True,
+                        breakout_direction="DOWNWARD_BREAKDOWN",
+                        expected_reversal_direction="VIOLENT_UPWARD_REVERSAL",
+                        advisory_message=(
+                            f"BEAR TRAP DETECTED: Price broke down at ₹{breakout_price:.2f} directly into "
+                            f"Higher Timeframe Demand Zone [₹{dl_demand:.2f} - ₹{pl_demand:.2f}]. "
+                            "Retail short sellers are dumping supply into institutional limit buy orders. "
+                            "Shorting prohibited; expect violent upward reversal."
+                        ),
+                    )
+
+        return MarketTrapReport(
+            trap_type=MarketTrapType.NO_TRAP,
+            trigger_price=breakout_price,
+            htf_zone_price_range=(0.0, 0.0),
+            is_trap_confirmed=False,
+            breakout_direction=breakout_type,
+            expected_reversal_direction="CONTINUATION",
+            advisory_message="No institutional trap detected. Move is in open territory.",
+        )
+
+    @staticmethod
+    def translate_conventional_chart_pattern(
+        pattern_type: ConventionalChartPatternType,
+        neckline_or_boundary_price: float,
+        htf_zone_level: float,
+        is_htf_demand: bool = True,
+    ) -> ChartPatternTruthReport:
+        """
+        Module 3: Demystifies conventional patterns through institutional Supply & Demand.
+        Proves why conventional neckline trades fail when colliding with HTF zones.
+        """
+        if pattern_type == ConventionalChartPatternType.HEAD_AND_SHOULDERS:
+            # Head hit HTF supply; neckline breakdown plunges into HTF demand
+            is_trap = is_htf_demand and abs(neckline_or_boundary_price - htf_zone_level) / htf_zone_level <= 0.03
+            return ChartPatternTruthReport(
+                pattern_type=pattern_type,
+                underlying_gtf_driver="Head formed at HTF Supply; neckline sits over HTF Demand",
+                neckline_or_boundary_price=neckline_or_boundary_price,
+                htf_inflection_zone_level=htf_zone_level,
+                retail_expectation="Short the neckline breakdown with target equal to Head-to-Neckline distance.",
+                institutional_reality=(
+                    "The breakdown plunges directly into unmitigated Higher Timeframe Demand. "
+                    "Institutional limit buy orders absorb the panic selling, trapping retail shorts."
+                ),
+                is_trap_risk_high=is_trap,
+                advisory_message="Head & Shoulders Truth: Do NOT short the neckline breakdown into HTF Demand. Expect Bear Trap.",
+            )
+
+        if pattern_type == ConventionalChartPatternType.INVERSE_HEAD_AND_SHOULDERS:
+            return ChartPatternTruthReport(
+                pattern_type=pattern_type,
+                underlying_gtf_driver="Head extreme low coincided with Quarterly/Monthly Demand origin (BEL Case Study)",
+                neckline_or_boundary_price=neckline_or_boundary_price,
+                htf_inflection_zone_level=htf_zone_level,
+                retail_expectation="Wait for late neckline breakout to buy with wide stop loss.",
+                institutional_reality=(
+                    "The entire rally was engineered by institutional orders at the HTF Demand origin. "
+                    "GTF traders entered at the Head origin; buying the neckline breakout is late with poor RRR."
+                ),
+                is_trap_risk_high=False,
+                advisory_message="Inverse H&S Truth: Enter at the Head origin Demand Zone with tight risk, not at the late neckline breakout.",
+            )
+
+        if pattern_type in (ConventionalChartPatternType.DOUBLE_TOP, ConventionalChartPatternType.TRIPLE_TOP):
+            return ChartPatternTruthReport(
+                pattern_type=pattern_type,
+                underlying_gtf_driver="Repeated retests of an Institutional Supply Zone",
+                neckline_or_boundary_price=neckline_or_boundary_price,
+                htf_inflection_zone_level=htf_zone_level,
+                retail_expectation="Sell after the double/triple top confirms with neckline break.",
+                institutional_reality="Visual artifact of tested supply; each test absorbs pending sell orders, reducing freshness.",
+                is_trap_risk_high=False,
+                advisory_message="Double/Triple Top Truth: It is simply a tested supply zone. Freshness is reduced; do not trade late tests.",
+            )
+
+        if pattern_type in (ConventionalChartPatternType.DOUBLE_BOTTOM, ConventionalChartPatternType.TRIPLE_BOTTOM):
+            return ChartPatternTruthReport(
+                pattern_type=pattern_type,
+                underlying_gtf_driver="Repeated retests of an Institutional Demand Zone (Colpal Case Study)",
+                neckline_or_boundary_price=neckline_or_boundary_price,
+                htf_inflection_zone_level=htf_zone_level,
+                retail_expectation="Buy after neckline break of double/triple bottom.",
+                institutional_reality="Visual artifact of tested demand holding firm while overhead supply is absorbed.",
+                is_trap_risk_high=False,
+                advisory_message="Double/Triple Bottom Truth: Price holding HTF demand while overhead resistance is cleared leads to explosive expansion.",
+            )
+
+        if pattern_type == ConventionalChartPatternType.CUP_AND_HANDLE:
+            is_trap = not is_htf_demand and abs(neckline_or_boundary_price - htf_zone_level) / htf_zone_level <= 0.03
+            return ChartPatternTruthReport(
+                pattern_type=pattern_type,
+                underlying_gtf_driver="Cup bottom sweeps HTF Demand; Handle is a secondary follow-up base",
+                neckline_or_boundary_price=neckline_or_boundary_price,
+                htf_inflection_zone_level=htf_zone_level,
+                retail_expectation="Buy handle breakout aggressively.",
+                institutional_reality=(
+                    "If handle breakout drives straight into an overhead HTF Supply Zone, "
+                    "the setup fails immediately, trapping breakout buyers."
+                ),
+                is_trap_risk_high=is_trap,
+                advisory_message="Cup & Handle Truth: Check overhead space! Handle breakout directly into HTF Supply will fail.",
+            )
+
+        if pattern_type in (ConventionalChartPatternType.FLAG_AND_PENNANT, ConventionalChartPatternType.CHANNEL_BREAKOUT):
+            return ChartPatternTruthReport(
+                pattern_type=pattern_type,
+                underlying_gtf_driver="Consolidation between minor levels; channel breakdown into HTF Demand (Ashok Leyland Case Study)",
+                neckline_or_boundary_price=neckline_or_boundary_price,
+                htf_inflection_zone_level=htf_zone_level,
+                retail_expectation="Short channel breakdown.",
+                institutional_reality="Breakdown into HTF Demand causes institutions to absorb retail selling and trigger multi-year rally.",
+                is_trap_risk_high=is_htf_demand,
+                advisory_message="Flag/Channel Truth: Downward channel breakdown directly into Monthly Demand is a legendary Bear Trap.",
+            )
+
+        return ChartPatternTruthReport(
+            pattern_type=ConventionalChartPatternType.NO_PATTERN,
+            underlying_gtf_driver="Clean Institutional Supply and Demand Zones",
+            neckline_or_boundary_price=neckline_or_boundary_price,
+            htf_inflection_zone_level=htf_zone_level,
+            retail_expectation="None",
+            institutional_reality="Price action governed strictly by institutional order matching.",
+            is_trap_risk_high=False,
+            advisory_message="Clean price action without conventional pattern traps.",
+        )
+
+    @staticmethod
+    def evaluate_indicator_confluence(
+        zone_is_demand: bool,
+        rsi_value: float,
+        itf_trend: str = "UPTREND",
+    ) -> IndicatorConfluenceReport:
+        """
+        Module 4: Indicators Reality Check (RSI & Stochastic in GTF Trading).
+        - Standalone Indicator Fallacy: Strong uptrends stay RSI > 70 for months. Never short overbought RSI in an uptrend!
+        - GTF Confluence: When an independently qualified Demand Zone coincides with Oversold RSI (<= 30),
+          award +1 Extra Trade Score Bonus.
+        """
+        trend_upper = itf_trend.upper()
+
+        # The Overbought Uptrend Trap
+        if "UP" in trend_upper and rsi_value >= 70.0:
+            return IndicatorConfluenceReport(
+                confluence_type=IndicatorConfluenceType.OVERBOUGHT_UPTREND_TRAP,
+                rsi_value=round(rsi_value, 2),
+                is_standalone_tradeable=False,
+                trade_score_bonus=0,
+                advisory_message=(
+                    f"INDICATOR MYTH AVOIDED: RSI is {rsi_value:.1f} (Overbought) in an institutional UPTREND. "
+                    "Assets can remain overbought for months while surging 100%+. Shorting strictly prohibited!"
+                ),
+            )
+
+        # The Oversold Downtrend Trap
+        if "DOWN" in trend_upper and rsi_value <= 30.0 and not zone_is_demand:
+            return IndicatorConfluenceReport(
+                confluence_type=IndicatorConfluenceType.OVERSOLD_DOWNTREND_TRAP,
+                rsi_value=round(rsi_value, 2),
+                is_standalone_tradeable=False,
+                trade_score_bonus=0,
+                advisory_message=(
+                    f"INDICATOR TRAP AVOIDED: RSI is {rsi_value:.1f} (Oversold) in an institutional DOWNTREND. "
+                    "Buying solely on oversold indicators without an institutional Demand Zone leads to falling knife traps."
+                ),
+            )
+
+        # Confluence Bonus at Demand Zone
+        if zone_is_demand and rsi_value <= 30.0:
+            return IndicatorConfluenceReport(
+                confluence_type=IndicatorConfluenceType.OVERSOLD_DEMAND_BOOST,
+                rsi_value=round(rsi_value, 2),
+                is_standalone_tradeable=False,  # Never trade standalone
+                trade_score_bonus=1,
+                advisory_message=(
+                    f"Indicator Confluence Bonus (+1 Point): Qualified Demand Zone coincides with Oversold RSI ({rsi_value:.1f}). "
+                    "Retail indicator algorithms may add supportive buying flow."
+                ),
+            )
+
+        # Confluence Bonus at Supply Zone
+        if not zone_is_demand and rsi_value >= 70.0:
+            return IndicatorConfluenceReport(
+                confluence_type=IndicatorConfluenceType.OVERBOUGHT_SUPPLY_BOOST,
+                rsi_value=round(rsi_value, 2),
+                is_standalone_tradeable=False,
+                trade_score_bonus=1,
+                advisory_message=(
+                    f"Indicator Confluence Bonus (+1 Point): Qualified Supply Zone coincides with Overbought RSI ({rsi_value:.1f}). "
+                    "Retail indicator algorithms may add supportive selling flow."
+                ),
+            )
+
+        return IndicatorConfluenceReport(
+            confluence_type=IndicatorConfluenceType.NEUTRAL_INDICATOR,
+            rsi_value=round(rsi_value, 2),
+            is_standalone_tradeable=False,
+            trade_score_bonus=0,
+            advisory_message=f"RSI reading {rsi_value:.1f} is neutral. No indicator bonus awarded.",
+        )
+
+`
+
+---
+
+### 12. Pre-Trade Risk Engine & Concentration Limits
 **File:** [alphacouncil/risk/pre_trade.py](alphacouncil/risk/pre_trade.py)
 
 `python
@@ -5123,7 +5741,7 @@ class PreTradeRiskEngine:
 
 ---
 
-### 12. Position Sizing & Kelly Calibration
+### 13. Position Sizing & Kelly Calibration
 **File:** [alphacouncil/risk/sizing.py](alphacouncil/risk/sizing.py)
 
 `python
@@ -5359,7 +5977,7 @@ class PositionSizingEngine:
 
 ---
 
-### 13. López de Prado Meta-Labeler Downscaler
+### 14. López de Prado Meta-Labeler Downscaler
 **File:** [alphacouncil/risk/meta_labeler.py](alphacouncil/risk/meta_labeler.py)
 
 `python
@@ -5474,7 +6092,7 @@ class LopezDePradoMetaLabeler:
 
 ---
 
-### 14. Intraday Kill-Switch & Monthly Session Halt
+### 15. Intraday Kill-Switch & Monthly Session Halt
 **File:** [alphacouncil/risk/kill_switch.py](alphacouncil/risk/kill_switch.py)
 
 `python
@@ -5611,7 +6229,7 @@ class IntradayKillSwitch:
 
 ---
 
-### 15. Direction-Aware Circuit Band Guard
+### 16. Direction-Aware Circuit Band Guard
 **File:** [alphacouncil/risk/circuits.py](alphacouncil/risk/circuits.py)
 
 `python
@@ -5745,7 +6363,7 @@ class MWPLBanTracker:
 
 ---
 
-### 16. GTF Risk Management & Capital Protection Engine
+### 17. GTF Risk Management & Capital Protection Engine
 **File:** [alphacouncil/risk/gtf_risk.py](alphacouncil/risk/gtf_risk.py)
 
 `python
@@ -6056,7 +6674,7 @@ class GTFRiskManager:
 
 ---
 
-### 17. Statutory Indian Market Friction Model (SEBI Oct 2024)
+### 18. Statutory Indian Market Friction Model (SEBI Oct 2024)
 **File:** [alphacouncil/execution/friction.py](alphacouncil/execution/friction.py)
 
 `python
@@ -6189,7 +6807,7 @@ class IndianMarketFrictionModel:
 
 ---
 
-### 18. Idempotent OMS & Broker GTT Bracket Sync
+### 19. Idempotent OMS & Broker GTT Bracket Sync
 **File:** [alphacouncil/execution/oms.py](alphacouncil/execution/oms.py)
 
 `python
@@ -6444,7 +7062,7 @@ class IdempotentOMS:
 
 ---
 
-### 19. Purged Walk-Forward Backtesting Engine
+### 20. Purged Walk-Forward Backtesting Engine
 **File:** [alphacouncil/backtest/engine.py](alphacouncil/backtest/engine.py)
 
 `python
@@ -6843,7 +7461,7 @@ class BacktestEngine:
 
 ---
 
-### 20. Deflated Sharpe Ratio (DSR) & Quant Metrics
+### 21. Deflated Sharpe Ratio (DSR) & Quant Metrics
 **File:** [alphacouncil/backtest/metrics.py](alphacouncil/backtest/metrics.py)
 
 `python
@@ -7074,7 +7692,7 @@ class QuantMetricsCalculator:
 
 ---
 
-### 21. 7-Model Orthogonal Ablation Suite
+### 22. 7-Model Orthogonal Ablation Suite
 **File:** [alphacouncil/backtest/ablation.py](alphacouncil/backtest/ablation.py)
 
 `python
@@ -7217,7 +7835,7 @@ class AblationSuiteRunner:
 
 ---
 
-### 22. Interactive Bloomberg Dashboard UI
+### 23. Interactive Bloomberg Dashboard UI
 **File:** [alphacouncil/ui/dashboard.py](alphacouncil/ui/dashboard.py)
 
 `python
@@ -7383,7 +8001,7 @@ class AlphaCouncilDashboard:
 
 ---
 
-### 23. Master Research Demo Runner
+### 24. Master Research Demo Runner
 **File:** [alphacouncil/run_council.py](alphacouncil/run_council.py)
 
 `python
