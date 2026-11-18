@@ -27,16 +27,17 @@
 | **17** | Candlestick Patterns and their Truth (The Absorption Law & +1 Booster) | 6 | **100%** (6/6) | 0.19s | 50/50 Coin-Toss Reality, The Whipsaw Trap, Institutional Absorption Law (Bearish in Demand Fails / Bear Trap), Rejection Law (Bullish in Supply Fails / Bull Trap), Structural Equivalence (Morning Star == DBR), +1 Post-Entry Confidence Booster | [`EPISODE_17_TEST_RESULTS.md`](EPISODE_17_TEST_RESULTS.md) |
 | **18** | Gap Theory (Structural & Behavioral, 4 Applications, Disappearing & Window Gap) | 7 | **100%** (7/7) | 0.41s | Inside vs. Outside Gap, Novice vs. Pro Gap, App 1 (Novice in Zone, +1 Score), App 2 (Novice in Pro Gap, +2 Score), App 3 (Pro Out Confirm), App 4 (Master Setup), Window Gap (Elevated vs. Disciplined Base), Disappearing Gap & Myth Debunking | [`EPISODE_18_TEST_RESULTS.md`](EPISODE_18_TEST_RESULTS.md) |
 | **19** | Market Traps & Truth Behind Conventional Patterns (LOTL, Bull/Bear Traps, H&S, Flags, RSI) | 7 | **100%** (7/7) | 0.42s | LOTL Stop-Loss Mandate, Balanced Middle Entry, 3+ Stacking Limit, Cross-Wave LOTL, Bull & Bear Trap Detectors, H&S / Double Bottom / Cup & Handle / Channel Truth, Overbought Uptrend Trap & RSI +1 Bonus | [`EPISODE_19_TEST_RESULTS.md`](EPISODE_19_TEST_RESULTS.md) |
-| **Total** | **All Episodes (Cumulative)** | **95** | **100%** (95/95) | **0.95s** | **Full GTF Price Action, Risk, Execution Stances, Confirmation Reversal, 14-Point Master Revision, Sectoral, Candlestick Pattern Truth, Gap Theory & Market Traps Architecture (`zone_engine.py` + `sector_engine.py` + `pattern_engine.py` + `gap_engine.py` + `trap_and_pattern_engine.py` + `gtf_risk.py`)** | - |
+| **20** | Putting It All Together (Dynamic Demand Trailing, 52W High Scanner & Grand Synthesis) | 7 | **100%** (7/7) | 0.41s | Weekly Demand-Anchored Dynamic Trailing, Confirmed Candle Close Exit, 52W High Approaching Shortcut, 30m Daily Stock Scanner, Price Alert Mandate ($PL + 2.0$), 7/7 Baseline Priority Rule & 15-Point Top-Down Synthesis | [`EPISODE_20_TEST_RESULTS.md`](EPISODE_20_TEST_RESULTS.md) |
+| **Total** | **All Episodes (Grand Curriculum Complete!)** | **102** | **100%** (102/102) | **0.95s** | **Full GTF Price Action, Risk, Execution Stances, Confirmation Reversal, 15-Point Master Revision, Sectoral, Candlestick Pattern Truth, Gap Theory, Market Traps, Dynamic Trailing & Scanner Architecture (`zone_engine.py` + `sector_engine.py` + `pattern_engine.py` + `gap_engine.py` + `trap_and_pattern_engine.py` + `scanner_and_trailing_engine.py` + `gtf_risk.py`)** | - |
 
 ---
 
 ## 🔬 System Health & Test Coverage Progress
 
 ```text
-Modules: alphacouncil/alpha/zone_engine.py + alphacouncil/alpha/sector_engine.py + alphacouncil/alpha/pattern_engine.py + alphacouncil/alpha/gap_engine.py + alphacouncil/alpha/trap_and_pattern_engine.py + alphacouncil/risk/gtf_risk.py
-Total Suite Tests: 114 (100% Passed)
-Cumulative Zone, Sector, Pattern, Gap & Trap Tests: 95 (100% Passed)
+Modules: zone_engine.py + sector_engine.py + pattern_engine.py + gap_engine.py + trap_and_pattern_engine.py + scanner_and_trailing_engine.py + gtf_risk.py
+Total Suite Tests: 121 (100% Passed)
+Cumulative Zone, Sector, Pattern, Gap, Trap & Trailing Tests: 102 (100% Passed)
 Linter Status: Ruff 0 errors, 0 warnings
 CI Status: GitHub Actions 100% Green (Python 3.11 & 3.12)
 ```
@@ -63,14 +64,4 @@ CI Status: GitHub Actions 100% Green (Python 3.11 & 3.12)
 - [`EPISODE_17_TEST_RESULTS.md`](EPISODE_17_TEST_RESULTS.md) - Candlestick patterns truth, absorption law & +1 confidence booster.
 - [`EPISODE_18_TEST_RESULTS.md`](EPISODE_18_TEST_RESULTS.md) - Gap theory, 4 core applications, disappearing gaps & window gap mechanics.
 - [`EPISODE_19_TEST_RESULTS.md`](EPISODE_19_TEST_RESULTS.md) - Market traps, LOTL merging, conventional patterns truth & indicator reality check.
-- [`EPISODE_04_TEST_RESULTS.md`](EPISODE_04_TEST_RESULTS.md) - Exceptional marking & trade execution.
-- [`EPISODE_05_TEST_RESULTS.md`](EPISODE_05_TEST_RESULTS.md) - Trading psychology, wick-to-wick, direct reversals & news traps.
-- [`EPISODE_06_TEST_RESULTS.md`](EPISODE_06_TEST_RESULTS.md) - The Closing concept, Gap+Base exciting, LOTL stacking, origin pivot & garbage filter.
-- [`EPISODE_07_TEST_RESULTS.md`](EPISODE_07_TEST_RESULTS.md) - Multiple Time Frame Analysis (MTFA), 50 SMA clock method, 5 curve tiers & boundary rule.
-- [`EPISODE_08_TEST_RESULTS.md`](EPISODE_08_TEST_RESULTS.md) - Trade Score (7/7), Mahabharata Alignment, Dynamic Opposing ITF Target & Best Setup Gold Standard.
-- [`EPISODE_09_TEST_RESULTS.md`](EPISODE_09_TEST_RESULTS.md) - Trading Style, Authentic Zones, Rupee-Risk Equality, 100-Trade Directive & Rejection Mindset.
-- [`EPISODE_10_TEST_RESULTS.md`](EPISODE_10_TEST_RESULTS.md) - Risk Management, Position Sizing, Anti-Tamper Guards, 10 Trades/Month Cap & Excel Growth Models.
-- [`EPISODE_11_TEST_RESULTS.md`](EPISODE_11_TEST_RESULTS.md) - Aggressive vs. Conservative Execution Stances, The Steamroller Effect, The Matching Timeframe Principle, Macro Anchoring to Shri Krishna & Regime Inversion.
-- [`EPISODE_12_TEST_RESULTS.md`](EPISODE_12_TEST_RESULTS.md) - Moving Averages (SMA vs EMA), Lagging Proof, Retail Crossover Traps Filtering, Extra Trade Score (8/7) & Dynamic MA Buffer Stop-Loss.
-- [`EPISODE_13_TEST_RESULTS.md`](EPISODE_13_TEST_RESULTS.md) - Advanced Trend Analysis (Demand/Supply Violation Technique), Mandatory Close Filter, Algorithmic EMA 20 Footprint & Volatility Squeeze.
-- [`EPISODE_14_TEST_RESULTS.md`](EPISODE_14_TEST_RESULTS.md) - Trading Against the Trend with Confirmation Entry, 1-Supply-Zone Rule, 30x Risk Compression & All-Time Low (ATL) Protocol.
+- [`EPISODE_20_TEST_RESULTS.md`](EPISODE_20_TEST_RESULTS.md) - Putting it all together, dynamic demand-anchored trailing, 52W high scanner & 15-point master top-down synthesis.

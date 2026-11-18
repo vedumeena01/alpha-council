@@ -27,4 +27,4 @@
 | **17** | **Candlestick Patterns & their Truth (50/50 Coin Toss, Absorption Law & +1 Confidence Booster)** | ✅ **Codified & Trained** | [`training/EPISODE_17_CANDLESTICK_PATTERNS_AND_THEIR_TRUTH.md`](EPISODE_17_CANDLESTICK_PATTERNS_AND_THEIR_TRUTH.md) |
 | **18** | **Gap Theory (Inside/Outside, Novice vs Pro, 4 Applications, Disappearing Gaps & Window Gap)** | ✅ **Codified & Trained** | [`training/EPISODE_18_GAP_THEORY.md`](EPISODE_18_GAP_THEORY.md) |
 | **19** | **Market Traps & Truth Behind Conventional Patterns (LOTL, Bull/Bear Traps, H&S, Flags, RSI)** | ✅ **Codified & Trained** | [`training/EPISODE_19_MARKET_TRAPS_AND_CONVENTIONAL_PATTERNS_TRUTH.md`](EPISODE_19_MARKET_TRAPS_AND_CONVENTIONAL_PATTERNS_TRUTH.md) |
-| **20** | **Upcoming Final Grand Milestone...** | ⏳ Pending | - |
+| **20** | **Putting It All Together (Dynamic Trailing Multi-Baggers, 52W High Scanner & Master Synthesis)** | ✅ **Codified & Trained (Grand Curriculum Complete!)** | [`training/EPISODE_20_PUTTING_IT_ALL_TOGETHER.md`](EPISODE_20_PUTTING_IT_ALL_TOGETHER.md) |

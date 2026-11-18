@@ -1,4 +1,4 @@
-"""Alpha generation, structural sweep detection, NLP sentiment featurization, Sectoral Analysis, Candlestick Pattern Truth Engine, Gap Theory Engine, and Market Traps & LOTL Engine."""
+"""Alpha generation, structural sweep detection, NLP sentiment featurization, Sectoral Analysis, Candlestick Pattern Truth Engine, Gap Theory Engine, Market Traps & LOTL Engine, and Dynamic Trailing & Scanner Engine."""
 
 from alphacouncil.alpha.gap_engine import (
     GapApplicationReport,
@@ -16,6 +16,15 @@ from alphacouncil.alpha.pattern_engine import (
     ConventionalPatternType,
     PatternEvaluationReport,
     PatternZoneInteraction,
+)
+from alphacouncil.alpha.scanner_and_trailing_engine import (
+    DynamicTrailingEngine,
+    DynamicTrailingState,
+    ScanCandidate,
+    ScanCandidatePriority,
+    StockScanFilterType,
+    TopDownScannerEngine,
+    TrailingMethodology,
 )
 from alphacouncil.alpha.sector_engine import (
     HeavyweightStatusReport,
@@ -72,4 +81,11 @@ __all__ = [
     "MarketTrapReport",
     "ChartPatternTruthReport",
     "IndicatorConfluenceReport",
+    "DynamicTrailingEngine",
+    "DynamicTrailingState",
+    "TrailingMethodology",
+    "TopDownScannerEngine",
+    "StockScanFilterType",
+    "ScanCandidatePriority",
+    "ScanCandidate",
 ]

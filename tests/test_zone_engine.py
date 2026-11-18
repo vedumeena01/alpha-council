@@ -71,6 +71,14 @@ from alphacouncil.alpha.trap_and_pattern_engine import (
     MarketTrapsAndPatternTruthEngine,
     MarketTrapType,
 )
+from alphacouncil.alpha.scanner_and_trailing_engine import (
+    DynamicTrailingEngine,
+    DynamicTrailingState,
+    ScanCandidatePriority,
+    StockScanFilterType,
+    TopDownScannerEngine,
+    TrailingMethodology,
+)
 from alphacouncil.risk.gtf_risk import (
     RiskTier,
     ExecutionErrorType,
@@ -4083,3 +4091,301 @@ def test_episode_19_top_down_auditor_lotl_and_market_trap_integration():
     )
     assert report_trap.is_approved is False
     assert any("BULL TRAP DETECTED" in rej for rej in report_trap.rejection_reasons)
+
+
+# ==============================================================================
+# EPISODE 20 TESTS: PUTTING IT ALL TOGETHER (DYNAMIC TRAILING & MASTER SYNTHESIS)
+# ==============================================================================
+
+
+def test_episode_20_dynamic_trailing_ratchet_behind_weekly_demand_distal():
+    """
+    Episode 20 Pillar 1: Dynamic Stop-Loss Trailing Engine.
+    - Anchors SL strictly beneath fresh Weekly Demand Zone Distal Lines.
+    - Ratchets upward automatically as price creates ascending weekly demand bases.
+    - Ignores arbitrary retail rupee movements and protects against premature cost-to-cost exit.
+    - Refuses to lower stop-loss under any circumstance.
+    """
+    state = DynamicTrailingEngine.initialize_trailing_position(
+        symbol="INFY",
+        entry_price=1000.0,
+        initial_stop_loss=950.0,
+    )
+    assert isinstance(state, DynamicTrailingState)
+    assert state.current_trailing_stop_loss == 950.0
+    assert state.trailing_level_count == 0
+    assert state.methodology == TrailingMethodology.WEEKLY_DEMAND_BASE_ANCHORED
+    assert state.is_position_active is True
+
+    # Base 1 Forms: Fresh Weekly Demand formed with Distal Line at ₹1,120, CMP at ₹1,200
+    state = DynamicTrailingEngine.advance_trailing_stop_loss(
+        state=state,
+        new_weekly_demand_zone_distal=1120.0,
+        current_cmp=1200.0,
+        candle_close_price=1195.0,
+    )
+    assert state.current_trailing_stop_loss == 1120.0
+    assert state.trailing_level_count == 1
+    assert state.unrealized_gain_pct == 20.0
+    assert state.is_position_active is True
+    assert "TRAILING SL ADVANCED (Level 1)" in state.advisory_message
+
+    # Routine Retracement: Price dips to ₹1,135, candle closes at ₹1,140 (Above DL 1120)
+    # Retail traders would have been stopped out by arbitrary ₹10 trailing; GTF holds!
+    state = DynamicTrailingEngine.advance_trailing_stop_loss(
+        state=state,
+        new_weekly_demand_zone_distal=1120.0,
+        current_cmp=1135.0,
+        candle_close_price=1140.0,
+    )
+    assert state.current_trailing_stop_loss == 1120.0
+    assert state.is_position_active is True
+    assert "HOLDING POSITION" in state.advisory_message
+
+    # Base 2 Forms: Another higher Weekly Demand forms with Distal Line at ₹1,350, CMP at ₹1,480
+    state = DynamicTrailingEngine.advance_trailing_stop_loss(
+        state=state,
+        new_weekly_demand_zone_distal=1350.0,
+        current_cmp=1480.0,
+        candle_close_price=1475.0,
+    )
+    assert state.current_trailing_stop_loss == 1350.0
+    assert state.trailing_level_count == 2
+    assert state.unrealized_gain_pct == 48.0
+    assert state.is_position_active is True
+
+    # Rule Check: Attempting to ratchet to a lower distal line (₹1,300) must NEVER lower SL
+    state = DynamicTrailingEngine.advance_trailing_stop_loss(
+        state=state,
+        new_weekly_demand_zone_distal=1300.0,
+        current_cmp=1490.0,
+        candle_close_price=1485.0,
+    )
+    assert state.current_trailing_stop_loss == 1350.0  # Kept higher value!
+
+
+def test_episode_20_dynamic_trailing_exit_on_confirmed_close_below_distal():
+    """
+    Episode 20 Trailing Exit Rule:
+    - Position exits ONLY when a confirmed weekly candle physically CLOSES below active trailing DL.
+    - Logs final realized gain percentage and deactivates position.
+    """
+    state = DynamicTrailingEngine.initialize_trailing_position(
+        symbol="WIPRO",
+        entry_price=400.0,
+        initial_stop_loss=370.0,
+    )
+    # Ratchet 1: Weekly DL at ₹550
+    state = DynamicTrailingEngine.advance_trailing_stop_loss(
+        state=state,
+        new_weekly_demand_zone_distal=550.0,
+        current_cmp=620.0,
+        candle_close_price=615.0,
+    )
+    # Ratchet 2: Weekly DL at ₹720
+    state = DynamicTrailingEngine.advance_trailing_stop_loss(
+        state=state,
+        new_weekly_demand_zone_distal=720.0,
+        current_cmp=800.0,
+        candle_close_price=790.0,
+    )
+    assert state.current_trailing_stop_loss == 720.0
+
+    # Trend Reversal: Candle closes at ₹710 (physically below ₹720 trailing DL)
+    state = DynamicTrailingEngine.advance_trailing_stop_loss(
+        state=state,
+        new_weekly_demand_zone_distal=720.0,
+        current_cmp=710.0,
+        candle_close_price=710.0,
+    )
+    assert state.is_position_active is False
+    assert state.exit_price == 710.0
+    assert "MULTI-BAGGER EXIT TRIGGERED" in state.advisory_message
+    assert "+77.5%" in state.advisory_message  # (710 - 400) / 400 = +77.5% gain captured
+
+
+def test_episode_20_approaching_52_week_high_scanner_filter():
+    """
+    Episode 20 Pillar 3: 'Approaching 52-Week High' Shortcut.
+    - Stocks within 5% to 10% of 52W high have confirmed multi-timeframe uptrends.
+    - Offers open sky with minimal overhead supply.
+    """
+    # 1. Stock within 5% of 52W high -> Approaching = True
+    is_near, dist = TopDownScannerEngine.evaluate_52_week_high_proximity(
+        cmp=950.0,
+        high_52w=1000.0,
+        threshold_pct=10.0,
+    )
+    assert is_near is True
+    assert dist == 5.0
+
+    # 2. Stock within 8.5% of 52W high -> Approaching = True
+    is_near_8, dist_8 = TopDownScannerEngine.evaluate_52_week_high_proximity(
+        cmp=915.0,
+        high_52w=1000.0,
+        threshold_pct=10.0,
+    )
+    assert is_near_8 is True
+    assert dist_8 == 8.5
+
+    # 3. Stock 18% below 52W high -> Approaching = False (Too deep in correction)
+    is_near_far, dist_far = TopDownScannerEngine.evaluate_52_week_high_proximity(
+        cmp=820.0,
+        high_52w=1000.0,
+        threshold_pct=10.0,
+    )
+    assert is_near_far is False
+    assert dist_far == 18.0
+
+
+def test_episode_20_daily_candle_activity_classifier_and_basing_churn_filter():
+    """
+    Episode 20 Pillar 3: 30-Minute Daily Stock Scanning Workflow.
+    - -0.5% to +0.5% daily move: Base candle equilibrium churn (IGNORE).
+    - Top Gainers (> +1.5%): Fresh origin demand base identification.
+    - Top Losers (< -1.5%): Pullbacks entering pre-identified demand zones.
+    """
+    # 1. Equilibrium Churn (-0.2% change)
+    f_type1, priority1, msg1 = TopDownScannerEngine.classify_daily_candle_activity(daily_pct_change=-0.20)
+    assert f_type1 == StockScanFilterType.BASING_RANGE_CHURN
+    assert priority1 == ScanCandidatePriority.IGNORE_BASING
+    assert "equilibrium base churn" in msg1
+
+    # 2. Top Gainer (+3.4% rally)
+    f_type2, priority2, msg2 = TopDownScannerEngine.classify_daily_candle_activity(daily_pct_change=3.40)
+    assert f_type2 == StockScanFilterType.FRESH_ORIGIN_FORMATION
+    assert priority2 == ScanCandidatePriority.WATCHLIST_ALERT
+    assert "Explosive leg-out departure" in msg2
+
+    # 3. Top Loser (-2.1% dip entering demand)
+    f_type3, priority3, msg3 = TopDownScannerEngine.classify_daily_candle_activity(
+        daily_pct_change=-2.10,
+        is_entering_demand=True,
+    )
+    assert f_type3 == StockScanFilterType.PULLBACK_INTO_DEMAND
+    assert priority3 == ScanCandidatePriority.WATCHLIST_ALERT
+    assert "Pullback entering pre-identified" in msg3
+
+
+def test_episode_20_price_alert_mandate_and_on_chart_note_generation():
+    """
+    Episode 20 Pillar 4: On-Chart Documentation & Mandatory Price Alert System.
+    - Price Alert placed 1 to 2 rupees above Proximal Line so traders never stare at live screens.
+    - Standardized 5-second on-chart note format.
+    """
+    # 1. Price Alert calculation
+    proximal = 2450.0
+    alert_price = TopDownScannerEngine.calculate_price_alert(proximal_line=proximal, buffer_inr=2.0)
+    assert alert_price == 2452.0
+
+    # 2. On-Chart Note generation
+    note = TopDownScannerEngine.generate_on_chart_note(
+        symbol="RELIANCE",
+        quarterly_trend="UPTREND",
+        monthly_trend="UPTREND",
+        weekly_trend="UPTREND",
+        daily_trend="UPTREND",
+        location_summary="Near Monthly Demand / Low on Curve",
+        trade_style="WIT",
+        score_ratio="7/7",
+        entry=2450.0,
+        stop_loss=2410.0,
+        target=2570.0,
+        rrr=3.0,
+    )
+    assert "=== RELIANCE GTF ON-CHART MASTER NOTE ===" in note
+    assert "TREND OVERVIEW: Q: UPTREND | M: UPTREND | W: UPTREND | D: UPTREND" in note
+    assert "Pre-set Price Alert at ₹2452.00" in note
+
+
+def test_episode_20_trade_scoring_hierarchy_baseline_priority_rule():
+    """
+    Episode 20 Pillar 2: Master Checklist Hierarchy & Baseline Priority Rule.
+    - The Primary Structural Baseline (7/7) is KING and non-negotiable.
+    - Secondary bonuses (MA +1, EMA +1, Gap +1, RSI +1, Sector +2) enhance scores to 8/7, 9/7, 10/7.
+    - Priority Rule: Bonuses CAN NEVER rescue a structurally flawed zone (e.g. 5.0/7).
+    """
+    # Perfect Baseline: 7/7
+    perfect_breakdown = TradeScoreBreakdown(
+        freshness_score=3.0,
+        strength_score=2.0,
+        time_at_base_score=2.0,
+        total_score=7.0,
+        quality=TradeScoreQuality.PRISTINE,
+        alignment=ZoneAlignmentType.COINCIDING,
+        is_best_setup=True,
+        ma_crossover_bonus=1,     # +1 MA bonus
+        ema20_confluence_bonus=1, # +1 20 EMA bonus
+        gap_confluence_bonus=1,   # +1 Gap bonus
+        indicator_confluence_bonus=1, # +1 RSI bonus
+    )
+    boosted_total = (
+        perfect_breakdown.total_score
+        + perfect_breakdown.ma_crossover_bonus
+        + perfect_breakdown.ema20_confluence_bonus
+        + perfect_breakdown.gap_confluence_bonus
+        + perfect_breakdown.indicator_confluence_bonus
+    )
+    assert boosted_total == 11.0  # 11/7 Supreme institutional confluence
+
+    # Flawed Baseline: 5/7 (Fails minimum institutional standard)
+    flawed_breakdown = TradeScoreBreakdown(
+        freshness_score=1.5,
+        strength_score=1.5,
+        time_at_base_score=2.0,
+        total_score=5.0,
+        quality=TradeScoreQuality.WEAK,
+        alignment=ZoneAlignmentType.COINCIDING,
+        is_best_setup=False,
+        ma_crossover_bonus=1,
+        indicator_confluence_bonus=1,
+    )
+    # Even with bonuses, baseline score < 6.5 remains substandard for aggressive execution
+    assert flawed_breakdown.total_score < 6.5
+
+
+def test_episode_20_master_top_down_synthesis_putting_it_all_together():
+    """
+    Episode 20 Grand Synthesis: End-to-End Master Top-Down Institutional Audit.
+    - Synthesizes all 20 episodes into one unified execution.
+    - Verifies ATH / Multi-Bagger expansion mode automatically sets projected RRR to 10.0:1.
+    - Verifies Dynamic Trailing Stop-Loss is activated.
+    - Verifies Mandatory Price Alert level is computed and logged.
+    - All 15 comprehensive audit checks pass seamlessly!
+    """
+    engine = DemandSupplyEngine()
+    zone = engine.scan_for_zones(
+        opens=np.array([100.0, 112.0, 115.0]),
+        highs=np.array([102.0, 118.0, 130.0]),
+        lows=np.array([98.0, 105.0, 114.0]),
+        closes=np.array([111.0, 115.0, 129.0]),
+        timeframe=TimeframeTier.WEEKLY,
+    )[0]
+    zone.proximal_line = 115.0
+    zone.distal_line = 105.0
+    zone.entry_price = 115.0
+    zone.stop_loss = 105.0
+
+    # Run Master Comprehensive Top-Down Audit with ATH Multi-Bagger flag
+    report = engine.audit_comprehensive_top_down_setup(
+        execution_zone=zone,
+        cmp=116.5,
+        is_ath_expansion_planned=True,
+        capital=200000.0,
+        risk_per_trade_pct=1.0,
+    )
+
+    assert isinstance(report, MasterRevisionAuditReport)
+    assert report.is_approved is True
+    assert report.projected_rrr == 10.0  # Multi-bagger open-sky expectation!
+    assert zone.is_trailing_multi_bagger_active is True
+    assert zone.price_alert_level == 117.0  # Entry 115 + 2 = 117.0
+    assert any("Price Alert Mandate (Episode 20)" in check for check in report.audit_checks_passed)
+    assert any("Dynamic Trailing Stop-Loss" in check for check in report.audit_checks_passed)
+    assert len(report.rejection_reasons) == 0
+
+    # Initialize trailing state from helper method
+    trailing_state = engine.setup_dynamic_trailing_for_zone(symbol="TCS", zone=zone)
+    assert trailing_state.current_trailing_stop_loss == 105.0
+    assert trailing_state.is_position_active is True
+

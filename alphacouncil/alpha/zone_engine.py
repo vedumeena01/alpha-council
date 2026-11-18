@@ -140,6 +140,9 @@ class TradeScoreBreakdown:
     indicator_confluence_bonus: int = 0 # 0 or 1 point from Episode 19 (RSI/Stochastic Confluence)
     lotl_entry_mode: str = ""          # AGGRESSIVE, CONSERVATIVE, or BALANCED_MIDDLE
     is_lotl_zone: bool = False         # True if part of Level on Top of the Level setup
+    trailing_sl_eligible: bool = False # True if eligible for dynamic Weekly Demand Distal trailing (Episode 20)
+    price_alert_level: Optional[float] = None # Alert 1-2 points above PL (Episode 20)
+    on_chart_note: str = ""            # Standardized 5-second restoration note (Episode 20)
 
 
 class EntryType(str, Enum):
@@ -318,6 +321,11 @@ class IdentifiedZone:
     is_lotl_cushion: bool = False               # True if upper demand or lower supply cushion in LOTL
     lotl_merged_entry: Optional[float] = None   # Middle or selected entry price
     lotl_merged_stoploss: Optional[float] = None # Lower distal (demand) or upper distal (supply)
+
+    # Dynamic Trailing & Alert Architecture (Episode 20)
+    is_trailing_multi_bagger_active: bool = False # True if riding ATH or macro expansion
+    current_trailing_sl: Optional[float] = None   # Current ratchet level anchored to Weekly Demand Distal
+    price_alert_level: Optional[float] = None     # Alert price placed 1-2 points above PL
 
 
 class DemandSupplyEngine:
@@ -2549,6 +2557,7 @@ class DemandSupplyEngine:
         is_breakout_trade: bool = False,
         breakout_price: Optional[float] = None,
         rsi_value: Optional[float] = None,
+        is_ath_expansion_planned: bool = False,
     ) -> MasterRevisionAuditReport:
         """
         Episode 15 Master Revision Class: The 14-Point Comprehensive Top-Down Institutional Auditor.
@@ -2817,8 +2826,15 @@ class DemandSupplyEngine:
         else:
             audit_checks_passed.append(f"Position Sizing: {calculated_qty} shares planned at exact ₹{monetary_risk:.2f} risk.")
 
-        # 12. Target Expectation & RRR Expansion (Ep 4, 8, 15)
-        if origin_quality == OriginQuality.PRISTINE_ORIGIN:
+        # 12. Target Expectation & RRR Expansion (Ep 4, 8, 15, 20)
+        if is_ath_expansion_planned or curve_position == CurvePosition.ALL_TIME_HIGH:
+            projected_rrr = 10.0  # Open sky multi-bagger expectation with dynamic trailing
+            execution_zone.is_trailing_multi_bagger_active = True
+            audit_checks_passed.append(
+                "Target Expectation (Episode 20): Asset in All-Time High / Multi-Bagger expansion mode. "
+                "Open sky target projected at 10.0:1+ RRR using Weekly Demand-Anchored Dynamic Trailing Stop-Loss."
+            )
+        elif origin_quality == OriginQuality.PRISTINE_ORIGIN:
             projected_rrr = 8.5  # Origin setups target opposing macro supply, delivering 8:1 to 10:1+
             audit_checks_passed.append("Target Expectation: Pristine origin expansion planned with 8.5:1 RRR targeting opposing macro supply.")
         else:
@@ -2845,6 +2861,22 @@ class DemandSupplyEngine:
             recommended_entry = EntryType.SET_AND_FORGET
         else:
             recommended_entry = EntryType.SET_AND_FORGET if total_score >= 6.5 else EntryType.CONFIRMATION_IN_ZONE
+
+        # 15. Price Alert Level & Screen-Time Elimination (Episode 20)
+        price_alert = (
+            round(effective_entry + 2.0, 2)
+            if execution_zone.is_demand
+            else round(effective_entry - 2.0, 2)
+        )
+        execution_zone.price_alert_level = price_alert
+        if execution_zone.trade_score is not None:
+            execution_zone.trade_score.price_alert_level = price_alert
+            execution_zone.trade_score.trailing_sl_eligible = bool(
+                is_ath_expansion_planned or curve_position == CurvePosition.ALL_TIME_HIGH
+            )
+        audit_checks_passed.append(
+            f"Price Alert Mandate (Episode 20): Alert level set at ₹{price_alert:.2f} (2 points before entry) to eliminate active screen-staring."
+        )
 
         is_approved = len(rejection_reasons) == 0
         if is_approved:
@@ -3099,3 +3131,19 @@ class DemandSupplyEngine:
                 zone.trade_score.total_score += 1.0
 
         return report
+
+    @classmethod
+    def setup_dynamic_trailing_for_zone(
+        cls,
+        symbol: str,
+        zone: IdentifiedZone,
+    ) -> Any:
+        """
+        Episode 20 GTF Rule: Initializes Dynamic Demand-Anchored Trailing for qualified positions.
+        """
+        from alphacouncil.alpha.scanner_and_trailing_engine import DynamicTrailingEngine
+        return DynamicTrailingEngine.initialize_trailing_position(
+            symbol=symbol,
+            entry_price=zone.entry_price,
+            initial_stop_loss=zone.stop_loss,
+        )

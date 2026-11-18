@@ -1,29 +1,30 @@
 # 🏛️ AlphaCouncil: Complete Consolidated Codebase
 ## Table of Contents
-- [1. Configuration & Statutory Parameters (alphacouncil/config.py)](#1-configuration--statutory-parameters)
-- [2. Market Data Feed & Synthetic Generator (alphacouncil/data/feed.py)](#2-market-data-feed--synthetic-generator)
-- [3. Point-in-Time Corporate Calendar & LODR 29 (alphacouncil/data/calendar.py)](#3-point-in-time-corporate-calendar--lodr-29)
-- [4. Demand & Supply Zone Core Engine (GTF Model) (alphacouncil/alpha/zone_engine.py)](#4-demand--supply-zone-core-engine-gtf-model)
-- [5. Deterministic Liquidity Sweep Detector (H1) (alphacouncil/alpha/sweep_detector.py)](#5-deterministic-liquidity-sweep-detector-h1)
-- [6. López de Prado Triple Barrier & OU Half-Life (alphacouncil/alpha/triple_barrier.py)](#6-lopez-de-prado-triple-barrier--ou-half-life)
-- [7. FinBERT Sentiment & Binomial Audit (H2) (alphacouncil/alpha/sentiment_nlp.py)](#7-finbert-sentiment--binomial-audit-h2)
-- [8. Sectoral Analysis Engine (Episode 16) (alphacouncil/alpha/sector_engine.py)](#8-sectoral-analysis-engine-episode-16)
-- [9. Candlestick Patterns Truth Engine (Episode 17) (alphacouncil/alpha/pattern_engine.py)](#9-candlestick-patterns-truth-engine-episode-17)
-- [10. Gap Theory Engine (Episode 18) (alphacouncil/alpha/gap_engine.py)](#10-gap-theory-engine-episode-18)
-- [11. Market Traps & LOTL Engine (Episode 19) (alphacouncil/alpha/trap_and_pattern_engine.py)](#11-market-traps--lotl-engine-episode-19)
-- [12. Pre-Trade Risk Engine & Concentration Limits (alphacouncil/risk/pre_trade.py)](#12-pre-trade-risk-engine--concentration-limits)
-- [13. Position Sizing & Kelly Calibration (alphacouncil/risk/sizing.py)](#13-position-sizing--kelly-calibration)
-- [14. López de Prado Meta-Labeler Downscaler (alphacouncil/risk/meta_labeler.py)](#14-lopez-de-prado-meta-labeler-downscaler)
-- [15. Intraday Kill-Switch & Monthly Session Halt (alphacouncil/risk/kill_switch.py)](#15-intraday-kill-switch--monthly-session-halt)
-- [16. Direction-Aware Circuit Band Guard (alphacouncil/risk/circuits.py)](#16-direction-aware-circuit-band-guard)
-- [17. GTF Risk Management & Capital Protection Engine (alphacouncil/risk/gtf_risk.py)](#17-gtf-risk-management--capital-protection-engine)
-- [18. Statutory Indian Market Friction Model (SEBI Oct 2024) (alphacouncil/execution/friction.py)](#18-statutory-indian-market-friction-model-sebi-oct-2024)
-- [19. Idempotent OMS & Broker GTT Bracket Sync (alphacouncil/execution/oms.py)](#19-idempotent-oms--broker-gtt-bracket-sync)
-- [20. Purged Walk-Forward Backtesting Engine (alphacouncil/backtest/engine.py)](#20-purged-walk-forward-backtesting-engine)
-- [21. Deflated Sharpe Ratio (DSR) & Quant Metrics (alphacouncil/backtest/metrics.py)](#21-deflated-sharpe-ratio-dsr--quant-metrics)
-- [22. 7-Model Orthogonal Ablation Suite (alphacouncil/backtest/ablation.py)](#22-7-model-orthogonal-ablation-suite)
-- [23. Interactive Bloomberg Dashboard UI (alphacouncil/ui/dashboard.py)](#23-interactive-bloomberg-dashboard-ui)
-- [24. Master Research Demo Runner (alphacouncil/run_council.py)](#24-master-research-demo-runner)
+- [1. Configuration & Statutory Parameters (alphacouncil/config.py)](#1.-configuration--statutory-parameters)
+- [2. Market Data Feed & Synthetic Generator (alphacouncil/data/feed.py)](#2.-market-data-feed--synthetic-generator)
+- [3. Point-in-Time Corporate Calendar & LODR 29 (alphacouncil/data/calendar.py)](#3.-point-in-time-corporate-calendar--lodr-29)
+- [4. Demand & Supply Zone Core Engine (GTF Model) (alphacouncil/alpha/zone_engine.py)](#4.-demand--supply-zone-core-engine-gtf-model)
+- [5. Deterministic Liquidity Sweep Detector (H1) (alphacouncil/alpha/sweep_detector.py)](#5.-deterministic-liquidity-sweep-detector-h1)
+- [6. López de Prado Triple Barrier & OU Half-Life (alphacouncil/alpha/triple_barrier.py)](#6.-lopez-de-prado-triple-barrier--ou-half-life)
+- [7. FinBERT Sentiment & Binomial Audit (H2) (alphacouncil/alpha/sentiment_nlp.py)](#7.-finbert-sentiment--binomial-audit-h2)
+- [8. Sectoral Analysis Engine (Episode 16) (alphacouncil/alpha/sector_engine.py)](#8.-sectoral-analysis-engine-episode-16)
+- [9. Candlestick Patterns Truth Engine (Episode 17) (alphacouncil/alpha/pattern_engine.py)](#9.-candlestick-patterns-truth-engine-episode-17)
+- [10. Gap Theory Engine (Episode 18) (alphacouncil/alpha/gap_engine.py)](#10.-gap-theory-engine-episode-18)
+- [11. Market Traps & LOTL Engine (Episode 19) (alphacouncil/alpha/trap_and_pattern_engine.py)](#11.-market-traps--lotl-engine-episode-19)
+- [12. High-Speed Stock Scanner & Dynamic Trailing Engine (Episode 20) (alphacouncil/alpha/scanner_and_trailing_engine.py)](#12.-high-speed-stock-scanner--dynamic-trailing-engine-episode-20)
+- [13. Pre-Trade Risk Engine & Concentration Limits (alphacouncil/risk/pre_trade.py)](#13.-pre-trade-risk-engine--concentration-limits)
+- [14. Position Sizing & Kelly Calibration (alphacouncil/risk/sizing.py)](#14.-position-sizing--kelly-calibration)
+- [15. López de Prado Meta-Labeler Downscaler (alphacouncil/risk/meta_labeler.py)](#15.-lopez-de-prado-meta-labeler-downscaler)
+- [16. Intraday Kill-Switch & Monthly Session Halt (alphacouncil/risk/kill_switch.py)](#16.-intraday-kill-switch--monthly-session-halt)
+- [17. Direction-Aware Circuit Band Guard (alphacouncil/risk/circuits.py)](#17.-direction-aware-circuit-band-guard)
+- [18. GTF Risk Management & Capital Protection Engine (alphacouncil/risk/gtf_risk.py)](#18.-gtf-risk-management--capital-protection-engine)
+- [19. Statutory Indian Market Friction Model (SEBI Oct 2024) (alphacouncil/execution/friction.py)](#19.-statutory-indian-market-friction-model-sebi-oct-2024)
+- [20. Idempotent OMS & Broker GTT Bracket Sync (alphacouncil/execution/oms.py)](#20.-idempotent-oms--broker-gtt-bracket-sync)
+- [21. Purged Walk-Forward Backtesting Engine (alphacouncil/backtest/engine.py)](#21.-purged-walk-forward-backtesting-engine)
+- [22. Deflated Sharpe Ratio (DSR) & Quant Metrics (alphacouncil/backtest/metrics.py)](#22.-deflated-sharpe-ratio-dsr--quant-metrics)
+- [23. 7-Model Orthogonal Ablation Suite (alphacouncil/backtest/ablation.py)](#23.-7-model-orthogonal-ablation-suite)
+- [24. Interactive Bloomberg Dashboard UI (alphacouncil/ui/dashboard.py)](#24.-interactive-bloomberg-dashboard-ui)
+- [25. Master Research Demo Runner (alphacouncil/run_council.py)](#25.-master-research-demo-runner)
 
 ---
 
@@ -88,9 +89,7 @@ class AlphaCouncilConfig(BaseModel):
 
 # Global default configuration instance
 DEFAULT_CONFIG = AlphaCouncilConfig()
-
 `
-
 ---
 
 ### 2. Market Data Feed & Synthetic Generator
@@ -258,9 +257,7 @@ class MarketDataFeed:
             px = base_prices.get(sym, 1000.0)
             dataset[sym] = self.generate_series(symbol=sym, n_bars=n_bars, initial_price=px)
         return dataset
-
 `
-
 ---
 
 ### 3. Point-in-Time Corporate Calendar & LODR 29
@@ -338,9 +335,7 @@ class PointInTimeCalendar:
         self._ensure_symbol_events(symbol)
         events = self.events.get(symbol, [])
         return events[0] if events else None
-
 `
-
 ---
 
 ### 4. Demand & Supply Zone Core Engine (GTF Model)
@@ -489,6 +484,9 @@ class TradeScoreBreakdown:
     indicator_confluence_bonus: int = 0 # 0 or 1 point from Episode 19 (RSI/Stochastic Confluence)
     lotl_entry_mode: str = ""          # AGGRESSIVE, CONSERVATIVE, or BALANCED_MIDDLE
     is_lotl_zone: bool = False         # True if part of Level on Top of the Level setup
+    trailing_sl_eligible: bool = False # True if eligible for dynamic Weekly Demand Distal trailing (Episode 20)
+    price_alert_level: Optional[float] = None # Alert 1-2 points above PL (Episode 20)
+    on_chart_note: str = ""            # Standardized 5-second restoration note (Episode 20)
 
 
 class EntryType(str, Enum):
@@ -667,6 +665,11 @@ class IdentifiedZone:
     is_lotl_cushion: bool = False               # True if upper demand or lower supply cushion in LOTL
     lotl_merged_entry: Optional[float] = None   # Middle or selected entry price
     lotl_merged_stoploss: Optional[float] = None # Lower distal (demand) or upper distal (supply)
+
+    # Dynamic Trailing & Alert Architecture (Episode 20)
+    is_trailing_multi_bagger_active: bool = False # True if riding ATH or macro expansion
+    current_trailing_sl: Optional[float] = None   # Current ratchet level anchored to Weekly Demand Distal
+    price_alert_level: Optional[float] = None     # Alert price placed 1-2 points above PL
 
 
 class DemandSupplyEngine:
@@ -2898,6 +2901,7 @@ class DemandSupplyEngine:
         is_breakout_trade: bool = False,
         breakout_price: Optional[float] = None,
         rsi_value: Optional[float] = None,
+        is_ath_expansion_planned: bool = False,
     ) -> MasterRevisionAuditReport:
         """
         Episode 15 Master Revision Class: The 14-Point Comprehensive Top-Down Institutional Auditor.
@@ -3166,8 +3170,15 @@ class DemandSupplyEngine:
         else:
             audit_checks_passed.append(f"Position Sizing: {calculated_qty} shares planned at exact ₹{monetary_risk:.2f} risk.")
 
-        # 12. Target Expectation & RRR Expansion (Ep 4, 8, 15)
-        if origin_quality == OriginQuality.PRISTINE_ORIGIN:
+        # 12. Target Expectation & RRR Expansion (Ep 4, 8, 15, 20)
+        if is_ath_expansion_planned or curve_position == CurvePosition.ALL_TIME_HIGH:
+            projected_rrr = 10.0  # Open sky multi-bagger expectation with dynamic trailing
+            execution_zone.is_trailing_multi_bagger_active = True
+            audit_checks_passed.append(
+                "Target Expectation (Episode 20): Asset in All-Time High / Multi-Bagger expansion mode. "
+                "Open sky target projected at 10.0:1+ RRR using Weekly Demand-Anchored Dynamic Trailing Stop-Loss."
+            )
+        elif origin_quality == OriginQuality.PRISTINE_ORIGIN:
             projected_rrr = 8.5  # Origin setups target opposing macro supply, delivering 8:1 to 10:1+
             audit_checks_passed.append("Target Expectation: Pristine origin expansion planned with 8.5:1 RRR targeting opposing macro supply.")
         else:
@@ -3194,6 +3205,22 @@ class DemandSupplyEngine:
             recommended_entry = EntryType.SET_AND_FORGET
         else:
             recommended_entry = EntryType.SET_AND_FORGET if total_score >= 6.5 else EntryType.CONFIRMATION_IN_ZONE
+
+        # 15. Price Alert Level & Screen-Time Elimination (Episode 20)
+        price_alert = (
+            round(effective_entry + 2.0, 2)
+            if execution_zone.is_demand
+            else round(effective_entry - 2.0, 2)
+        )
+        execution_zone.price_alert_level = price_alert
+        if execution_zone.trade_score is not None:
+            execution_zone.trade_score.price_alert_level = price_alert
+            execution_zone.trade_score.trailing_sl_eligible = bool(
+                is_ath_expansion_planned or curve_position == CurvePosition.ALL_TIME_HIGH
+            )
+        audit_checks_passed.append(
+            f"Price Alert Mandate (Episode 20): Alert level set at ₹{price_alert:.2f} (2 points before entry) to eliminate active screen-staring."
+        )
 
         is_approved = len(rejection_reasons) == 0
         if is_approved:
@@ -3449,8 +3476,22 @@ class DemandSupplyEngine:
 
         return report
 
+    @classmethod
+    def setup_dynamic_trailing_for_zone(
+        cls,
+        symbol: str,
+        zone: IdentifiedZone,
+    ) -> Any:
+        """
+        Episode 20 GTF Rule: Initializes Dynamic Demand-Anchored Trailing for qualified positions.
+        """
+        from alphacouncil.alpha.scanner_and_trailing_engine import DynamicTrailingEngine
+        return DynamicTrailingEngine.initialize_trailing_position(
+            symbol=symbol,
+            entry_price=zone.entry_price,
+            initial_stop_loss=zone.stop_loss,
+        )
 `
-
 ---
 
 ### 5. Deterministic Liquidity Sweep Detector (H1)
@@ -3577,9 +3618,7 @@ class LiquiditySweepDetector:
             if sig and sig.signal == 1:
                 signals.append(sig)
         return signals
-
 `
-
 ---
 
 ### 6. López de Prado Triple Barrier & OU Half-Life
@@ -3710,9 +3749,7 @@ class TripleBarrierLabeler:
             holding_period_days=limit,
             is_success=(ret > 0.0),
         )
-
 `
-
 ---
 
 ### 7. FinBERT Sentiment & Binomial Audit (H2)
@@ -3840,9 +3877,7 @@ class FinBertSentimentExtractor:
         normalized_indices = list(range(len(dates)))
         rebased_prices = [round((p / prices[0]) * 100.0, 2) for p in prices]
         return synthetic_symbol, normalized_indices, rebased_prices
-
 `
-
 ---
 
 ### 8. Sectoral Analysis Engine (Episode 16)
@@ -4378,9 +4413,7 @@ class SectorAnalysisEngine:
             rejection_reasons=rejection_reasons,
             advisory=advisory,
         )
-
 `
-
 ---
 
 ### 9. Candlestick Patterns Truth Engine (Episode 17)
@@ -4699,9 +4732,7 @@ class CandlestickPatternTruthEngine:
             ConventionalPatternType.NO_PATTERN: "Standard order flow without textbook candlestick formation.",
         }
         return translations.get(pattern, "Standard price action.")
-
 `
-
 ---
 
 ### 10. Gap Theory Engine (Episode 18)
@@ -5113,9 +5144,7 @@ class GapTheoryEngine:
             is_demand_zone=is_demand_zone,
             advisory_message=msg,
         )
-
 `
-
 ---
 
 ### 11. Market Traps & LOTL Engine (Episode 19)
@@ -5597,12 +5626,295 @@ class MarketTrapsAndPatternTruthEngine:
             trade_score_bonus=0,
             advisory_message=f"RSI reading {rsi_value:.1f} is neutral. No indicator bonus awarded.",
         )
-
 `
-
 ---
 
-### 12. Pre-Trade Risk Engine & Concentration Limits
+### 12. High-Speed Stock Scanner & Dynamic Trailing Engine (Episode 20)
+**File:** [alphacouncil/alpha/scanner_and_trailing_engine.py](alphacouncil/alpha/scanner_and_trailing_engine.py)
+
+`python
+"""
+High-Speed Stock Scanner, Dynamic Stop-Loss Trailing & Master Checklist Engine (Trading in the Zone / GTF Methodology).
+Codifies Episode 20 principles:
+1. Advanced Dynamic Stop-Loss Trailing (Unlocking Multi-Baggers — 100% to 1,000%+ returns):
+   - The Retail Flaw: Fixed rupee trailing (moving SL up arbitrarily by ₹5, ₹10) or premature Cost-to-Cost shifts.
+     Normal structural retracements shake retail traders out before multi-bagger expansions.
+   - The GTF Trailing Blueprint: Anchor Stop-Loss strictly beneath the Distal Line of newly formed, fresh
+     Weekly Demand Zones (or Daily for swing). Hold position until a confirmed candle physically closes below the distal line.
+   - Live Case Studies: Wipro, Infosys, Bank of Baroda.
+2. The Unified GTF Trade Scoring Hierarchy & Master Checklist:
+   - Primary Structural Score (Freshness 3, Strength 2, Base 2 = 7/7 Baseline) + Mandatory Filters (Clean Closing,
+     HTF Shri Krishna Location, Intermediate Trend) are NON-NEGOTIABLE.
+   - Secondary Bonuses (Moving Averages +1, 20 EMA +1, Gap Confluence +1/+2, RSI Oversold +1) enhance score to 8/7 or 9/7.
+   - Supreme Institutional Catalyst: Parent Sector Support (+2 Extra Trade Score).
+   - Priority Rule: Never take a structurally flawed 5/7 setup simply because a moving average or indicator aligns.
+3. High-Speed Stock Scanning & Watchlist Architecture:
+   - Funnel: Nifty 50/Next 50 -> "52-Week High Approaching" List (verified multi-timeframe uptrends with open sky).
+   - 30-Minute Daily Scanning Workflow:
+     * -0.5% to +0.5% daily move: Base candle churn (Ignore).
+     * Top Gainers: Scan for fresh Daily demand origin bases.
+     * Top Losers: Scan for pullbacks entering pre-identified demand zones.
+4. On-Chart Documentation & Mandatory Price Alert System:
+   - Permanent 5-second on-chart analytical status block.
+   - Price Alert placed 1 to 2 rupees above Proximal Line; eliminate live screen-staring.
+5. The 100-Trade Discipline Roadmap (Amol Jagdale Blueprint):
+   - Strictly Monthly (MIT) and Weekly (WIT) Income Trades for first 100 trades.
+   - Maximum 10 Trades per Month, 0.5% to 1.0% fixed Risk Per Trade.
+   - 100% personal responsibility; zero external tips/noise.
+"""
+
+from dataclasses import dataclass, field
+from enum import Enum
+from typing import Any, Dict, List, Optional, Tuple
+
+
+class TrailingMethodology(str, Enum):
+    WEEKLY_DEMAND_BASE_ANCHORED = "WEEKLY_DEMAND_BASE_ANCHORED"  # GTF Institutional Trailing (Survives retracements)
+    FIXED_POINTS_RETAIL_TRAP = "FIXED_POINTS_RETAIL_TRAP"        # Conventional Retail Error (Arbitrary points or cost-to-cost)
+
+
+class StockScanFilterType(str, Enum):
+    APPROACHING_52_WEEK_HIGH = "APPROACHING_52_WEEK_HIGH"        # Within 5-10% of 52W high; established macro uptrends
+    PULLBACK_INTO_DEMAND = "PULLBACK_INTO_DEMAND"                # Top loser entering pre-identified institutional demand
+    FRESH_ORIGIN_FORMATION = "FRESH_ORIGIN_FORMATION"            # Top gainer forming fresh origin base
+    BASING_RANGE_CHURN = "BASING_RANGE_CHURN"                    # -0.5% to +0.5% move; base candle (ignore)
+
+
+class ScanCandidatePriority(str, Enum):
+    TOP_CONVICTION = "TOP_CONVICTION"    # Approaching 52W high + Sector Support + 7/7 Zone
+    WATCHLIST_ALERT = "WATCHLIST_ALERT"  # Valid pullback or fresh origin requiring price alert
+    IGNORE_BASING = "IGNORE_BASING"      # Minor consolidation churn; discard
+
+
+@dataclass
+class DynamicTrailingState:
+    symbol: str
+    entry_price: float
+    initial_stop_loss: float
+    current_trailing_stop_loss: float
+    methodology: TrailingMethodology = TrailingMethodology.WEEKLY_DEMAND_BASE_ANCHORED
+    trailing_level_count: int = 0
+    trailing_history: List[Dict[str, Any]] = field(default_factory=list)
+    highest_price_reached: float = 0.0
+    unrealized_gain_pct: float = 0.0
+    is_position_active: bool = True
+    exit_price: Optional[float] = None
+    advisory_message: str = ""
+
+
+@dataclass
+class ScanCandidate:
+    symbol: str
+    cmp: float
+    high_52w: float
+    low_52w: float
+    pct_from_52w_high: float
+    daily_pct_change: float
+    filter_type: StockScanFilterType
+    priority: ScanCandidatePriority
+    sector_name: str
+    is_sector_support_active: bool
+    price_alert_level: Optional[float] = None
+    on_chart_note: str = ""
+    advisory_message: str = ""
+
+
+class DynamicTrailingEngine:
+    """
+    Episode 20 Dynamic Stop-Loss Trailing Engine:
+    Ratchets stop-loss strictly behind newly formed, fresh Higher Timeframe (Weekly/Daily)
+    Demand Zone Distal Lines to capture generational multi-bagger expansions (100% to 1,000%+).
+    """
+
+    @classmethod
+    def initialize_trailing_position(
+        cls,
+        symbol: str,
+        entry_price: float,
+        initial_stop_loss: float,
+    ) -> DynamicTrailingState:
+        """Initializes a new macro position with GTF demand-anchored trailing."""
+        return DynamicTrailingState(
+            symbol=symbol,
+            entry_price=round(entry_price, 2),
+            initial_stop_loss=round(initial_stop_loss, 2),
+            current_trailing_stop_loss=round(initial_stop_loss, 2),
+            trailing_level_count=0,
+            trailing_history=[{
+                "level": 0,
+                "trailing_sl": round(initial_stop_loss, 2),
+                "reason": "Initial Distal Line Stop-Loss",
+            }],
+            highest_price_reached=round(entry_price, 2),
+            unrealized_gain_pct=0.0,
+            is_position_active=True,
+            advisory_message="Position initialized. Trailing will engage as fresh Weekly Demand Bases form.",
+        )
+
+    @classmethod
+    def advance_trailing_stop_loss(
+        cls,
+        state: DynamicTrailingState,
+        new_weekly_demand_zone_distal: float,
+        current_cmp: float,
+        candle_close_price: float,
+    ) -> DynamicTrailingState:
+        """
+        Advances the trailing stop-loss strictly behind confirmed fresh Weekly Demand Zone Distal Lines.
+        Rules:
+        1. Never lower the stop-loss (strictly ratchets upward).
+        2. Prohibits arbitrary ₹5/₹10 retail shifts or premature cost-to-cost panic moves.
+        3. Position exits ONLY when candle physically closes below the active trailing distal line.
+        """
+        if not state.is_position_active:
+            state.advisory_message = "Position is already closed. No trailing adjustments permitted."
+            return state
+
+        state.highest_price_reached = max(state.highest_price_reached, current_cmp)
+        unrealized_gain = ((current_cmp - state.entry_price) / state.entry_price) * 100.0
+        state.unrealized_gain_pct = round(unrealized_gain, 2)
+
+        # 1. Check if price physically breached and closed below active trailing stop-loss
+        if candle_close_price < state.current_trailing_stop_loss:
+            state.is_position_active = False
+            state.exit_price = candle_close_price
+            final_gain = ((candle_close_price - state.entry_price) / state.entry_price) * 100.0
+            state.advisory_message = (
+                f"MULTI-BAGGER EXIT TRIGGERED: Candle closed at ₹{candle_close_price:.2f} below confirmed Weekly "
+                f"Demand Distal Line ₹{state.current_trailing_stop_loss:.2f}. "
+                f"Final Realized Gain: +{final_gain:.1f}% across {state.trailing_level_count} trailing bases."
+            )
+            return state
+
+        # 2. Check if newly formed Weekly demand zone provides a higher anchor
+        if new_weekly_demand_zone_distal > state.current_trailing_stop_loss:
+            old_sl = state.current_trailing_stop_loss
+            state.current_trailing_stop_loss = round(new_weekly_demand_zone_distal, 2)
+            state.trailing_level_count += 1
+            state.trailing_history.append({
+                "level": state.trailing_level_count,
+                "trailing_sl": round(new_weekly_demand_zone_distal, 2),
+                "cmp_at_shift": round(current_cmp, 2),
+                "reason": f"Anchored beneath fresh Weekly Demand Base Distal Line (Level {state.trailing_level_count})",
+            })
+            state.advisory_message = (
+                f"TRAILING SL ADVANCED (Level {state.trailing_level_count}): Shifted from ₹{old_sl:.2f} to ₹{new_weekly_demand_zone_distal:.2f} "
+                f"beneath confirmed Weekly Demand Distal Line. Surviving structural pullbacks; riding trend (+{unrealized_gain:.1f}% unrealized)."
+            )
+        else:
+            state.advisory_message = (
+                f"HOLDING POSITION: Candidate zone distal ₹{new_weekly_demand_zone_distal:.2f} is not higher than "
+                f"active trailing SL ₹{state.current_trailing_stop_loss:.2f}. SL remains firmly anchored."
+            )
+
+        return state
+
+
+class TopDownScannerEngine:
+    """
+    Episode 20 High-Speed Stock Scanner & Watchlist Architecture:
+    Filters thousands of stocks down to a high-conviction master watchlist in 30 minutes a day.
+    """
+
+    @staticmethod
+    def evaluate_52_week_high_proximity(
+        cmp: float,
+        high_52w: float,
+        threshold_pct: float = 10.0,
+    ) -> Tuple[bool, float]:
+        """
+        The 'Approaching 52-Week High' Shortcut:
+        Stocks within 5-10% of 52W high are in established multi-timeframe uptrends (Daily, Weekly, Monthly green).
+        Provides open sky with minimal overhead resistance.
+        """
+        if high_52w <= 0:
+            return False, 0.0
+        distance_pct = ((high_52w - cmp) / high_52w) * 100.0
+        is_approaching = 0.0 <= distance_pct <= threshold_pct
+        return is_approaching, round(distance_pct, 2)
+
+    @staticmethod
+    def classify_daily_candle_activity(
+        daily_pct_change: float,
+        is_entering_demand: bool = False,
+        is_fresh_origin: bool = False,
+    ) -> Tuple[StockScanFilterType, ScanCandidatePriority, str]:
+        """
+        30-Minute Daily Scanning Workflow:
+        - -0.5% to +0.5%: Base candle equilibrium churn (IGNORE).
+        - Top Gainers (> +1.5%): Scan for fresh Daily origin bases.
+        - Top Losers (< -1.5%): Scan for pullbacks entering pre-identified demand zones.
+        """
+        abs_change = abs(daily_pct_change)
+
+        if abs_change <= 0.50:
+            return (
+                StockScanFilterType.BASING_RANGE_CHURN,
+                ScanCandidatePriority.IGNORE_BASING,
+                f"Daily change {daily_pct_change:+.2f}% represents equilibrium base churn. Discard for active trading.",
+            )
+
+        if is_entering_demand or daily_pct_change < -1.5:
+            return (
+                StockScanFilterType.PULLBACK_INTO_DEMAND,
+                ScanCandidatePriority.WATCHLIST_ALERT,
+                f"Daily dip {daily_pct_change:+.2f}%: Pullback entering pre-identified institutional demand zone. Verify alert.",
+            )
+
+        if is_fresh_origin or daily_pct_change > 1.5:
+            return (
+                StockScanFilterType.FRESH_ORIGIN_FORMATION,
+                ScanCandidatePriority.WATCHLIST_ALERT,
+                f"Daily rally {daily_pct_change:+.2f}%: Explosive leg-out departure. Mark fresh origin demand base.",
+            )
+
+        return (
+            StockScanFilterType.BASING_RANGE_CHURN,
+            ScanCandidatePriority.IGNORE_BASING,
+            f"Daily change {daily_pct_change:+.2f}% is routine intermediate movement.",
+        )
+
+    @staticmethod
+    def calculate_price_alert(
+        proximal_line: float,
+        buffer_inr: float = 2.0,
+    ) -> float:
+        """
+        The Mandatory Price Alert Mandate:
+        Places alert 1 to 2 rupees above the Proximal Line so traders never stare at live screens.
+        """
+        return round(proximal_line + buffer_inr, 2)
+
+    @staticmethod
+    def generate_on_chart_note(
+        symbol: str,
+        quarterly_trend: str,
+        monthly_trend: str,
+        weekly_trend: str,
+        daily_trend: str,
+        location_summary: str,
+        trade_style: str,
+        score_ratio: str,
+        entry: float,
+        stop_loss: float,
+        target: float,
+        rrr: float,
+    ) -> str:
+        """
+        The Permanent On-Chart Note-Taking Protocol:
+        Generates a 5-second complete analytical restoration block directly on chart.
+        """
+        return (
+            f"=== {symbol} GTF ON-CHART MASTER NOTE ===\n"
+            f"TREND OVERVIEW: Q: {quarterly_trend} | M: {monthly_trend} | W: {weekly_trend} | D: {daily_trend}\n"
+            f"LOCATION CONTEXT: {location_summary}\n"
+            f"TRADE PLAN: {trade_style} Long ({score_ratio}) | Entry: ₹{entry:.2f} | SL: ₹{stop_loss:.2f} | Tgt: ₹{target:.2f} | RRR: {rrr:.1f}:1\n"
+            f"ACTION: Pre-set Price Alert at ₹{entry + 2.0:.2f}. Review intermediate trend upon mobile alert."
+        )
+`
+---
+
+### 13. Pre-Trade Risk Engine & Concentration Limits
 **File:** [alphacouncil/risk/pre_trade.py](alphacouncil/risk/pre_trade.py)
 
 `python
@@ -5736,12 +6048,10 @@ class PreTradeRiskEngine:
             adjusted_quantity=proposed_quantity,
             reason="PRE_TRADE_PASSED: All boundary checks green",
         )
-
 `
-
 ---
 
-### 13. Position Sizing & Kelly Calibration
+### 14. Position Sizing & Kelly Calibration
 **File:** [alphacouncil/risk/sizing.py](alphacouncil/risk/sizing.py)
 
 `python
@@ -5972,12 +6282,10 @@ class PositionSizingEngine:
             regime_mode=regime,
             rationale=msg,
         )
-
 `
-
 ---
 
-### 14. López de Prado Meta-Labeler Downscaler
+### 15. López de Prado Meta-Labeler Downscaler
 **File:** [alphacouncil/risk/meta_labeler.py](alphacouncil/risk/meta_labeler.py)
 
 `python
@@ -6087,12 +6395,10 @@ class LopezDePradoMetaLabeler:
             sentiment_score=round(sentiment_score, 4),
             reasoning=reason,
         )
-
 `
-
 ---
 
-### 15. Intraday Kill-Switch & Monthly Session Halt
+### 16. Intraday Kill-Switch & Monthly Session Halt
 **File:** [alphacouncil/risk/kill_switch.py](alphacouncil/risk/kill_switch.py)
 
 `python
@@ -6224,12 +6530,10 @@ class IntradayKillSwitch:
         """
         elapsed = time.time() - self.last_heartbeat_time
         return elapsed < max_allowed_miss_sec
-
 `
-
 ---
 
-### 16. Direction-Aware Circuit Band Guard
+### 17. Direction-Aware Circuit Band Guard
 **File:** [alphacouncil/risk/circuits.py](alphacouncil/risk/circuits.py)
 
 `python
@@ -6358,12 +6662,10 @@ class MWPLBanTracker:
             )
 
         return True, "HEDGING_NORMAL: OI within permissible limits."
-
 `
-
 ---
 
-### 17. GTF Risk Management & Capital Protection Engine
+### 18. GTF Risk Management & Capital Protection Engine
 **File:** [alphacouncil/risk/gtf_risk.py](alphacouncil/risk/gtf_risk.py)
 
 `python
@@ -6669,12 +6971,10 @@ class GTFRiskManager:
             monthly_return_pct=monthly_return_pct,
             annual_return_pct=annual_return_pct,
         )
-
 `
-
 ---
 
-### 18. Statutory Indian Market Friction Model (SEBI Oct 2024)
+### 19. Statutory Indian Market Friction Model (SEBI Oct 2024)
 **File:** [alphacouncil/execution/friction.py](alphacouncil/execution/friction.py)
 
 `python
@@ -6802,12 +7102,10 @@ class IndianMarketFrictionModel:
             total_friction_inr=round(total_friction, 2),
             effective_friction_bps=round(effective_bps, 2),
         )
-
 `
-
 ---
 
-### 19. Idempotent OMS & Broker GTT Bracket Sync
+### 20. Idempotent OMS & Broker GTT Bracket Sync
 **File:** [alphacouncil/execution/oms.py](alphacouncil/execution/oms.py)
 
 `python
@@ -7057,12 +7355,10 @@ class IdempotentOMS:
             "status": "Entry order and linked stops/targets canceled cleanly",
         })
         return True
-
 `
-
 ---
 
-### 20. Purged Walk-Forward Backtesting Engine
+### 21. Purged Walk-Forward Backtesting Engine
 **File:** [alphacouncil/backtest/engine.py](alphacouncil/backtest/engine.py)
 
 `python
@@ -7456,12 +7752,10 @@ class BacktestEngine:
             signals_skipped_noise_trap=skipped_noise,
             noise_trap_skip_rate_pct=round(skip_rate, 2),
         )
-
 `
-
 ---
 
-### 21. Deflated Sharpe Ratio (DSR) & Quant Metrics
+### 22. Deflated Sharpe Ratio (DSR) & Quant Metrics
 **File:** [alphacouncil/backtest/metrics.py](alphacouncil/backtest/metrics.py)
 
 `python
@@ -7687,12 +7981,10 @@ class QuantMetricsCalculator:
             total_trades=n_trades,
             trials_logged=n_trials_logged,
         )
-
 `
-
 ---
 
-### 22. 7-Model Orthogonal Ablation Suite
+### 23. 7-Model Orthogonal Ablation Suite
 **File:** [alphacouncil/backtest/ablation.py](alphacouncil/backtest/ablation.py)
 
 `python
@@ -7830,12 +8122,10 @@ class AblationSuiteRunner:
         )
 
         return results
-
 `
-
 ---
 
-### 23. Interactive Bloomberg Dashboard UI
+### 24. Interactive Bloomberg Dashboard UI
 **File:** [alphacouncil/ui/dashboard.py](alphacouncil/ui/dashboard.py)
 
 `python
@@ -7996,12 +8286,10 @@ class AlphaCouncilDashboard:
         panel = Panel(panel_text, title="Lookahead Bias Defense", border_style="cyan")
         self.console.print(panel)
         self.console.print()
-
 `
-
 ---
 
-### 24. Master Research Demo Runner
+### 25. Master Research Demo Runner
 **File:** [alphacouncil/run_council.py](alphacouncil/run_council.py)
 
 `python
@@ -8174,8 +8462,5 @@ def run_interactive_pitch_demo():
 
 if __name__ == "__main__":
     run_interactive_pitch_demo()
-
 `
-
 ---
-
