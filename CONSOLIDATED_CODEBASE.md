@@ -349,7 +349,7 @@ Entry, Stop-Loss (with speeding bus volatility buffers), and Target (2:1 RRR) ex
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 import numpy as np
 
 
@@ -435,6 +435,31 @@ class DemandSupplyEngine:
         self.buffer_ratio = buffer_ratio
         self.min_buffer = min_buffer
         self.target_rrr = target_rrr
+
+    @staticmethod
+    def get_nse_session_partitions() -> Dict[str, int]:
+        """
+        Episode 1: Standard 375-minute Indian market session (09:15 to 15:30 IST).
+        Eliminates distorted/orphan candles caused by 60-minute charts (6.25 bars).
+        - 75-minute timeframe: exactly 5 bars per session (375 / 75 = 5).
+        - 125-minute timeframe: exactly 3 bars per session (375 / 125 = 3).
+        """
+        return {"session_minutes": 375, "75m_bars": 5, "125m_bars": 3}
+
+    @staticmethod
+    def is_wickless_candle(
+        open_p: float, high_p: float, low_p: float, close_p: float, tolerance: float = 1e-4
+    ) -> Tuple[bool, str]:
+        """
+        Episode 1: Identifies pure directional institutional power (wickless candles):
+        - Open == Low: Zero lower shadow, pure buying power (Green).
+        - Open == High: Zero upper shadow, pure selling power (Red).
+        """
+        if abs(open_p - low_p) <= tolerance and close_p > open_p:
+            return True, "OPEN_EQUALS_LOW_PURE_BUYING"
+        elif abs(open_p - high_p) <= tolerance and close_p < open_p:
+            return True, "OPEN_EQUALS_HIGH_PURE_SELLING"
+        return False, "STANDARD_CANDLE"
 
     def classify_candle(
         self,

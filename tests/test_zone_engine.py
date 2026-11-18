@@ -16,6 +16,46 @@ import numpy as np
 from alphacouncil.alpha.zone_engine import DemandSupplyEngine, CandleType, ZoneType
 
 
+# =====================================================================
+# EPISODE 1 TESTS: CHARTING, SESSION PARTITIONS & CANDLE MECHANICS
+# =====================================================================
+
+def test_episode_01_nse_session_partitions_no_orphan_candles():
+    """
+    Episode 1: 375-minute Indian session partition:
+    75m bars = 5 per day, 125m bars = 3 per day.
+    """
+    parts = DemandSupplyEngine.get_nse_session_partitions()
+    assert parts["session_minutes"] == 375
+    assert parts["75m_bars"] == 5
+    assert parts["125m_bars"] == 3
+    assert (parts["session_minutes"] % 75) == 0
+    assert (parts["session_minutes"] % 125) == 0
+
+
+def test_episode_01_wickless_candles_directional_power():
+    """
+    Episode 1: Pure directional candles without wicks:
+    - Open == Low -> Pure green buying pressure
+    - Open == High -> Pure red selling pressure
+    """
+    is_w, label = DemandSupplyEngine.is_wickless_candle(100.0, 115.0, 100.0, 114.0)
+    assert is_w is True
+    assert label == "OPEN_EQUALS_LOW_PURE_BUYING"
+
+    is_w, label = DemandSupplyEngine.is_wickless_candle(150.0, 150.0, 130.0, 132.0)
+    assert is_w is True
+    assert label == "OPEN_EQUALS_HIGH_PURE_SELLING"
+
+    is_w, label = DemandSupplyEngine.is_wickless_candle(100.0, 115.0, 95.0, 110.0)
+    assert is_w is False
+    assert label == "STANDARD_CANDLE"
+
+
+# =====================================================================
+# EPISODE 2 TESTS: 50% BODY RATIO RULE & CANDLE CLASSIFICATION
+# =====================================================================
+
 def test_candle_classification_exciting_vs_base():
     engine = DemandSupplyEngine()
 
@@ -31,6 +71,10 @@ def test_candle_classification_exciting_vs_base():
     c3 = engine.classify_candle(2, open_p=105.0, high_p=115.0, low_p=95.0, close_p=106.0)
     assert c3.candle_type == CandleType.BASE
 
+
+# =====================================================================
+# EPISODE 3 TESTS: ZONE MARKING, PROXIMAL/DISTAL LINES & FRESHNESS
+# =====================================================================
 
 def test_demand_zone_marking_and_freshness():
     engine = DemandSupplyEngine()

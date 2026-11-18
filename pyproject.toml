@@ -30,7 +30,7 @@ dev = [
 
 [tool.setuptools.packages.find]
 include = ["alphacouncil*"]
-exclude = ["training*", "tests*", "docs*"]
+exclude = ["training*", "tests*", "docs*", "test_results*"]
 
 [tool.pytest.ini_options]
 minversion = "8.0"
