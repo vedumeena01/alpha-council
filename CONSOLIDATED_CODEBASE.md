@@ -343,7 +343,8 @@ class PointInTimeCalendar:
 Demand & Supply Core Engine (Trading in the Zone / GTF Methodology).
 Codifies institutional order-matching mechanics, Exciting vs Base candle classification,
 structural zone detection (DBR, RBR, RBD, DBD), exact Zone Marking (Proximal & Distal lines),
-and Freshness vs. Tested evaluation.
+Normal vs. Exceptional marking (reversal vs. continuous wick rules),
+Entry, Stop-Loss (with speeding bus volatility buffers), and Target (2:1 RRR) execution levels.
 """
 
 from dataclasses import dataclass
@@ -388,27 +389,52 @@ class IdentifiedZone:
     base_candles_count: int
     first_leg_out_idx: int
 
-    # Exact Zone Marking (Episode 3 Formulas)
-    proximal_line: float       # Entry Reference
-    distal_line: float         # Stop-Loss Reference
-    zone_width: float          # Inherent risk per share (Proximal - Distal)
+    # Exact Zone Marking (Episodes 3 & 4 Formulas)
+    proximal_line: float            # Entry Reference (Invariant - Never changes)
+    distal_line: float              # Active Distal Reference used for execution
+    distal_line_normal: float = 0.0 # Normal DL (Base candle extreme wick only)
+    distal_line_exceptional: float = 0.0  # Exceptional DL (Evaluates leg wicks based on reversal/continuous rules)
+    zone_width: float = 0.0         # abs(proximal_line - distal_line)
 
-    departure_strength: int    # Consecutive exciting candles leaving the zone
-    departure_velocity: float  # Total price expansion in leg-out
+    departure_strength: int = 1     # Consecutive exciting candles leaving the zone
+    departure_velocity: float = 0.0 # Total price expansion in leg-out
 
-    is_fresh: bool             # True if price has NEVER touched proximal line since leg-out
+    is_fresh: bool = True           # True if price has NEVER touched proximal line since leg-out
     tested_at_idx: Optional[int] = None
     is_high_quality: bool = True
+    is_exceptional: bool = True     # True if active distal_line uses exceptional marking
+
+    # Trade Execution Levels (Episode 4)
+    entry_price: float = 0.0        # Long: PL + buffer; Short: PL - buffer
+    stop_loss: float = 0.0          # Long: DL - buffer; Short: DL + buffer (Speeding bus buffer)
+    risk_per_share: float = 0.0     # abs(entry_price - stop_loss)
+    target_price: float = 0.0       # Long: Entry + 2*Risk; Short: Entry - 2*Risk (Minimum 2:1 RRR)
+    reward_per_share: float = 0.0   # abs(target_price - entry_price)
+    risk_reward_ratio: float = 2.0
 
 
 class DemandSupplyEngine:
     """
-    Core Price Action Engine trained on Institutional Order Flow and Demand-Supply Imbalances.
+    Core Price Action Engine trained on Institutional Order Flow,
+    Demand-Supply Imbalances, Normal vs. Exceptional Zone Marking,
+    and Mechanical Trade Execution (Entry, Stop-Loss, Target).
     """
 
-    def __init__(self, min_range_atr_ratio: float = 0.25, max_base_candles: int = 6):
+    def __init__(
+        self,
+        min_range_atr_ratio: float = 0.25,
+        max_base_candles: int = 6,
+        use_exceptional_marking: bool = True,
+        buffer_ratio: float = 0.02,
+        min_buffer: float = 0.05,
+        target_rrr: float = 2.0,
+    ):
         self.min_range_atr_ratio = min_range_atr_ratio
         self.max_base_candles = max_base_candles
+        self.use_exceptional_marking = use_exceptional_marking
+        self.buffer_ratio = buffer_ratio
+        self.min_buffer = min_buffer
+        self.target_rrr = target_rrr
 
     def classify_candle(
         self,
@@ -460,15 +486,21 @@ class DemandSupplyEngine:
         lows: np.ndarray,
         closes: np.ndarray,
         atr14: Optional[np.ndarray] = None,
+        use_exceptional: Optional[bool] = None,
     ) -> List[IdentifiedZone]:
         """
         Scans series of candles to identify institutional Demand and Supply zones:
         Leg-in (Arrival) -> Base Candles (Pending Orders) -> Leg-out (Departure).
-        Computes Proximal Line, Distal Line, and verifies Freshness.
+        Computes Proximal Line, Distal Line (Normal & Exceptional),
+        Entry, Stop-Loss with volatility buffer, and Target (2:1 RRR).
         """
         n = len(closes)
         if n < 3:
             return []
+
+        use_exceptional_eff = (
+            self.use_exceptional_marking if use_exceptional is None else use_exceptional
+        )
 
         # 1. Classify all candles
         classified: List[CandleFeature] = []
@@ -538,21 +570,64 @@ class DemandSupplyEngine:
                         is_reversal = False
 
                     if z_type:
-                        # 3. Exact Zone Marking (Episode 3 Formulas)
+                        # 3. Exact Zone Marking (Episode 3 & 4 Formulas)
                         base_candles = classified[base_start : base_end + 1]
 
                         if is_demand:
-                            # Demand: Proximal = Highest Body of all base candles
+                            # Demand Proximal: Highest Body of all base candles (NEVER CHANGES)
                             proximal = max(max(b.open, b.close) for b in base_candles)
-                            # Demand: Distal = Lowest Wick of all base candles
-                            distal = min(b.low for b in base_candles)
-                            zone_width = round(proximal - distal, 2)
+                            # Demand Distal Normal: Lowest Wick of all base candles
+                            distal_normal = min(b.low for b in base_candles)
+
+                            # Demand Distal Exceptional:
+                            if is_reversal:
+                                # DBR: Lowest wick among [Leg-in, Base, Leg-out]
+                                distal_exceptional = min(leg_in.low, distal_normal, leg_out.low)
+                            else:
+                                # RBR: Lowest wick between [Base, Leg-out] (Leg-in strictly ignored!)
+                                distal_exceptional = min(distal_normal, leg_out.low)
+
+                            active_distal = (
+                                distal_exceptional if use_exceptional_eff else distal_normal
+                            )
+                            zone_width = round(proximal - active_distal, 2)
+
+                            # Execution Levels (Demand / Long):
+                            # Entry slightly above PL, SL slightly below DL (speeding bus buffer)
+                            buffer = round(max(self.min_buffer, zone_width * self.buffer_ratio), 2)
+                            entry_p = round(proximal + buffer, 2)
+                            sl_p = round(active_distal - buffer, 2)
+                            risk_ps = round(entry_p - sl_p, 2)
+                            target_p = round(entry_p + (self.target_rrr * risk_ps), 2)
+                            reward_ps = round(target_p - entry_p, 2)
+
                         else:
-                            # Supply: Proximal = Lowest Body of all base candles
+                            # Supply Proximal: Lowest Body of all base candles (NEVER CHANGES)
                             proximal = min(min(b.open, b.close) for b in base_candles)
-                            # Supply: Distal = Highest Wick of all base candles
-                            distal = max(b.high for b in base_candles)
-                            zone_width = round(distal - proximal, 2)
+                            # Supply Distal Normal: Highest Wick of all base candles
+                            distal_normal = max(b.high for b in base_candles)
+
+                            # Supply Distal Exceptional:
+                            if is_reversal:
+                                # RBD: Highest wick among [Leg-in, Base, Leg-out]
+                                distal_exceptional = max(leg_in.high, distal_normal, leg_out.high)
+                            else:
+                                # DBD: Highest wick between [Base, Leg-out] (Leg-in strictly ignored!)
+                                distal_exceptional = max(distal_normal, leg_out.high)
+
+                            active_distal = (
+                                distal_exceptional if use_exceptional_eff else distal_normal
+                            )
+                            zone_width = round(active_distal - proximal, 2)
+
+                            # Execution Levels (Supply / Short):
+                            # Entry slightly below PL, SL slightly above DL (speeding bus buffer)
+                            buffer = round(max(self.min_buffer, zone_width * self.buffer_ratio), 2)
+                            entry_p = round(proximal - buffer, 2)
+                            sl_p = round(active_distal + buffer, 2)
+                            risk_ps = round(sl_p - entry_p, 2)
+                            target_p = round(entry_p - (self.target_rrr * risk_ps), 2)
+                            reward_ps = round(entry_p - target_p, 2)
 
                         # 4. Freshness vs Tested Evaluation
                         # Monitored immediately after the first leg-out candle
@@ -583,13 +658,22 @@ class DemandSupplyEngine:
                                 base_candles_count=base_count,
                                 first_leg_out_idx=first_leg_out_idx,
                                 proximal_line=round(proximal, 2),
-                                distal_line=round(distal, 2),
+                                distal_line=round(active_distal, 2),
+                                distal_line_normal=round(distal_normal, 2),
+                                distal_line_exceptional=round(distal_exceptional, 2),
                                 zone_width=zone_width,
                                 departure_strength=departure_strength,
                                 departure_velocity=round(dep_velocity, 2),
                                 is_fresh=is_fresh,
                                 tested_at_idx=tested_at,
                                 is_high_quality=is_hq,
+                                is_exceptional=use_exceptional_eff,
+                                entry_price=entry_p,
+                                stop_loss=sl_p,
+                                risk_per_share=risk_ps,
+                                target_price=target_p,
+                                reward_per_share=reward_ps,
+                                risk_reward_ratio=round(self.target_rrr, 2),
                             )
                         )
             else:
@@ -605,13 +689,16 @@ class DemandSupplyEngine:
         lows: np.ndarray,
         closes: np.ndarray,
         only_fresh: bool = True,
+        use_exceptional: Optional[bool] = None,
     ) -> Tuple[List[IdentifiedZone], List[IdentifiedZone]]:
         """
-        Navigates relative to Current Market Price (CMP) as taught in Episode 3:
+        Navigates relative to Current Market Price (CMP) as taught in Episode 3 & 4:
         1. Demand Zones: Look Left & Down (Proximal Line < CMP).
         2. Supply Zones: Look Left & Up (Proximal Line > CMP).
         """
-        all_zones = self.scan_for_zones(opens, highs, lows, closes)
+        all_zones = self.scan_for_zones(
+            opens, highs, lows, closes, use_exceptional=use_exceptional
+        )
 
         demand_zones: List[IdentifiedZone] = []
         supply_zones: List[IdentifiedZone] = []
@@ -632,6 +719,7 @@ class DemandSupplyEngine:
         supply_zones.sort(key=lambda x: x.proximal_line)
 
         return demand_zones, supply_zones
+
 `
 
 ---

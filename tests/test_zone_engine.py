@@ -1,11 +1,15 @@
 """
-Comprehensive Tests for Demand & Supply Core Engine (Episodes 1, 2, and 3).
+Comprehensive Tests for Demand & Supply Core Engine (Episodes 1, 2, 3, and 4).
 Verifies:
 1. Candlestick Classification (50% body ratio rule).
 2. 4 Structural Patterns (DBR, RBR, RBD, DBD).
 3. Exact Zone Marking (Proximal = Highest/Lowest Body, Distal = Lowest/Highest Wick).
 4. Freshness vs. Tested Zone Logic.
 5. Left & Down (Demand < CMP) and Left & Up (Supply > CMP) Navigation.
+6. Episode 4: Normal vs. Exceptional Marking (Proximal Line Invariance).
+7. Episode 4: Reversal Patterns (DBR/RBD evaluate Leg-in, Base, Leg-out wicks).
+8. Episode 4: Continuous Patterns (RBR/DBD evaluate ONLY Base & Leg-out wicks; Leg-in strictly excluded).
+9. Episode 4: Trade Execution (Entry slightly above/below PL, SL buffer below/above DL, 2:1 Target).
 """
 
 import numpy as np
@@ -117,3 +121,217 @@ def test_find_active_zones_relative_to_cmp():
     assert len(demand_zones) == 1
     assert demand_zones[0].proximal_line == 107.0
     assert len(supply_zones) == 0
+
+
+# =====================================================================
+# EPISODE 4 TESTS: EXCEPTIONAL MARKING & EXECUTION LEVELS
+# =====================================================================
+
+def test_exceptional_marking_dbr_vedanta_case_study():
+    """
+    Vedanta Case Study: Leg-in has an extended lower wick below base candle wicks.
+    Under Normal Marking: DL = Base Low (triggers premature stopout during market sell-off).
+    Under Exceptional Marking: DL = Leg-in Low (protects position from the speeding bus).
+    Proximal Line remains strictly invariant.
+    """
+    engine = DemandSupplyEngine(use_exceptional_marking=True)
+
+    # Bar 0: Leg-in Drop: Open 250, High 251, Low 190, Close 200 (Long lower wick down to 190)
+    # Bar 1: Base: Open 200, High 205, Low 198, Close 203 (Base low is 198, Highest body is 203)
+    # Bar 2: Leg-out Rally: Open 203, High 230, Low 202, Close 228
+    opens = np.array([250.0, 200.0, 203.0])
+    highs = np.array([251.0, 205.0, 230.0])
+    lows = np.array([190.0, 198.0, 202.0])
+    closes = np.array([200.0, 203.0, 228.0])
+
+    # Scan with exceptional marking (default)
+    zones = engine.scan_for_zones(opens, highs, lows, closes)
+    assert len(zones) == 1
+    z = zones[0]
+
+    assert z.zone_type == ZoneType.DEMAND_DBR
+    assert z.proximal_line == 203.0  # Highest body of base (Invariant!)
+    assert z.distal_line_normal == 198.0  # Base wick only
+    assert z.distal_line_exceptional == 190.0  # Extended leg-in wick
+    assert z.distal_line == 190.0  # Active DL is exceptional
+    assert z.zone_width == 13.0  # 203 - 190
+
+    # Test that normal mode keeps distal at 198
+    zones_normal = engine.scan_for_zones(opens, highs, lows, closes, use_exceptional=False)
+    assert zones_normal[0].distal_line == 198.0
+    assert zones_normal[0].proximal_line == 203.0  # Proximal Invariance confirmed
+
+
+def test_exceptional_marking_dbr_alkyl_amines_case_study():
+    """
+    Alkyl Amines Case Study: Dual wick exception.
+    Both leg-in and leg-out dip below the base candle, but leg-out is lowest.
+    DL = min(Leg-in low, Base low, Leg-out low).
+    """
+    engine = DemandSupplyEngine(use_exceptional_marking=True)
+
+    # Bar 0: Leg-in Drop: Open 300, High 301, Low 255, Close 260
+    # Bar 1: Base: Open 260, High 265, Low 258, Close 262
+    # Bar 2: Leg-out Rally: Open 262, High 290, Low 250, Close 288 (Extreme dip to 250)
+    opens = np.array([300.0, 260.0, 262.0])
+    highs = np.array([301.0, 265.0, 290.0])
+    lows = np.array([255.0, 258.0, 250.0])
+    closes = np.array([260.0, 262.0, 288.0])
+
+    zones = engine.scan_for_zones(opens, highs, lows, closes)
+    assert len(zones) == 1
+    z = zones[0]
+
+    assert z.proximal_line == 262.0
+    assert z.distal_line_normal == 258.0
+    assert z.distal_line_exceptional == 250.0  # Leg-out wick was the extreme
+    assert z.distal_line == 250.0
+
+
+def test_exceptional_marking_rbr_continuous_strictly_ignores_leg_in():
+    """
+    Continuous Pattern Rule: In RBR and DBD, Leg-in is STRICTLY EXCLUDED.
+    Leg-in belonged to an independent prior trend and was not part of basing struggle.
+    DL evaluates ONLY [Base, Leg-out].
+    """
+    engine = DemandSupplyEngine(use_exceptional_marking=True)
+
+    # Bar 0: Leg-in Rally: Open 100, High 130, Low 85, Close 128 (Extreme low wick at 85)
+    # Bar 1: Base: Open 128, High 132, Low 125, Close 130
+    # Bar 2: Leg-out Rally: Open 130, High 150, Low 127, Close 148
+    opens = np.array([100.0, 128.0, 130.0])
+    highs = np.array([130.0, 132.0, 150.0])
+    lows = np.array([85.0, 125.0, 127.0])
+    closes = np.array([128.0, 130.0, 148.0])
+
+    zones = engine.scan_for_zones(opens, highs, lows, closes)
+    assert len(zones) == 1
+    z = zones[0]
+
+    assert z.zone_type == ZoneType.DEMAND_RBR
+    assert z.is_reversal is False
+    assert z.proximal_line == 130.0
+    assert z.distal_line_normal == 125.0
+    # Leg-in low (85.0) MUST BE IGNORED!
+    assert z.distal_line_exceptional == 125.0
+    assert z.distal_line == 125.0
+
+
+def test_exceptional_marking_continuous_rbr_with_leg_out_wick():
+    """
+    RBR where Leg-out dips lower than the base candle wicks.
+    DL shifts to the leg-out wick.
+    """
+    engine = DemandSupplyEngine(use_exceptional_marking=True)
+
+    # Bar 0: Leg-in Rally: Open 100, High 130, Low 98, Close 128
+    # Bar 1: Base: Open 128, High 132, Low 125, Close 130
+    # Bar 2: Leg-out Rally: Open 130, High 150, Low 122, Close 148 (Dips to 122 < 125)
+    opens = np.array([100.0, 128.0, 130.0])
+    highs = np.array([130.0, 132.0, 150.0])
+    lows = np.array([98.0, 125.0, 122.0])
+    closes = np.array([128.0, 130.0, 148.0])
+
+    zones = engine.scan_for_zones(opens, highs, lows, closes)
+    z = zones[0]
+
+    assert z.distal_line_normal == 125.0
+    assert z.distal_line_exceptional == 122.0  # Leg-out wick taken
+    assert z.distal_line == 122.0
+
+
+def test_exceptional_marking_supply_patterns():
+    """
+    Supply Reversal (RBD): Evaluates Leg-in, Base, Leg-out highest wicks.
+    Supply Continuous (DBD): Evaluates ONLY Base and Leg-out (ignores Leg-in).
+    """
+    engine = DemandSupplyEngine(use_exceptional_marking=True)
+
+    # RBD (Reversal): Leg-in has highest upper wick at 155
+    opens = np.array([110.0, 144.0, 142.0])
+    highs = np.array([155.0, 145.0, 143.0])  # Leg-in peak 155
+    lows = np.array([109.0, 140.0, 120.0])
+    closes = np.array([144.0, 142.0, 122.0])
+
+    z_rbd = engine.scan_for_zones(opens, highs, lows, closes)[0]
+    assert z_rbd.zone_type == ZoneType.SUPPLY_RBD
+    assert z_rbd.proximal_line == 142.0  # Lowest body of base
+    assert z_rbd.distal_line_normal == 145.0  # Base wick
+    assert z_rbd.distal_line_exceptional == 155.0  # Leg-in upper wick
+    assert z_rbd.distal_line == 155.0
+
+    # DBD (Continuous): Leg-in has peak at 200 from previous drop (must be IGNORED)
+    opens_dbd = np.array([190.0, 144.0, 142.0])
+    highs_dbd = np.array([200.0, 145.0, 148.0])  # Leg-out peak 148 > Base 145
+    lows_dbd = np.array([145.0, 140.0, 120.0])
+    closes_dbd = np.array([145.0, 142.0, 122.0])
+
+    z_dbd = engine.scan_for_zones(opens_dbd, highs_dbd, lows_dbd, closes_dbd)[0]
+    assert z_dbd.zone_type == ZoneType.SUPPLY_DBD
+    assert z_dbd.proximal_line == 142.0
+    assert z_dbd.distal_line_normal == 145.0
+    # Leg-in (200) ignored, Leg-out (148) evaluated
+    assert z_dbd.distal_line_exceptional == 148.0
+    assert z_dbd.distal_line == 148.0
+
+
+def test_execution_orders_entry_sl_target_calculations():
+    """
+    Verifies Episode 4 Execution Rules:
+    1. Demand: Entry = PL + buffer, SL = DL - buffer, Target = Entry + 2*Risk (2:1 RRR)
+    2. Supply: Entry = PL - buffer, SL = DL + buffer, Target = Entry - 2*Risk (2:1 RRR)
+    """
+    # 5% buffer ratio for clear arithmetic testing
+    engine = DemandSupplyEngine(buffer_ratio=0.05, target_rrr=2.0)
+
+    # Demand Setup (DBR):
+    # Proximal = 200.0, Distal = 190.0 -> Zone width = 10.0
+    # Buffer = 10.0 * 0.05 = 0.50
+    # Entry = 200.0 + 0.50 = 200.50
+    # SL = 190.0 - 0.50 = 189.50
+    # Risk = 200.50 - 189.50 = 11.00
+    # Target (2:1) = 200.50 + (2 * 11.00) = 222.50
+    # Reward = 22.00
+    opens = np.array([230.0, 195.0, 200.0])
+    highs = np.array([231.0, 202.0, 225.0])
+    lows = np.array([195.0, 190.0, 198.0])
+    closes = np.array([195.0, 200.0, 224.0])
+
+    z_demand = engine.scan_for_zones(opens, highs, lows, closes)[0]
+    assert z_demand.proximal_line == 200.0
+    assert z_demand.distal_line == 190.0
+    assert z_demand.zone_width == 10.0
+
+    assert z_demand.entry_price == 200.50
+    assert z_demand.stop_loss == 189.50
+    assert z_demand.risk_per_share == 11.00
+    assert z_demand.target_price == 222.50
+    assert z_demand.reward_per_share == 22.00
+    assert z_demand.risk_reward_ratio == 2.0
+
+    # Supply Setup (RBD):
+    # Base open 150, close 145 (Lowest body = 145 = PL)
+    # Base high 155 (Highest wick = 155 = DL)
+    # Zone width = 155 - 145 = 10.0
+    # Buffer = 10.0 * 0.05 = 0.50
+    # Entry = 145.0 - 0.50 = 144.50 (slightly below PL)
+    # SL = 155.0 + 0.50 = 155.50 (slightly above DL)
+    # Risk = 155.50 - 144.50 = 11.00
+    # Target (2:1) = 144.50 - (2 * 11.00) = 122.50
+    # Reward = 22.00
+    opens_s = np.array([120.0, 150.0, 145.0])
+    highs_s = np.array([146.0, 155.0, 145.0])
+    lows_s = np.array([119.0, 144.0, 120.0])
+    closes_s = np.array([145.0, 145.0, 122.0])
+
+    z_supply = engine.scan_for_zones(opens_s, highs_s, lows_s, closes_s)[0]
+    assert z_supply.proximal_line == 145.0
+    assert z_supply.distal_line == 155.0
+    assert z_supply.zone_width == 10.0
+
+    assert z_supply.entry_price == 144.50
+    assert z_supply.stop_loss == 155.50
+    assert z_supply.risk_per_share == 11.00
+    assert z_supply.target_price == 122.50
+    assert z_supply.reward_per_share == 22.00
+    assert z_supply.risk_reward_ratio == 2.0
