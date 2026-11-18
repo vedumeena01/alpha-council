@@ -15,7 +15,8 @@
 | **05** | Trading Psychology, Wick-to-Wick & Anti-News Engine | 5 | **100%** (5/5) | 0.14s | Base Candle Count Scorer (1-3 vs 4-5+), Wick-to-Wick Marking, Direct Reversals (0 Base), Timeframe Hierarchy (Monthly 4.0x), News Trap Contrarian Filter | [`EPISODE_05_TEST_RESULTS.md`](EPISODE_05_TEST_RESULTS.md) |
 | **06** | Price Action Behind Candles (Closing, Gap-Base, Garbage) | 6 | **100%** (6/6) | 0.15s | The Closing Concept (Proven vs. Unproven), Gap+Base Exciting Equation, LOTL Stacking, Garbage Area Filter, Origin Pivot Isolation | [`EPISODE_06_TEST_RESULTS.md`](EPISODE_06_TEST_RESULTS.md) |
 | **07** | Multiple Time Frame Analysis (MTFA, 50 SMA Clock, Boundary Rule) | 5 | **100%** (5/5) | 0.23s | 50 SMA Clock Method (7th Candle Rule), 5 Curve Sections, Curve vs. Trend Matrix, The Boundary Rule, ATH Shorting Prohibition | [`EPISODE_07_TEST_RESULTS.md`](EPISODE_07_TEST_RESULTS.md) |
-| **Total** | **All Episodes (Cumulative)** | **29** | **100%** (29/29) | **0.25s** | **Full GTF Price Action Core (`zone_engine.py`)** | - |
+| **08** | Trade Score, Mahabharata Alignment & Dynamic Target | 5 | **100%** (5/5) | 0.38s | Trade Score (Max 7/7), 4 Characters (Krishna, Bhishma, Arjuna, Duryodhana), Opposing ITF Target Rule, Best Setup Gold Standard | [`EPISODE_08_TEST_RESULTS.md`](EPISODE_08_TEST_RESULTS.md) |
+| **Total** | **All Episodes (Cumulative)** | **34** | **100%** (34/34) | **0.30s** | **Full GTF Price Action Core (`zone_engine.py`)** | - |
 
 ---
 
@@ -23,10 +24,10 @@
 
 ```text
 Module: alphacouncil/alpha/zone_engine.py
-Statements: 529
-Missed: 71
-Test Coverage: 86.6%
-Total Suite Tests: 48 (100% Passed)
+Statements: 648
+Missed: 98
+Test Coverage: 85.0%
+Total Suite Tests: 53 (100% Passed)
 Linter Status: Ruff 0 errors, 0 warnings
 CI Status: GitHub Actions 100% Green (Python 3.11 & 3.12)
 ```
@@ -41,3 +42,4 @@ CI Status: GitHub Actions 100% Green (Python 3.11 & 3.12)
 - [`EPISODE_05_TEST_RESULTS.md`](EPISODE_05_TEST_RESULTS.md) - Trading psychology, wick-to-wick, direct reversals & news traps.
 - [`EPISODE_06_TEST_RESULTS.md`](EPISODE_06_TEST_RESULTS.md) - The Closing concept, Gap+Base exciting, LOTL stacking, origin pivot & garbage filter.
 - [`EPISODE_07_TEST_RESULTS.md`](EPISODE_07_TEST_RESULTS.md) - Multiple Time Frame Analysis (MTFA), 50 SMA clock method, 5 curve tiers & boundary rule.
+- [`EPISODE_08_TEST_RESULTS.md`](EPISODE_08_TEST_RESULTS.md) - Trade Score (7/7), Mahabharata Alignment, Dynamic Opposing ITF Target & Best Setup Gold Standard.

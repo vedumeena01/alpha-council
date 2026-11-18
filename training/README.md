@@ -15,5 +15,6 @@
 | **05** | **Trading Psychology, Wick-to-Wick & Anti-News Engine** | ✅ **Codified & Trained** | [`training/EPISODE_05_TRADING_PSYCHOLOGY_AND_ADVANCED_ZONE_MAPPING.md`](EPISODE_05_TRADING_PSYCHOLOGY_AND_ADVANCED_ZONE_MAPPING.md) |
 | **06** | **Price Action Behind Candles (Closing, Gap-Base, Garbage)** | ✅ **Codified & Trained** | [`training/EPISODE_06_PRICE_ACTION_BEHIND_THE_CANDLES.md`](EPISODE_06_PRICE_ACTION_BEHIND_THE_CANDLES.md) |
 | **07** | **Multiple Time Frame Analysis (MTFA, 50 SMA Clock, Curve)** | ✅ **Codified & Trained** | [`training/EPISODE_07_MULTIPLE_TIMEFRAME_ANALYSIS.md`](EPISODE_07_MULTIPLE_TIMEFRAME_ANALYSIS.md) |
-| **08** | *Upcoming...* | ⏳ Pending | - |
+| **08** | **Trade Score (7/7), Mahabharata Alignment & Dynamic Target** | ✅ **Codified & Trained** | [`training/EPISODE_08_TRADE_SCORE_AND_BEST_SETUP.md`](EPISODE_08_TRADE_SCORE_AND_BEST_SETUP.md) |
+| **09** | *Upcoming...* | ⏳ Pending | - |
 | **...**| *Episodes 09 - 20* | ⏳ Pending | - |

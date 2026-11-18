@@ -24,6 +24,9 @@ from alphacouncil.alpha.zone_engine import (
     CurvePosition,
     TradeActionBias,
     MultiTimeframePlan,
+    TradeScoreQuality,
+    ZoneAlignmentType,
+    TradeScoreBreakdown,
 )
 
 
@@ -926,3 +929,300 @@ def test_episode_07_all_time_high_shorting_prohibition():
 
 
 
+
+
+# =====================================================================
+# EPISODE 8 TESTS: TRADE SCORE (7/7), MAHABHARATA ALIGNMENT & DYNAMIC TARGET
+# =====================================================================
+
+def test_episode_08_trade_score_three_parameters_and_quality_tiers():
+    """
+    Episode 8 Concept 2: The Three Parameters of Trade Score (Max: 7 Points).
+    - Freshness: 3.0 (fresh), 1.5 (tested 1x), 0.0 (tested >=2x)
+    - Strength: 2.0 (>=2 exciting or gap), 1.0 (1 exciting no gap)
+    - Time at Base: 2.0 (1-3 base), 1.0 (4-5 base), 0.0 (>5 base)
+    """
+    engine = DemandSupplyEngine()
+    # Mock base zone: DBR Demand (PL 100.0, DL 90.0)
+    opens = np.array([120.0, 95.0, 100.0])
+    highs = np.array([121.0, 102.0, 125.0])
+    lows = np.array([94.0, 90.0, 99.0])
+    closes = np.array([95.0, 100.0, 124.0])
+    base_zone = engine.scan_for_zones(opens, highs, lows, closes)[0]
+
+    # Picture 1: Fresh (3) + 2 Exciting Leg-outs (2) + 1 Base Candle (2) = 7/7 (PRISTINE)
+    base_zone.departure_strength = 2
+    base_zone.base_candles_count = 1
+    f1, s1, t1, tot1, q1 = DemandSupplyEngine.calculate_trade_score(base_zone, test_count=0)
+    assert f1 == 3.0
+    assert s1 == 2.0
+    assert t1 == 2.0
+    assert tot1 == 7.0
+    assert q1 == TradeScoreQuality.PRISTINE
+
+    # Picture 2: Fresh (3) + 2 Exciting Leg-outs (2) + 4 Base Candles (1) = 6/7 (SOLID)
+    base_zone.base_candles_count = 4
+    f2, s2, t2, tot2, q2 = DemandSupplyEngine.calculate_trade_score(base_zone, test_count=0)
+    assert f2 == 3.0
+    assert s2 == 2.0
+    assert t2 == 1.0
+    assert tot2 == 6.0
+    assert q2 == TradeScoreQuality.SOLID
+
+    # Picture 3: Fresh (3) + 1 Leg-out with Gap (2) + 1 Base Candle (2) = 7/7 (PRISTINE)
+    base_zone.departure_strength = 1
+    base_zone.base_candles_count = 1
+    f3, s3, t3, tot3, q3 = DemandSupplyEngine.calculate_trade_score(base_zone, test_count=0, is_gap_departure=True)
+    assert f3 == 3.0
+    assert s3 == 2.0
+    assert t3 == 2.0
+    assert tot3 == 7.0
+    assert q3 == TradeScoreQuality.PRISTINE
+
+    # Picture 4: Fresh (3) + 1 Leg-out no Gap (1) + 4 Base Candles (1) = 5/7 (WEAK)
+    base_zone.departure_strength = 1
+    base_zone.base_candles_count = 4
+    f4, s4, t4, tot4, q4 = DemandSupplyEngine.calculate_trade_score(base_zone, test_count=0, is_gap_departure=False)
+    assert f4 == 3.0
+    assert s4 == 1.0
+    assert t4 == 1.0
+    assert tot4 == 5.0
+    assert q4 == TradeScoreQuality.WEAK
+
+    # Tested 1x: 1.5 + 2 + 2 = 5.5 (WEAK)
+    base_zone.departure_strength = 2
+    base_zone.base_candles_count = 1
+    f_test1, _, _, tot_test1, q_test1 = DemandSupplyEngine.calculate_trade_score(base_zone, test_count=1)
+    assert f_test1 == 1.5
+    assert tot_test1 == 5.5
+    assert q_test1 == TradeScoreQuality.WEAK
+
+    # Tested >=2x: 0.0 + 2 + 2 = 4.0 (WEAK)
+    f_test2, _, _, tot_test2, q_test2 = DemandSupplyEngine.calculate_trade_score(base_zone, test_count=2)
+    assert f_test2 == 0.0
+    assert tot_test2 == 4.0
+    assert q_test2 == TradeScoreQuality.WEAK
+
+
+def test_episode_08_mahabharata_character_alignment_coinciding_aggressive_fatal():
+    """
+    Episode 8 Concept 4: The Mahabharata Metaphor.
+    - Shri Krishna: HTF Demand (PL 100, DL 90)
+    - Bhishma Pitamah: HTF Supply (PL 200, DL 210)
+    - Arjuna: LTF Demand
+    - Duryodhana: LTF Supply
+    """
+    engine = DemandSupplyEngine()
+    htf_demand = engine.scan_for_zones(
+        np.array([120.0, 95.0, 100.0]),
+        np.array([121.0, 102.0, 125.0]),
+        np.array([94.0, 90.0, 99.0]),
+        np.array([95.0, 100.0, 124.0]),
+    )[0]  # PL 100.0, DL 90.0
+
+    htf_supply = engine.scan_for_zones(
+        np.array([180.0, 205.0, 200.0]),
+        np.array([185.0, 210.0, 201.0]),
+        np.array([179.0, 198.0, 180.0]),
+        np.array([205.0, 200.0, 182.0]),
+    )[0]  # PL 200.0, DL 210.0
+
+    # 1. Coinciding: Arjuna stands beside Shri Krishna (PL 98, DL 92)
+    ltf_coinciding = engine.scan_for_zones(
+        np.array([110.0, 95.0, 98.0]),
+        np.array([111.0, 100.0, 115.0]),
+        np.array([94.0, 92.0, 97.0]),
+        np.array([95.0, 98.0, 114.0]),
+    )[0]
+    align_coinciding = DemandSupplyEngine.evaluate_character_alignment(ltf_coinciding, htf_demand, htf_supply)
+    assert align_coinciding == ZoneAlignmentType.COINCIDING
+
+    # 2. Aggressive: Arjuna stands ahead of Shri Krishna (PL 140, DL 135)
+    ltf_aggressive = engine.scan_for_zones(
+        np.array([150.0, 137.0, 140.0]),
+        np.array([151.0, 142.0, 160.0]),
+        np.array([136.0, 135.0, 139.0]),
+        np.array([137.0, 140.0, 158.0]),
+    )[0]
+    align_aggressive = DemandSupplyEngine.evaluate_character_alignment(ltf_aggressive, htf_demand, htf_supply)
+    assert align_aggressive == ZoneAlignmentType.AGGRESSIVE
+
+    # 3. Fatal Trap: Arjuna entering Bhishma Pitamah's territory (PL 202, DL 195)
+    ltf_fatal = engine.scan_for_zones(
+        np.array([215.0, 200.0, 202.0]),
+        np.array([216.0, 204.0, 220.0]),
+        np.array([199.0, 195.0, 201.0]),
+        np.array([200.0, 202.0, 219.0]),
+    )[0]
+    align_fatal = DemandSupplyEngine.evaluate_character_alignment(ltf_fatal, htf_demand, htf_supply)
+    assert align_fatal == ZoneAlignmentType.FATAL_TRAP
+
+    # 4. Short Fatal Trap: Duryodhana shorting right after Shri Krishna bounce (PL <= 100.0)
+    ltf_short_trap = engine.scan_for_zones(
+        np.array([90.0, 100.0, 98.0]),
+        np.array([92.0, 102.0, 99.0]),
+        np.array([89.0, 97.0, 80.0]),
+        np.array([100.0, 98.0, 81.0]),
+    )[0]  # Supply zone with PL 98.0 <= HTF Demand PL 100.0
+    align_short_trap = DemandSupplyEngine.evaluate_character_alignment(ltf_short_trap, htf_demand, htf_supply)
+    assert align_short_trap == ZoneAlignmentType.FATAL_TRAP
+
+
+def test_episode_08_dynamic_opposing_itf_target_and_rrr_filter():
+    """
+    Episode 8 Concept 6: The Opposing ITF Zone Target Rule.
+    Target = Proximal Line of Opposing Intermediate Supply (for Long) or Demand (for Short).
+    Must satisfy minimum 2:1 RRR.
+    """
+    engine = DemandSupplyEngine()
+    # LTF Demand: Entry = 100.0, SL = 90.0 (Risk = 10.0)
+    ltf_demand = engine.scan_for_zones(
+        np.array([110.0, 95.0, 100.0]),
+        np.array([111.0, 100.0, 120.0]),
+        np.array([94.0, 90.0, 99.0]),
+        np.array([95.0, 100.0, 119.0]),
+    )[0]
+    ltf_demand.entry_price = 100.0
+    ltf_demand.stop_loss = 90.0
+
+    # 1. High Reward Case: Opposing ITF Supply PL = 135.0 (Reward = 35.0 -> 3.5:1 RRR >= 2.0)
+    itf_supply_far = engine.scan_for_zones(
+        np.array([125.0, 140.0, 135.0]),
+        np.array([126.0, 142.0, 136.0]),
+        np.array([124.0, 134.0, 115.0]),
+        np.array([139.0, 135.0, 116.0]),
+    )[0]  # PL 135.0
+    target1, rrr1, ok1 = DemandSupplyEngine.calculate_opposing_itf_target(ltf_demand, itf_supply_far)
+    assert target1 == itf_supply_far.proximal_line
+    assert bool(ok1) is True
+    assert rrr1 >= 2.0
+
+    # 2. Low Reward Case: Opposing ITF Supply PL = 115.0 (Reward = 15.0 -> 1.5:1 RRR < 2.0) -> REJECTED!
+    itf_supply_close = engine.scan_for_zones(
+        np.array([105.0, 120.0, 115.0]),
+        np.array([106.0, 122.0, 116.0]),
+        np.array([104.0, 114.0, 95.0]),
+        np.array([119.0, 115.0, 96.0]),
+    )[0]  # PL
+    target2, rrr2, ok2 = DemandSupplyEngine.calculate_opposing_itf_target(ltf_demand, itf_supply_close)
+    assert target2 == itf_supply_close.proximal_line
+    assert bool(ok2) is False
+    assert rrr2 < 2.0
+
+    # 3. Clean Sky / ATH (opposing_itf_zone is None) -> Defaults to 2:1 (120.0)
+    target3, rrr3, ok3 = DemandSupplyEngine.calculate_opposing_itf_target(ltf_demand, None)
+    assert target3 == 120.0
+    assert rrr3 == 2.0
+    assert bool(ok3) is True
+
+
+def test_episode_08_gold_standard_best_trade_setup_evaluation():
+    """
+    Episode 8 Concept 5: Definition of a "Best Trade Setup" (The 4 Pillars).
+    Pillar 1: Trade Score >= 6.0 (preferably 7.0)
+    Pillar 2: Clean Closing (proven zone)
+    Pillar 3: Alignment (Coinciding or Pristine Aggressive)
+    Pillar 4: Trend Support (UPTREND for Long)
+    Pillar 5: Opposing ITF RRR >= 2.0
+    """
+    engine = DemandSupplyEngine()
+    # Mock HTF Demand & Supply
+    htf_demand = engine.scan_for_zones(
+        np.array([120.0, 95.0, 100.0]),
+        np.array([121.0, 102.0, 125.0]),
+        np.array([94.0, 90.0, 99.0]),
+        np.array([95.0, 100.0, 124.0]),
+    )[0]  # PL 100, DL 90
+    htf_supply = engine.scan_for_zones(
+        np.array([180.0, 205.0, 200.0]),
+        np.array([185.0, 210.0, 201.0]),
+        np.array([179.0, 198.0, 180.0]),
+        np.array([205.0, 200.0, 182.0]),
+    )[0]  # PL 200, DL 210
+
+    # Maruti Master Setup: Coinciding 7/7 demand zone (PL 98, DL 92), Entry 98, SL 91
+    ltf_maruti = engine.scan_for_zones(
+        np.array([110.0, 95.0, 98.0]),
+        np.array([111.0, 100.0, 120.0]),
+        np.array([94.0, 92.0, 97.0]),
+        np.array([95.0, 98.0, 119.0]),
+    )[0]
+    ltf_maruti.departure_strength = 2
+    ltf_maruti.base_candles_count = 1
+    ltf_maruti.has_clean_closing = True
+    ltf_maruti.is_proven_zone = True
+    ltf_maruti.entry_price = 98.0
+    ltf_maruti.stop_loss = 91.0  # Risk = 7.0
+
+    # Opposing weekly supply at 135.0 (Reward = 37.0 -> RRR = 5.28:1)
+    opposing_itf = engine.scan_for_zones(
+        np.array([125.0, 140.0, 135.0]),
+        np.array([126.0, 142.0, 136.0]),
+        np.array([124.0, 134.0, 115.0]),
+        np.array([139.0, 135.0, 116.0]),
+    )[0]
+
+    eval_best = DemandSupplyEngine.evaluate_best_trade_setup(
+        ltf_zone=ltf_maruti,
+        htf_demand=htf_demand,
+        htf_supply=htf_supply,
+        itf_trend=TrendDirection.UPTREND,
+        opposing_itf_zone=opposing_itf,
+    )
+    assert isinstance(eval_best, TradeScoreBreakdown)
+    assert eval_best.total_score == 7.0
+    assert eval_best.quality == TradeScoreQuality.PRISTINE
+    assert eval_best.alignment == ZoneAlignmentType.COINCIDING
+    assert eval_best.is_best_setup is True
+    assert eval_best.realized_rrr > 2.0
+    assert len(eval_best.rejection_reasons) == 0
+
+    # Counter-trend failure case (Downtrend on ITF) -> Rejected!
+    eval_fail_trend = DemandSupplyEngine.evaluate_best_trade_setup(
+        ltf_zone=ltf_maruti,
+        htf_demand=htf_demand,
+        htf_supply=htf_supply,
+        itf_trend=TrendDirection.DOWNTREND,
+        opposing_itf_zone=opposing_itf,
+    )
+    assert eval_fail_trend.is_best_setup is False
+    assert any("Requires UPTREND" in r for r in eval_fail_trend.rejection_reasons)
+
+
+def test_episode_08_mtfa_plan_evaluates_execution_zones_scores():
+    """
+    Episode 8 Integration: build_multi_timeframe_plan automatically scores eligible execution zones.
+    """
+    engine = DemandSupplyEngine()
+    htf_demand = engine.scan_for_zones(
+        np.array([120.0, 95.0, 100.0]),
+        np.array([121.0, 102.0, 125.0]),
+        np.array([94.0, 90.0, 99.0]),
+        np.array([95.0, 100.0, 124.0]),
+    )[0]
+    htf_supply = engine.scan_for_zones(
+        np.array([180.0, 205.0, 200.0]),
+        np.array([185.0, 210.0, 201.0]),
+        np.array([179.0, 198.0, 180.0]),
+        np.array([205.0, 200.0, 182.0]),
+    )[0]
+
+    ltf_zone = engine.scan_for_zones(
+        np.array([110.0, 95.0, 98.0]),
+        np.array([111.0, 100.0, 115.0]),
+        np.array([94.0, 92.0, 97.0]),
+        np.array([95.0, 98.0, 114.0]),
+    )[0]
+    ltf_zone.departure_strength = 2
+    ltf_zone.base_candles_count = 1
+
+    itf_up = np.linspace(100.0, 150.0, 60)
+    plan = DemandSupplyEngine.build_multi_timeframe_plan(
+        TradingStyle.MIT, 120.0, htf_demand, htf_supply, itf_up, [ltf_zone]
+    )
+
+    assert len(plan.eligible_execution_zones) == 1
+    scored_zone = plan.eligible_execution_zones[0]
+    assert scored_zone.trade_score is not None
+    assert isinstance(scored_zone.trade_score, TradeScoreBreakdown)
+    assert scored_zone.trade_score.total_score == 7.0

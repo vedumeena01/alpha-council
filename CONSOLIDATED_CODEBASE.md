@@ -351,7 +351,7 @@ Level-on-Top-of-Level (LOTL) Stacking, Origin Pivot Isolation, Garbage Area Filt
 and Trading Psychology Anti-News Liquidity Trap filtering ("Human can lie, but chart can't").
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Dict, List, Optional, Tuple
 import numpy as np
@@ -431,6 +431,33 @@ class MultiTimeframePlan:
     rationale: str
 
 
+class TradeScoreQuality(str, Enum):
+    PRISTINE = "PRISTINE"  # 7.0 / 7.0 (Best Setup)
+    SOLID = "SOLID"        # 6.0 - 6.5 / 7.0 (Better Setup)
+    WEAK = "WEAK"          # <= 5.5 / 7.0 (Poor / Discarded)
+
+
+class ZoneAlignmentType(str, Enum):
+    COINCIDING = "COINCIDING"  # Arjuna beside Shri Krishna (Safest, highest institutional backing)
+    AGGRESSIVE = "AGGRESSIVE"  # Arjuna stands ahead of Shri Krishna (Requires score >= 6.5/7.0)
+    FATAL_TRAP = "FATAL_TRAP"  # Arjuna entering Bhishma Pitamah or Duryodhana right after Shri Krishna bounce
+
+
+@dataclass
+class TradeScoreBreakdown:
+    freshness_score: float             # 0.0, 1.5, or 3.0
+    strength_score: float              # 1.0 or 2.0
+    time_at_base_score: float          # 0.0, 1.0, or 2.0
+    total_score: float                 # Sum out of 7.0
+    quality: TradeScoreQuality
+    alignment: ZoneAlignmentType
+    is_best_setup: bool
+    opposing_itf_target_price: Optional[float] = None
+    realized_rrr: float = 0.0
+    is_target_acceptable: bool = True
+    rejection_reasons: List[str] = field(default_factory=list)
+
+
 @dataclass
 class CandleFeature:
     index: int
@@ -502,6 +529,9 @@ class IdentifiedZone:
     is_proven_zone: bool = True             # True if clean close cleared opposing overhead/underlying orders
     origin_candle_idx: Optional[int] = None # True origin pivot candle in multi-base cluster
     is_gap_base_zone: bool = False          # Zone formed via Gap + Base synthetic exciting candle
+
+    # Quantitative Zone Rating & Best Setup Evaluation (Episode 8)
+    trade_score: Optional[TradeScoreBreakdown] = None
 
 
 class DemandSupplyEngine:
@@ -769,6 +799,7 @@ class DemandSupplyEngine:
         htf_supply: Optional[IdentifiedZone],
         itf_closes: np.ndarray,
         ltf_zones: List[IdentifiedZone],
+        opposing_itf_zone: Optional[IdentifiedZone] = None,
     ) -> MultiTimeframePlan:
         """
         Episode 7: Multiple Time Frame Analysis (MTFA) Decision Plan.
@@ -886,6 +917,16 @@ class DemandSupplyEngine:
                     else:
                         eligible.append(z)
 
+        # Episode 8: Score eligible execution zones and evaluate best setup status
+        for z in eligible:
+            z.trade_score = cls.evaluate_best_trade_setup(
+                z,
+                htf_demand=htf_demand,
+                htf_supply=htf_supply,
+                itf_trend=trend,
+                opposing_itf_zone=opposing_itf_zone,
+            )
+
         return MultiTimeframePlan(
             trading_style=trading_style,
             htf_timeframe=htf_tf,
@@ -900,6 +941,246 @@ class DemandSupplyEngine:
             eligible_execution_zones=eligible,
             rejected_boundary_zones=rejected,
             rationale=" ".join(rationale_parts),
+        )
+
+
+
+    # =========================================================================
+    # EPISODE 8: TRADE SCORE & BEST TRADE SETUP EVALUATION
+    # =========================================================================
+
+    @staticmethod
+    def calculate_trade_score(
+        zone: IdentifiedZone,
+        test_count: int = 0,
+        is_gap_departure: bool = False,
+    ) -> Tuple[float, float, float, float, TradeScoreQuality]:
+        """
+        Episode 8 Parameter Scoring (Total Max Score: 7 Points).
+        Strictly applied to Lower Time Frame (Execution Time Frame) zones.
+
+        Parameters:
+        1. Freshness (Max 3 Points):
+           - Completely Fresh (Untested): 3.0 Points
+           - Tested Once (1 touch): 1.5 Points
+           - Tested Twice or More (>=2 touches): 0.0 Points
+        2. Strength of Departure (Max 2 Points):
+           - >= 2 Exciting Candles in Leg-out: 2.0 Points
+           - 1 Exciting Candle + Significant Gap: 2.0 Points
+           - 1 Exciting Candle & No Gap: 1.0 Point
+        3. Time at the Base (Max 2 Points):
+           - 1 to 3 Base Candles: 2.0 Points (Fast, decisive victory)
+           - 4 to 5 Base Candles: 1.0 Point (Contested struggle)
+           - > 5 Base Candles: 0.0 Points (Garbage consolidation)
+           - Direct Reversal (0 Base Candles): 2.0 Points
+
+        Returns:
+            (freshness_score, strength_score, time_at_base_score, total_score, quality)
+        """
+        # 1. Freshness
+        if test_count == 0 and zone.is_fresh:
+            freshness_score = 3.0
+        elif test_count == 1:
+            freshness_score = 1.5
+        elif test_count >= 2:
+            freshness_score = 0.0
+        elif not zone.is_fresh:
+            freshness_score = 1.5
+        else:
+            freshness_score = 3.0
+
+        # 2. Strength
+        if zone.departure_strength >= 2:
+            strength_score = 2.0
+        elif is_gap_departure or zone.is_gap_base_zone:
+            strength_score = 2.0
+        else:
+            strength_score = 1.0
+
+        # 3. Time at the Base
+        if 1 <= zone.base_candles_count <= 3:
+            time_at_base_score = 2.0
+        elif 4 <= zone.base_candles_count <= 5:
+            time_at_base_score = 1.0
+        elif zone.base_candles_count > 5:
+            time_at_base_score = 0.0
+        else:
+            # 0 base candles (direct reversal / V-shape)
+            time_at_base_score = 2.0
+
+        total_score = round(freshness_score + strength_score + time_at_base_score, 1)
+
+        if total_score >= 7.0:
+            quality = TradeScoreQuality.PRISTINE
+        elif total_score >= 6.0:
+            quality = TradeScoreQuality.SOLID
+        else:
+            quality = TradeScoreQuality.WEAK
+
+        return freshness_score, strength_score, time_at_base_score, total_score, quality
+
+    @staticmethod
+    def evaluate_character_alignment(
+        ltf_zone: IdentifiedZone,
+        htf_demand: Optional[IdentifiedZone] = None,
+        htf_supply: Optional[IdentifiedZone] = None,
+    ) -> ZoneAlignmentType:
+        """
+        Episode 8: The Mahabharata Metaphor (Mapping 4 Characters on the Chart).
+        HTF Demand: Shri Krishna (Supreme macro support)
+        HTF Supply: Bhishma Pitamah (Massive macro resistance)
+        LTF Demand: Arjuna (Long execution level)
+        LTF Supply: Duryodhana (Short execution level)
+
+        Returns:
+            COINCIDING: Safest setup; LTF zone sits inside or at the boundary of HTF location.
+            AGGRESSIVE: LTF zone stands ahead/outside HTF location; requires pristine 7/7 score.
+            FATAL_TRAP: LTF zone sits directly inside opposing HTF institutional territory.
+        """
+        if ltf_zone.is_demand:
+            # Long Setup: Arjuna
+            # Fatal Trap: Arjuna entering Bhishma Pitamah's territory (HTF Supply)
+            if htf_supply is not None:
+                if ltf_zone.proximal_line >= htf_supply.proximal_line:
+                    return ZoneAlignmentType.FATAL_TRAP
+
+            # Coinciding: Arjuna standing beside Shri Krishna (HTF Demand)
+            if htf_demand is not None:
+                if ltf_zone.proximal_line <= htf_demand.proximal_line and ltf_zone.distal_line >= htf_demand.distal_line:
+                    return ZoneAlignmentType.COINCIDING
+                if ltf_zone.distal_line <= htf_demand.proximal_line and ltf_zone.proximal_line >= htf_demand.distal_line:
+                    return ZoneAlignmentType.COINCIDING
+
+            return ZoneAlignmentType.AGGRESSIVE
+        else:
+            # Short Setup: Duryodhana
+            # Fatal Trap: Duryodhana entering Shri Krishna's territory (HTF Demand)
+            if htf_demand is not None:
+                if ltf_zone.proximal_line <= htf_demand.proximal_line:
+                    return ZoneAlignmentType.FATAL_TRAP
+
+            # Coinciding: Duryodhana standing beside Bhishma Pitamah (HTF Supply)
+            if htf_supply is not None:
+                if ltf_zone.proximal_line >= htf_supply.proximal_line and ltf_zone.distal_line <= htf_supply.distal_line:
+                    return ZoneAlignmentType.COINCIDING
+                if ltf_zone.distal_line >= htf_supply.proximal_line and ltf_zone.proximal_line <= htf_supply.distal_line:
+                    return ZoneAlignmentType.COINCIDING
+
+            return ZoneAlignmentType.AGGRESSIVE
+
+    @staticmethod
+    def calculate_opposing_itf_target(
+        ltf_zone: IdentifiedZone,
+        opposing_itf_zone: Optional[IdentifiedZone] = None,
+        min_rrr: float = 2.0,
+    ) -> Tuple[float, float, bool]:
+        """
+        Episode 8: Setting Real-World Targets (The Opposing ITF Zone Rule).
+        - Long Trades: Target at Proximal Line of Opposing Supply Zone on Intermediate Time Frame (ITF).
+        - Short Trades: Target at Proximal Line of Opposing Demand Zone on Intermediate Time Frame (ITF).
+        - The 2:1 Minimum Target Filter: Realized RRR must be >= 2:1 before reaching the opposing ITF zone.
+
+        Returns:
+            (target_price, realized_rrr, is_target_acceptable)
+        """
+        risk = abs(ltf_zone.entry_price - ltf_zone.stop_loss)
+        if risk <= 0.0:
+            risk = max(ltf_zone.zone_width, 1.0)
+
+        if ltf_zone.is_demand:
+            # Long Setup
+            if opposing_itf_zone is not None and not opposing_itf_zone.is_demand:
+                target_price = opposing_itf_zone.proximal_line
+                reward = target_price - ltf_zone.entry_price
+                realized_rrr = round(reward / risk, 2)
+            else:
+                # Clear sky / ATH / No opposing ITF zone: default 2:1
+                reward = min_rrr * risk
+                target_price = round(ltf_zone.entry_price + reward, 2)
+                realized_rrr = min_rrr
+        else:
+            # Short Setup
+            if opposing_itf_zone is not None and opposing_itf_zone.is_demand:
+                target_price = opposing_itf_zone.proximal_line
+                reward = ltf_zone.entry_price - target_price
+                realized_rrr = round(reward / risk, 2)
+            else:
+                reward = min_rrr * risk
+                target_price = round(ltf_zone.entry_price - reward, 2)
+                realized_rrr = min_rrr
+
+        is_target_acceptable = bool(realized_rrr >= min_rrr)
+        return target_price, realized_rrr, is_target_acceptable
+
+    @classmethod
+    def evaluate_best_trade_setup(
+        cls,
+        ltf_zone: IdentifiedZone,
+        htf_demand: Optional[IdentifiedZone] = None,
+        htf_supply: Optional[IdentifiedZone] = None,
+        itf_trend: TrendDirection = TrendDirection.UPTREND,
+        opposing_itf_zone: Optional[IdentifiedZone] = None,
+        test_count: int = 0,
+        is_gap_departure: bool = False,
+        min_rrr: float = 2.0,
+    ) -> TradeScoreBreakdown:
+        """
+        Episode 8: The Gold Standard "Best Trade Setup" Evaluator.
+        A setup transitions from Good to Best when it satisfies four simultaneous criteria:
+        1. Trade Score: Must score >= 6.0/7.0 (preferably 7.0/7.0).
+        2. Clean Closing: Leg-out closed decisively above prior leg-in (Demand) or below (Supply).
+        3. Alignment: Coinciding with HTF location (or aggressive with score 7.0 and ample room).
+           Fatal traps are strictly blocked.
+        4. Intermediate Trend Support: ITF trend aligns with trade direction.
+        5. Opposing ITF Target RRR: Realized RRR to opposing ITF proximal line >= 2.0.
+        """
+        rejection_reasons: List[str] = []
+
+        # 1. Trade Score
+        f_score, s_score, t_score, total_score, quality = cls.calculate_trade_score(
+            ltf_zone, test_count=test_count, is_gap_departure=is_gap_departure
+        )
+        if total_score < 6.0:
+            rejection_reasons.append(f"Trade Score {total_score}/7 is below solid threshold (>=6.0).")
+
+        # 2. Closing Concept
+        if not ltf_zone.has_clean_closing or not ltf_zone.is_proven_zone:
+            rejection_reasons.append("Leg-out failed clean closing above leg-in / overhead consolidation.")
+
+        # 3. Mahabharata Character Alignment
+        alignment = cls.evaluate_character_alignment(ltf_zone, htf_demand, htf_supply)
+        if alignment == ZoneAlignmentType.FATAL_TRAP:
+            rejection_reasons.append("Fatal Trap: Execution zone sits inside opposing HTF institutional territory.")
+        elif alignment == ZoneAlignmentType.AGGRESSIVE and total_score < 7.0:
+            rejection_reasons.append("Aggressive execution level requires pristine 7/7 score to trade without HTF backing.")
+
+        # 4. Trend Support
+        if ltf_zone.is_demand and itf_trend != TrendDirection.UPTREND:
+            rejection_reasons.append(f"Long trade conflicts with ITF trend: {itf_trend.value} (Requires UPTREND).")
+        elif not ltf_zone.is_demand and itf_trend != TrendDirection.DOWNTREND:
+            rejection_reasons.append(f"Short trade conflicts with ITF trend: {itf_trend.value} (Requires DOWNTREND).")
+
+        # 5. Dynamic Opposing ITF Target & RRR
+        target_price, realized_rrr, is_target_acceptable = cls.calculate_opposing_itf_target(
+            ltf_zone, opposing_itf_zone, min_rrr=min_rrr
+        )
+        if not is_target_acceptable:
+            rejection_reasons.append(f"Realized RRR to opposing ITF zone ({realized_rrr}:1) is below {min_rrr}:1 minimum.")
+
+        is_best = len(rejection_reasons) == 0
+
+        return TradeScoreBreakdown(
+            freshness_score=f_score,
+            strength_score=s_score,
+            time_at_base_score=t_score,
+            total_score=total_score,
+            quality=quality,
+            alignment=alignment,
+            is_best_setup=is_best,
+            opposing_itf_target_price=target_price,
+            realized_rrr=realized_rrr,
+            is_target_acceptable=is_target_acceptable,
+            rejection_reasons=rejection_reasons,
         )
 
     def classify_candle(
