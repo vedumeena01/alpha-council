@@ -39,6 +39,15 @@ from alphacouncil.alpha.zone_engine import (
     OriginQuality,
     MasterRevisionAuditReport,
 )
+from alphacouncil.alpha.sector_engine import (
+    SectorAnalysisEngine,
+    SectorName,
+    SectorConfluenceLevel,
+    SectorRotationPhase,
+    SectorConfluenceResult,
+    HeavyweightStatusReport,
+    PortfolioSectorAllocationReport,
+)
 from alphacouncil.risk.gtf_risk import (
     RiskTier,
     ExecutionErrorType,
@@ -2895,3 +2904,232 @@ def test_episode_15_14_point_master_revision_auditor_multiple_rejections():
     assert any("Base Candle Count" in r for r in report.rejection_reasons)
     assert any("ATL Long Prohibition" in r for r in report.rejection_reasons)
     assert "REJECTED BY INSTITUTIONAL DISCIPLINE" in report.audit_verdict_summary
+
+
+# =====================================================================
+# EPISODE 16 TESTS: SECTORAL ANALYSIS & THE CONFLUENCE MULTIPLIER
+# =====================================================================
+
+def test_episode_16_sector_support_plus_two_bonus_trade_score():
+    """
+    Episode 16 GTF Rule: Sector Support as Supreme Extra Trade Score (+2 Points).
+    An ordinary 6 out of 7 setup elevates to 8 out of 7 when parent sector hits a demand zone.
+    """
+    engine = DemandSupplyEngine()
+    demand_opens = np.array([100.0, 110.0, 112.0])
+    demand_highs = np.array([102.0, 115.0, 125.0])
+    demand_lows = np.array([98.0, 108.0, 111.0])
+    demand_closes = np.array([109.0, 112.0, 124.0])
+
+    stock_demand = engine.scan_for_zones(demand_opens, demand_highs, demand_lows, demand_closes)[0]
+    stock_demand.is_demand = True
+    stock_demand.is_fresh = True
+    stock_demand.departure_strength = 1  # 1 exciting legout -> Strength = 1.0 pt
+    stock_demand.base_candles_count = 2   # 1-3 base candles -> Time at base = 2.0 pts
+    # Freshness (3.0) + Strength (1.0) + Time at Base (2.0) = 6.0 / 7.0 (Ordinary setup)
+
+    # 1. Without sector support: awards 0 bonus points
+    has_bonus_none, bonus_none, _ = DemandSupplyEngine.evaluate_sector_support_bonus(
+        zone=stock_demand,
+        is_parent_sector_in_demand=False,
+    )
+    assert has_bonus_none is False
+    assert bonus_none == 0
+
+    # 2. With parent sector in Demand Zone: awards +2 Supreme Bonus Points!
+    has_bonus_sec, bonus_sec, msg_sec = DemandSupplyEngine.evaluate_sector_support_bonus(
+        zone=stock_demand,
+        is_parent_sector_in_demand=True,
+    )
+    assert has_bonus_sec is True
+    assert bonus_sec == 2
+    assert "Sector Support Confirmed (+2 Extra Trade Score awarded)" in msg_sec
+
+    # 3. Comprehensive top-down evaluation: 6.0/7.0 setup elevates to 8.0/7.0 and is APPROVED
+    report = DemandSupplyEngine.audit_comprehensive_top_down_setup(
+        execution_zone=stock_demand,
+        cmp=120.0,
+        itf_trend=TrendDirection.UPTREND,
+        curve_position=CurvePosition.LOW_ON_CURVE,
+        is_parent_sector_in_demand=True,
+    )
+    assert report.is_approved is True
+    assert report.trade_score == 8.0  # 6.0 base + 2.0 sector support = 8.0!
+    assert any("Sector Support Verified (+2 Extra Trade Score Points awarded)" in c for c in report.audit_checks_passed)
+
+
+def test_episode_16_the_missing_support_filter_blocks_long_execution():
+    """
+    Episode 16: The Missing Support Filter.
+    If an individual stock looks attractive in Demand, but parent sector is in free fall,
+    long execution is strictly halted to avoid the missing support trap.
+    """
+    engine = DemandSupplyEngine()
+    demand_opens = np.array([100.0, 110.0, 112.0])
+    demand_highs = np.array([102.0, 115.0, 125.0])
+    demand_lows = np.array([98.0, 108.0, 111.0])
+    demand_closes = np.array([109.0, 112.0, 124.0])
+
+    stock_demand = engine.scan_for_zones(demand_opens, demand_highs, demand_lows, demand_closes)[0]
+    stock_demand.is_demand = True
+
+    # 1. Engine Confluence Evaluation flags MISSING_SUPPORT
+    confluence = SectorAnalysisEngine.evaluate_simultaneous_confluence(
+        is_stock_in_demand=True,
+        is_sector_in_demand=False,
+        is_nifty_in_demand=False,
+        is_sector_in_free_fall=True,
+    )
+    assert isinstance(confluence, SectorConfluenceResult)
+    assert confluence.confluence_level == SectorConfluenceLevel.MISSING_SUPPORT
+    assert confluence.missing_support_warning is True
+    assert confluence.bonus_points == 0.0
+    assert "The Missing Support Trap Detected" in confluence.status_message
+
+    # 2. Top-down auditor blocks trade setup
+    report = DemandSupplyEngine.audit_comprehensive_top_down_setup(
+        execution_zone=stock_demand,
+        cmp=120.0,
+        itf_trend=TrendDirection.UPTREND,
+        curve_position=CurvePosition.LOW_ON_CURVE,
+        is_sector_in_free_fall=True,
+    )
+    assert report.is_approved is False
+    assert any("The Missing Support Trap Detected" in r for r in report.rejection_reasons)
+    assert "REJECTED BY INSTITUTIONAL DISCIPLINE" in report.audit_verdict_summary
+
+
+def test_episode_16_simultaneous_triad_alignment_level_3_rocket_move_sbi_case_study():
+    """
+    Episode 16: Simultaneous Triad Alignment (February 29, 2016 State Bank of India Case Study).
+    When Stock + Sector + Nifty 50 are ALL in Demand Zones simultaneously:
+    - Declares Level 3 Confluence ("Rocket Move!").
+    - Awards +2 Extra Trade Score points.
+    - Yields maximum statistical probability regardless of external news or crises.
+    """
+    # Simultaneous alignment on Feb 29, 2016: SBI in Monthly DZ, Bank Nifty in Monthly DZ, Nifty 50 in Monthly DZ
+    confluence = SectorAnalysisEngine.evaluate_simultaneous_confluence(
+        is_stock_in_demand=True,
+        is_sector_in_demand=True,
+        is_nifty_in_demand=True,
+    )
+
+    assert confluence.confluence_level == SectorConfluenceLevel.LEVEL_3_ROCKET_MOVE
+    assert confluence.is_rocket_move is True
+    assert confluence.bonus_points == 2.0
+    assert "Level 3 Confluence (Explosive Rocket Move!)" in confluence.status_message
+
+
+def test_episode_16_heavyweight_concentration_greater_than_50_percent_rule():
+    """
+    Episode 16: The >50% Heavyweight Concentration Rule.
+    - Nifty Auto: M&M (20%), Maruti (19%), Tata Motors (12%) = 51.0% (>50%).
+    - If heavyweights are in Demand, sector index will rally.
+    - Low-weight constituents (e.g. Ashok Leyland 4%) jumping 5% will NOT move index if heavyweights are in Supply.
+    """
+    # 1. Nifty Auto with M&M and Maruti in Demand
+    auto_states_bullish = {
+        "M&M": "DEMAND",
+        "MARUTI": "DEMAND",
+        "TATAMOTORS": "NEUTRAL",
+        "ASHOKLEY": "NEUTRAL",
+    }
+    report_auto = SectorAnalysisEngine.evaluate_heavyweight_concentration(
+        sector=SectorName.NIFTY_AUTO,
+        stock_zone_states=auto_states_bullish,
+    )
+    assert isinstance(report_auto, HeavyweightStatusReport)
+    assert report_auto.top_heavyweights == ["M&M", "MARUTI", "TATAMOTORS"]
+    assert report_auto.heavyweight_combined_weight_pct == 51.0
+    assert report_auto.is_heavyweight_momentum_bullish is True
+    assert "Bullish Heavyweight Momentum in NIFTY_AUTO" in report_auto.explanation
+
+    # 2. Nifty Metal with Heavyweights in Supply and low-weight SAIL in Demand
+    metal_states_drag = {
+        "JSWSTEEL": "SUPPLY",
+        "TATASTEEL": "SUPPLY",
+        "HINDALCO": "NEUTRAL",
+        "SAIL": "DEMAND",  # Only 4% weight!
+    }
+    report_metal = SectorAnalysisEngine.evaluate_heavyweight_concentration(
+        sector=SectorName.NIFTY_METAL,
+        stock_zone_states=metal_states_drag,
+    )
+    assert report_metal.top_heavyweights == ["JSWSTEEL", "TATASTEEL", "HINDALCO"]
+    assert report_metal.heavyweight_combined_weight_pct == 60.0  # 22 + 20 + 18
+    assert report_metal.is_heavyweight_momentum_bullish is False
+    assert "Bearish Heavyweight Drag in NIFTY_METAL" in report_metal.explanation
+
+
+def test_episode_16_sector_rotation_dynamics_sectors_cannot_go_to_zero():
+    """
+    Episode 16: Sector Rotation Dynamics.
+    - "Sectors Cannot Go to Zero": Generational accumulation at multi-year macro demand origin.
+    - Tested Supply Trendline: Relief bounces testing and depleting overhead supply clear the runway.
+    - Peak at ATH: Rotate out of 5x leaders into lagging constituents (GTF 40-40-20 rule).
+    """
+    # 1. Nifty PSU Bank at multi-year macro demand origin with tested overhead supply
+    phase_psu, msg_psu = SectorAnalysisEngine.evaluate_sector_rotation(
+        sector=SectorName.NIFTY_PSU_BANK,
+        current_index_level=1250.0,
+        macro_demand_zone=(1300.0, 1150.0),
+        tested_overhead_supply_count=3,
+        is_at_all_time_high=False,
+    )
+    assert phase_psu == SectorRotationPhase.ACCUMULATION_AT_CYCLE_LOW
+    assert "Sectors cannot go to zero" in msg_psu
+    assert "Overhead supply trendline exhausted with 3 tested supply zones" in msg_psu
+
+    # 2. Sector at All-Time High
+    phase_ath, msg_ath = SectorAnalysisEngine.evaluate_sector_rotation(
+        sector=SectorName.NIFTY_METAL,
+        current_index_level=8500.0,
+        is_at_all_time_high=True,
+    )
+    assert phase_ath == SectorRotationPhase.PEAK_AT_ALL_TIME_HIGH
+    assert "Avoid chasing 5x run leaders" in msg_ath
+    assert "GTF 40-40-20 rule" in msg_ath
+
+
+def test_episode_16_portfolio_construction_12_to_15_stocks_and_sector_allocation():
+    """
+    Episode 16: Long-Term Portfolio Construction Blueprint.
+    - Portfolio size must be 12 to 15 stocks maximum.
+    - Sector allocation: 2 to 4 stocks across different sectors.
+    """
+    valid_portfolio = [
+        "MARUTI", "M&M", "TATAMOTORS",          # Auto (3)
+        "TCS", "INFY", "HCLTECH",               # IT (3)
+        "HDFCBANK", "ICICIBANK", "AXISBANK",    # Bank (3)
+        "JSWSTEEL", "TATASTEEL", "HINDALCO",    # Metal (3)
+        "DLF", "GODREJPROP",                    # Realty (2) -> Total 14 stocks
+    ]
+
+    report_valid = SectorAnalysisEngine.audit_portfolio_construction(valid_portfolio)
+    assert isinstance(report_valid, PortfolioSectorAllocationReport)
+    assert report_valid.is_allocation_valid is True
+    assert report_valid.total_stocks_count == 14
+    assert len(report_valid.sectors_represented) == 5
+    assert len(report_valid.rejection_reasons) == 0
+
+    # Under-diversified portfolio (< 12 stocks)
+    report_under = SectorAnalysisEngine.audit_portfolio_construction(valid_portfolio[:8])
+    assert report_under.is_allocation_valid is False
+    assert any("Under-diversified Portfolio" in r for r in report_under.rejection_reasons)
+
+    # Over-diversified portfolio (> 15 stocks)
+    extended_portfolio = valid_portfolio + ["SBIN", "VEDL", "WIPRO"]  # 17 stocks
+    report_over = SectorAnalysisEngine.audit_portfolio_construction(extended_portfolio)
+    assert report_over.is_allocation_valid is False
+    assert any("Over-diversified Portfolio" in r for r in report_over.rejection_reasons)
+
+    # Sector over-concentration (> 4 stocks in one sector)
+    over_conc_portfolio = [
+        "HDFCBANK", "ICICIBANK", "AXISBANK", "KOTAKBANK", "SBIN",  # 5 Banks!
+        "TCS", "INFY", "HCLTECH",
+        "MARUTI", "M&M", "TATAMOTORS",
+        "JSWSTEEL",
+    ]
+    report_conc = SectorAnalysisEngine.audit_portfolio_construction(over_conc_portfolio)
+    assert report_conc.is_allocation_valid is False
+    assert any("Sector Over-concentration: NIFTY_BANK holds 5 stocks" in r for r in report_conc.rejection_reasons)

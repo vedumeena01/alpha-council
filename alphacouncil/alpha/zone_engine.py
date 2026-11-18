@@ -132,6 +132,8 @@ class TradeScoreBreakdown:
     ma_crossover_bonus: int = 0        # 0 or 1 point from Episode 12
     crossover_type: MACrossoverType = MACrossoverType.NO_CROSSOVER
     ema20_confluence_bonus: int = 0    # 0 or 1 point from Episode 13
+    sector_support_bonus: int = 0      # 0 or 2 points from Episode 16 (The Supreme Add-on)
+    sector_confluence_level: str = ""  # Level 1, Level 2, or Level 3 Rocket Move
 
 
 class EntryType(str, Enum):
@@ -2514,6 +2516,9 @@ class DemandSupplyEngine:
         risk_per_trade_pct: float = 1.0,
         prior_trades_count: int = 100,
         attempted_entry_type: EntryType = EntryType.SET_AND_FORGET,
+        is_parent_sector_in_demand: bool = False,
+        is_nifty_in_demand: bool = False,
+        is_sector_in_free_fall: bool = False,
     ) -> MasterRevisionAuditReport:
         """
         Episode 15 Master Revision Class: The 14-Point Comprehensive Top-Down Institutional Auditor.
@@ -2632,7 +2637,23 @@ class DemandSupplyEngine:
         ema_bonus = 1.0 if has_ema_support else 0.0
         total_score = min(8.0, base_score + ema_bonus)
 
-        if base_score < 6.0:
+        # Episode 16: Sector Support Supreme Add-on (+2 Points) & Missing Support Filter
+        if execution_zone.is_demand:
+            if is_sector_in_free_fall:
+                rejection_reasons.append(
+                    "The Missing Support Trap Detected: Stock is in Demand Zone, but parent sector is in free fall. "
+                    "Long execution is prohibited until parent sector reaches historical support."
+                )
+            elif is_parent_sector_in_demand:
+                sector_bonus = 2.0
+                total_score = min(9.0, total_score + sector_bonus)
+                confluence_text = " (Level 3 Rocket Move with Nifty 50!)" if is_nifty_in_demand else ""
+                audit_checks_passed.append(
+                    f"Sector Support Verified (+2 Extra Trade Score Points awarded{confluence_text}): "
+                    f"Parent sector is in Demand Zone."
+                )
+
+        if base_score < 6.0 and not is_parent_sector_in_demand:
             rejection_reasons.append(f"Trade Score: Base score {base_score:.1f}/7.0 is below institutional minimum threshold of 6.0/7.0.")
         else:
             audit_checks_passed.append(f"Trade Score: Score {total_score:.1f}/7.0 meets 1% Club institutional standard.")
@@ -2728,3 +2749,50 @@ class DemandSupplyEngine:
             audit_verdict_summary=summary,
             overpowering_htf_supply=macro_wall_zone,
         )
+
+    @staticmethod
+    def evaluate_sector_support_bonus(
+        zone: IdentifiedZone,
+        is_parent_sector_in_demand: bool,
+        is_nifty_in_demand: bool = False,
+        is_sector_in_free_fall: bool = False,
+    ) -> Tuple[bool, int, str]:
+        """
+        Episode 16 GTF Rule: Sector Support as Supreme Extra Trade Score (+2 Points).
+        - Conventional indicators add +1 bonus point; Sector Support awards +2 bonus points.
+        - An ordinary 6/7 setup with parent sector in demand reaches 8/7, easily reaching target.
+        - Missing Support Filter: If stock is in demand but parent sector is in free fall,
+          awards 0 bonus points and triggers a high-vulnerability warning.
+        """
+        if not zone.is_demand:
+            return False, 0, "Sector support evaluation only applicable for demand long setups currently."
+
+        if is_sector_in_free_fall:
+            return (
+                False,
+                0,
+                "The Missing Support Trap: Parent sector is in free fall. Long execution prohibited until sector reaches demand.",
+            )
+
+        if is_parent_sector_in_demand and is_nifty_in_demand:
+            return (
+                True,
+                2,
+                "Level 3 Confluence (Rocket Move!): Stock + Parent Sector + Nifty 50 ALL in Demand (+2 Extra Trade Score awarded).",
+            )
+
+        if is_parent_sector_in_demand:
+            return (
+                True,
+                2,
+                "Sector Support Confirmed (+2 Extra Trade Score awarded): Parent sector is in Demand Zone.",
+            )
+
+        if is_nifty_in_demand:
+            return (
+                True,
+                1,
+                "Nifty Universal Umbrella Support (+1 Extra Trade Score awarded): Nifty 50 is in Demand Zone.",
+            )
+
+        return False, 0, "No sector support detected; baseline trade score intact."
