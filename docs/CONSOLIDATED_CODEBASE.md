@@ -384,6 +384,53 @@ class TimeframeTier(str, Enum):
     INTRADAY = "INTRADAY"  # 5m-60m noise vulnerable (Weight 1.0)
 
 
+class TradingStyle(str, Enum):
+    HIT = "HIT"  # Hourly Income Trade: 60m/75m HTF -> 15m ITF -> 5m LTF
+    DIT = "DIT"  # Daily Income Trade: Daily HTF -> 60m/75m ITF -> 15m LTF
+    WIT = "WIT"  # Weekly Income Trade / Swing: Weekly HTF -> Daily ITF -> 125m LTF
+    MIT = "MIT"  # Monthly Income Trade / Positional: Monthly HTF -> Weekly ITF -> Daily LTF
+    QIT = "QIT"  # Quarterly Investing: Quarterly HTF -> Monthly ITF -> Weekly LTF
+
+
+class TrendDirection(str, Enum):
+    UPTREND = "UPTREND"      # 12 to 3 o'clock (positive slope, green)
+    DOWNTREND = "DOWNTREND"  # 3 to 6 o'clock (negative slope, red)
+    SIDEWAYS = "SIDEWAYS"    # 3 o'clock flat
+
+
+class CurvePosition(str, Enum):
+    VERY_LOW_ON_CURVE = "VERY_LOW_ON_CURVE"    # VLOC: Inside Demand Zone (Below Demand PL)
+    LOW_ON_CURVE = "LOW_ON_CURVE"              # LOC: Lower Third (0% to 33.33%)
+    EQUILIBRIUM = "EQUILIBRIUM"                # EQB: Middle Third (33.33% to 66.66%)
+    HIGH_ON_CURVE = "HIGH_ON_CURVE"            # HOC: Upper Third (66.66% to 100.0%)
+    VERY_HIGH_ON_CURVE = "VERY_HIGH_ON_CURVE"  # VHOC: Inside Supply Zone (Above Supply PL)
+    ALL_TIME_HIGH = "ALL_TIME_HIGH"            # ATH: Above all historical resistance
+
+
+class TradeActionBias(str, Enum):
+    BUY_ONLY = "BUY_ONLY"
+    SELL_ONLY = "SELL_ONLY"
+    BUY_AGGRESSIVE = "BUY_AGGRESSIVE"  # VLOC with pristine origin against downtrend
+    NO_TRADE = "NO_TRADE"              # Hazardous counter-trend trap
+
+
+@dataclass
+class MultiTimeframePlan:
+    trading_style: TradingStyle
+    htf_timeframe: TimeframeTier
+    itf_timeframe: TimeframeTier
+    ltf_timeframe: TimeframeTier
+    cmp: float
+    curve_position: CurvePosition
+    curve_retracement_pct: float
+    itf_trend: TrendDirection
+    itf_sma_slope: float
+    action_bias: TradeActionBias
+    eligible_execution_zones: List["IdentifiedZone"]
+    rejected_boundary_zones: List["IdentifiedZone"]
+    rationale: str
+
+
 @dataclass
 class CandleFeature:
     index: int
@@ -636,6 +683,224 @@ class DemandSupplyEngine:
                             "absorption_cushion_active": True,
                         })
         return lotl_pairs
+
+    @staticmethod
+    def calculate_sma50_clock_trend(
+        closes: np.ndarray, lookback_bars: int = 7, min_sma_period: int = 50
+    ) -> Tuple[TrendDirection, float, str]:
+        """
+        Episode 7: Trend Analysis - The 50 SMA Clock Method.
+        Evaluates the 7-candle lookback on the 50-period Simple Moving Average.
+        - 12 to 3 o'clock (positive slope, green) -> UPTREND
+        - 3 to 6 o'clock (negative slope, red) -> DOWNTREND
+        - 3 o'clock flat -> SIDEWAYS
+        """
+        n = len(closes)
+        if n < lookback_bars:
+            return TrendDirection.SIDEWAYS, 0.0, "3_OCLOCK_FLAT"
+
+        period = min(min_sma_period, n)
+        sma_curr = float(np.mean(closes[-period:]))
+
+        if n >= period + lookback_bars:
+            sma_past = float(np.mean(closes[-period - lookback_bars : -lookback_bars]))
+        elif n > lookback_bars:
+            sma_past = float(np.mean(closes[: max(1, n - lookback_bars)]))
+        else:
+            sma_past = float(closes[0])
+
+        if sma_past <= 1e-6:
+            return TrendDirection.SIDEWAYS, 0.0, "3_OCLOCK_FLAT"
+
+        delta_pct = (sma_curr - sma_past) / sma_past
+
+        if delta_pct >= 0.0005:
+            return TrendDirection.UPTREND, round(delta_pct, 4), "12_TO_3_OCLOCK"
+        elif delta_pct <= -0.0005:
+            return TrendDirection.DOWNTREND, round(delta_pct, 4), "3_TO_6_OCLOCK"
+        else:
+            return TrendDirection.SIDEWAYS, round(delta_pct, 4), "3_OCLOCK_FLAT"
+
+    @staticmethod
+    def calculate_curve_position(
+        cmp: float,
+        htf_demand: IdentifiedZone,
+        htf_supply: Optional[IdentifiedZone] = None,
+    ) -> Tuple[CurvePosition, float]:
+        """
+        Episode 7: Higher Time Frame Curve / Location Analysis.
+        Divides the curve between Demand Proximal (0%) and Supply Proximal (100%) into:
+        - VERY_LOW_ON_CURVE: Inside Demand Zone (CMP < Demand PL)
+        - LOW_ON_CURVE: Lower Third (0% to 33.33%)
+        - EQUILIBRIUM: Middle Third (33.33% to 66.66%)
+        - HIGH_ON_CURVE: Upper Third (66.66% to 100.0%)
+        - VERY_HIGH_ON_CURVE: Inside Supply Zone (CMP > Supply PL)
+        - ALL_TIME_HIGH: No fresh overhead supply exists; shorting is strictly prohibited.
+        """
+        if htf_supply is None:
+            return CurvePosition.ALL_TIME_HIGH, 0.0
+
+        dem_prox = htf_demand.proximal_line
+        sup_prox = htf_supply.proximal_line
+        curve_range = sup_prox - dem_prox
+
+        if curve_range <= 1e-6:
+            return CurvePosition.EQUILIBRIUM, 50.0
+
+        pct = ((cmp - dem_prox) / curve_range) * 100.0
+
+        if cmp < dem_prox:
+            return CurvePosition.VERY_LOW_ON_CURVE, round(pct, 2)
+        elif pct <= 33.33:
+            return CurvePosition.LOW_ON_CURVE, round(pct, 2)
+        elif pct <= 66.66:
+            return CurvePosition.EQUILIBRIUM, round(pct, 2)
+        elif pct <= 100.0:
+            return CurvePosition.HIGH_ON_CURVE, round(pct, 2)
+        else:
+            return CurvePosition.VERY_HIGH_ON_CURVE, round(pct, 2)
+
+    @classmethod
+    def build_multi_timeframe_plan(
+        cls,
+        trading_style: TradingStyle,
+        cmp: float,
+        htf_demand: IdentifiedZone,
+        htf_supply: Optional[IdentifiedZone],
+        itf_closes: np.ndarray,
+        ltf_zones: List[IdentifiedZone],
+    ) -> MultiTimeframePlan:
+        """
+        Episode 7: Multiple Time Frame Analysis (MTFA) Decision Plan.
+        1. Identifies HTF Location / Curve Position (VLOC, LOC, EQB, HOC, VHOC, ATH).
+        2. Evaluates ITF Trend via 50 SMA Clock Method (12-3 Uptrend, 3-6 Downtrend).
+        3. Enforces Directional Bias Alignment (~95% Rule & ATH Rule).
+        4. Enforces The Boundary Rule: LTF execution zone must NEVER extend past HTF Distal Line.
+        """
+        if trading_style == TradingStyle.HIT:
+            htf_tf = TimeframeTier.INTRADAY
+            itf_tf = TimeframeTier.INTRADAY
+            ltf_tf = TimeframeTier.INTRADAY
+        elif trading_style == TradingStyle.DIT:
+            htf_tf = TimeframeTier.DAILY
+            itf_tf = TimeframeTier.INTRADAY
+            ltf_tf = TimeframeTier.INTRADAY
+        elif trading_style == TradingStyle.WIT:
+            htf_tf = TimeframeTier.WEEKLY
+            itf_tf = TimeframeTier.DAILY
+            ltf_tf = TimeframeTier.M125
+        elif trading_style == TradingStyle.MIT:
+            htf_tf = TimeframeTier.MONTHLY
+            itf_tf = TimeframeTier.WEEKLY
+            ltf_tf = TimeframeTier.DAILY
+        else:  # QIT
+            htf_tf = TimeframeTier.MONTHLY
+            itf_tf = TimeframeTier.WEEKLY
+            ltf_tf = TimeframeTier.DAILY
+
+        curve_pos, curve_pct = cls.calculate_curve_position(cmp, htf_demand, htf_supply)
+        trend, slope, clock_pos = cls.calculate_sma50_clock_trend(itf_closes)
+
+        rationale_parts = [
+            f"Trading Style: {trading_style.value}.",
+            f"HTF Location: {curve_pos.value} ({curve_pct}% retracement).",
+            f"ITF Trend: {trend.value} ({clock_pos}, slope: {slope}).",
+        ]
+
+        if curve_pos == CurvePosition.ALL_TIME_HIGH:
+            if trend == TrendDirection.UPTREND:
+                action_bias = TradeActionBias.BUY_ONLY
+                rationale_parts.append(
+                    "Asset at All-Time Highs with Uptrend. Long setups only; shorting is strictly prohibited."
+                )
+            else:
+                action_bias = TradeActionBias.NO_TRADE
+                rationale_parts.append(
+                    "Asset at All-Time Highs but lack of Uptrend momentum. No trade."
+                )
+        elif curve_pos == CurvePosition.VERY_LOW_ON_CURVE:
+            if trend == TrendDirection.DOWNTREND:
+                action_bias = TradeActionBias.BUY_AGGRESSIVE
+                rationale_parts.append(
+                    "Very Low on Curve against Downtrend. Buy permitted only on pristine origin demand."
+                )
+            else:
+                action_bias = TradeActionBias.BUY_ONLY
+                rationale_parts.append("Very Low on Curve confirmed by trend. Definitely Buy.")
+        elif curve_pos == CurvePosition.LOW_ON_CURVE:
+            if trend == TrendDirection.DOWNTREND:
+                action_bias = TradeActionBias.NO_TRADE
+                rationale_parts.append(
+                    "Low on Curve with Downtrend. Counter-trend trap; buying prohibited without trend alignment."
+                )
+            else:
+                action_bias = TradeActionBias.BUY_ONLY
+                rationale_parts.append("Low on Curve confirmed with Uptrend. High probability Buy.")
+        elif curve_pos == CurvePosition.EQUILIBRIUM:
+            if trend == TrendDirection.UPTREND:
+                action_bias = TradeActionBias.BUY_ONLY
+                rationale_parts.append("Equilibrium position. Follow intermediate Uptrend momentum.")
+            elif trend == TrendDirection.DOWNTREND:
+                action_bias = TradeActionBias.SELL_ONLY
+                rationale_parts.append("Equilibrium position. Follow intermediate Downtrend momentum.")
+            else:
+                action_bias = TradeActionBias.NO_TRADE
+                rationale_parts.append(
+                    "Equilibrium position with Sideways trend. Directional edge absent; no trade."
+                )
+        elif curve_pos == CurvePosition.HIGH_ON_CURVE:
+            if trend == TrendDirection.UPTREND:
+                action_bias = TradeActionBias.NO_TRADE
+                rationale_parts.append(
+                    "High on Curve with Uptrend. Counter-trend trap; shorting prohibited into bullish momentum."
+                )
+            else:
+                action_bias = TradeActionBias.SELL_ONLY
+                rationale_parts.append("High on Curve confirmed with Downtrend. High probability Short.")
+        else:  # VERY_HIGH_ON_CURVE
+            if trend == TrendDirection.UPTREND:
+                action_bias = TradeActionBias.NO_TRADE
+                rationale_parts.append("Very High on Curve but Uptrend persists. Await trend exhaustion.")
+            else:
+                action_bias = TradeActionBias.SELL_ONLY
+                rationale_parts.append("Very High on Curve confirmed by Downtrend. Definitely Sell / Short.")
+
+        # Episode 7 Concept 7: The Boundary Rule
+        eligible: List[IdentifiedZone] = []
+        rejected: List[IdentifiedZone] = []
+
+        for z in ltf_zones:
+            if action_bias in (TradeActionBias.BUY_ONLY, TradeActionBias.BUY_AGGRESSIVE):
+                if z.is_demand:
+                    if z.distal_line >= htf_demand.distal_line:
+                        eligible.append(z)
+                    else:
+                        rejected.append(z)
+            elif action_bias == TradeActionBias.SELL_ONLY:
+                if not z.is_demand:
+                    if htf_supply is not None:
+                        if z.distal_line <= htf_supply.distal_line:
+                            eligible.append(z)
+                        else:
+                            rejected.append(z)
+                    else:
+                        eligible.append(z)
+
+        return MultiTimeframePlan(
+            trading_style=trading_style,
+            htf_timeframe=htf_tf,
+            itf_timeframe=itf_tf,
+            ltf_timeframe=ltf_tf,
+            cmp=cmp,
+            curve_position=curve_pos,
+            curve_retracement_pct=curve_pct,
+            itf_trend=trend,
+            itf_sma_slope=slope,
+            action_bias=action_bias,
+            eligible_execution_zones=eligible,
+            rejected_boundary_zones=rejected,
+            rationale=" ".join(rationale_parts),
+        )
 
     def classify_candle(
         self,
@@ -1124,7 +1389,6 @@ class DemandSupplyEngine:
         supply_zones.sort(key=lambda x: x.proximal_line)
 
         return demand_zones, supply_zones
-
 `
 
 ---

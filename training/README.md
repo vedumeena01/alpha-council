@@ -14,5 +14,6 @@
 | **04** | **Entry, Stoploss, Target & Exceptional Marking** | ✅ **Codified & Trained** | [`training/EPISODE_04_ENTRY_STOPLOSS_TARGET_AND_EXCEPTIONAL_MARKING.md`](EPISODE_04_ENTRY_STOPLOSS_TARGET_AND_EXCEPTIONAL_MARKING.md) |
 | **05** | **Trading Psychology, Wick-to-Wick & Anti-News Engine** | ✅ **Codified & Trained** | [`training/EPISODE_05_TRADING_PSYCHOLOGY_AND_ADVANCED_ZONE_MAPPING.md`](EPISODE_05_TRADING_PSYCHOLOGY_AND_ADVANCED_ZONE_MAPPING.md) |
 | **06** | **Price Action Behind Candles (Closing, Gap-Base, Garbage)** | ✅ **Codified & Trained** | [`training/EPISODE_06_PRICE_ACTION_BEHIND_THE_CANDLES.md`](EPISODE_06_PRICE_ACTION_BEHIND_THE_CANDLES.md) |
-| **07** | *Upcoming...* | ⏳ Pending | - |
-| **...**| *Episodes 08 - 20* | ⏳ Pending | - |
+| **07** | **Multiple Time Frame Analysis (MTFA, 50 SMA Clock, Curve)** | ✅ **Codified & Trained** | [`training/EPISODE_07_MULTIPLE_TIMEFRAME_ANALYSIS.md`](EPISODE_07_MULTIPLE_TIMEFRAME_ANALYSIS.md) |
+| **08** | *Upcoming...* | ⏳ Pending | - |
+| **...**| *Episodes 09 - 20* | ⏳ Pending | - |

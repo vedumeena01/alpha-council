@@ -19,6 +19,11 @@ from alphacouncil.alpha.zone_engine import (
     ZoneType,
     MarkingMode,
     TimeframeTier,
+    TradingStyle,
+    TrendDirection,
+    CurvePosition,
+    TradeActionBias,
+    MultiTimeframePlan,
 )
 
 
@@ -714,5 +719,210 @@ def test_episode_06_origin_pivot_isolation():
     assert z.base_candles_count == 4
     # Origin candle index must point to index 2 (Base 1, where low was 101.0)
     assert z.origin_candle_idx == 2
+
+
+# =====================================================================
+# EPISODE 7 TESTS: MULTIPLE TIMEFRAME ANALYSIS (MTFA, 50 SMA CLOCK, CURVE)
+# =====================================================================
+
+def test_episode_07_sma50_clock_trend_uptrend_downtrend_sideways():
+    """
+    Episode 7 Concept 2: The 50 SMA Clock Method & 7th Candle Rule.
+    - 12 to 3 o'clock -> UPTREND
+    - 3 to 6 o'clock -> DOWNTREND
+    - 3 o'clock flat -> SIDEWAYS
+    """
+    # 1. Uptrend: 60 bars rising steadily from 100 to 160
+    closes_up = np.linspace(100.0, 160.0, 60)
+    trend_up, slope_up, clock_up = DemandSupplyEngine.calculate_sma50_clock_trend(closes_up)
+    assert trend_up == TrendDirection.UPTREND
+    assert clock_up == "12_TO_3_OCLOCK"
+    assert slope_up > 0
+
+    # 2. Downtrend: 60 bars dropping steadily from 160 to 100
+    closes_down = np.linspace(160.0, 100.0, 60)
+    trend_down, slope_down, clock_down = DemandSupplyEngine.calculate_sma50_clock_trend(closes_down)
+    assert trend_down == TrendDirection.DOWNTREND
+    assert clock_down == "3_TO_6_OCLOCK"
+    assert slope_down < 0
+
+    # 3. Sideways: 60 bars oscillating around 100 with 0 net drift
+    closes_side = np.full(60, 100.0)
+    trend_side, slope_side, clock_side = DemandSupplyEngine.calculate_sma50_clock_trend(closes_side)
+    assert trend_side == TrendDirection.SIDEWAYS
+    assert clock_side == "3_OCLOCK_FLAT"
+
+
+def test_episode_07_curve_position_5_tiers_and_all_time_high():
+    """
+    Episode 7 Concept 5: The Five Curve Sections (0%, 33.33%, 66.66%, 100%).
+    Demand Zone PL = 100.0, Supply Zone PL = 200.0 (Range = 100.0 points).
+    """
+    engine = DemandSupplyEngine()
+    # Mock HTF Demand: PL = 100.0, DL = 90.0
+    opens_d = np.array([120.0, 95.0, 100.0])
+    highs_d = np.array([121.0, 102.0, 125.0])
+    lows_d = np.array([94.0, 90.0, 99.0])
+    closes_d = np.array([95.0, 100.0, 124.0])
+    htf_demand = engine.scan_for_zones(opens_d, highs_d, lows_d, closes_d)[0]
+
+    # Mock HTF Supply: PL = 200.0, DL = 210.0
+    opens_s = np.array([180.0, 205.0, 200.0])
+    highs_s = np.array([185.0, 210.0, 201.0])
+    lows_s = np.array([179.0, 198.0, 180.0])
+    closes_s = np.array([205.0, 200.0, 182.0])
+    htf_supply = engine.scan_for_zones(opens_s, highs_s, lows_s, closes_s)[0]
+
+    # VLOC: CMP = 95.0 (< 100.0 Demand PL)
+    pos, pct = DemandSupplyEngine.calculate_curve_position(95.0, htf_demand, htf_supply)
+    assert pos == CurvePosition.VERY_LOW_ON_CURVE
+
+    # LOC: CMP = 120.0 (20.0% of curve)
+    pos, pct = DemandSupplyEngine.calculate_curve_position(120.0, htf_demand, htf_supply)
+    assert pos == CurvePosition.LOW_ON_CURVE
+    assert pct == 20.0
+
+    # EQB: CMP = 150.0 (50.0% of curve)
+    pos, pct = DemandSupplyEngine.calculate_curve_position(150.0, htf_demand, htf_supply)
+    assert pos == CurvePosition.EQUILIBRIUM
+    assert pct == 50.0
+
+    # HOC: CMP = 180.0 (80.0% of curve)
+    pos, pct = DemandSupplyEngine.calculate_curve_position(180.0, htf_demand, htf_supply)
+    assert pos == CurvePosition.HIGH_ON_CURVE
+    assert pct == 80.0
+
+    # VHOC: CMP = 205.0 (> 200.0 Supply PL)
+    pos, pct = DemandSupplyEngine.calculate_curve_position(205.0, htf_demand, htf_supply)
+    assert pos == CurvePosition.VERY_HIGH_ON_CURVE
+
+    # ATH: No fresh overhead supply exists
+    pos_ath, _ = DemandSupplyEngine.calculate_curve_position(250.0, htf_demand, None)
+    assert pos_ath == CurvePosition.ALL_TIME_HIGH
+
+
+def test_episode_07_directional_bias_curve_vs_trend_mit_and_wit():
+    """
+    Episode 7 Concept 6: Directional Bias Matrix.
+    - LOC + Uptrend -> BUY_ONLY
+    - LOC + Downtrend -> NO_TRADE (Counter-trend trap)
+    - HOC + Downtrend -> SELL_ONLY
+    - EQB + Uptrend -> BUY_ONLY (Trend Follower)
+    - EQB + Downtrend -> SELL_ONLY (Trend Follower)
+    """
+    engine = DemandSupplyEngine()
+    # Mock HTF Demand (PL 100, DL 90) & Supply (PL 200, DL 210)
+    htf_demand = engine.scan_for_zones(
+        np.array([120.0, 95.0, 100.0]),
+        np.array([121.0, 102.0, 125.0]),
+        np.array([94.0, 90.0, 99.0]),
+        np.array([95.0, 100.0, 124.0]),
+    )[0]
+    htf_supply = engine.scan_for_zones(
+        np.array([180.0, 205.0, 200.0]),
+        np.array([185.0, 210.0, 201.0]),
+        np.array([179.0, 198.0, 180.0]),
+        np.array([205.0, 200.0, 182.0]),
+    )[0]
+
+    itf_up = np.linspace(100.0, 150.0, 60)
+    itf_down = np.linspace(150.0, 100.0, 60)
+
+    # 1. LOC + Uptrend (CMP 120.0) -> High probability Buy
+    plan_loc_up = DemandSupplyEngine.build_multi_timeframe_plan(
+        TradingStyle.MIT, 120.0, htf_demand, htf_supply, itf_up, []
+    )
+    assert plan_loc_up.action_bias == TradeActionBias.BUY_ONLY
+
+    # 2. LOC + Downtrend (CMP 120.0) -> Counter-trend trap! Prohibited!
+    plan_loc_down = DemandSupplyEngine.build_multi_timeframe_plan(
+        TradingStyle.MIT, 120.0, htf_demand, htf_supply, itf_down, []
+    )
+    assert plan_loc_down.action_bias == TradeActionBias.NO_TRADE
+
+    # 3. HOC + Downtrend (CMP 180.0) -> High probability Short
+    plan_hoc_down = DemandSupplyEngine.build_multi_timeframe_plan(
+        TradingStyle.WIT, 180.0, htf_demand, htf_supply, itf_down, []
+    )
+    assert plan_hoc_down.action_bias == TradeActionBias.SELL_ONLY
+
+    # 4. EQB + Uptrend (CMP 150.0) -> Buy with trend
+    plan_eqb_up = DemandSupplyEngine.build_multi_timeframe_plan(
+        TradingStyle.DIT, 150.0, htf_demand, htf_supply, itf_up, []
+    )
+    assert plan_eqb_up.action_bias == TradeActionBias.BUY_ONLY
+
+
+def test_episode_07_the_boundary_rule_ltf_within_htf_distal():
+    """
+    Episode 7 Concept 7: The Boundary Rule.
+    LTF Execution zones must NEVER extend past the Distal Line of the HTF Location Zone.
+    """
+    engine = DemandSupplyEngine()
+    # HTF Demand: PL = 100.0, DL = 90.0
+    htf_demand = engine.scan_for_zones(
+        np.array([120.0, 95.0, 100.0]),
+        np.array([121.0, 102.0, 125.0]),
+        np.array([94.0, 90.0, 99.0]),
+        np.array([95.0, 100.0, 124.0]),
+    )[0]
+    htf_supply = engine.scan_for_zones(
+        np.array([180.0, 205.0, 200.0]),
+        np.array([185.0, 210.0, 201.0]),
+        np.array([179.0, 198.0, 180.0]),
+        np.array([205.0, 200.0, 182.0]),
+    )[0]
+
+    # LTF Zone 1: Demand PL = 98.0, DL = 92.0 (>= 90.0 HTF Distal Line) -> ELIGIBLE
+    ltf_zone_valid = engine.scan_for_zones(
+        np.array([110.0, 95.0, 98.0]),
+        np.array([111.0, 100.0, 115.0]),
+        np.array([94.0, 92.0, 97.0]),  # DL = 92.0
+        np.array([95.0, 98.0, 114.0]),
+    )[0]
+
+    # LTF Zone 2: Demand PL = 95.0, DL = 85.0 (< 90.0 HTF Distal Line) -> REJECTED!
+    ltf_zone_invalid = engine.scan_for_zones(
+        np.array([110.0, 90.0, 95.0]),
+        np.array([111.0, 97.0, 115.0]),
+        np.array([89.0, 85.0, 94.0]),  # DL = 85.0 breaches HTF Distal 90.0!
+        np.array([90.0, 95.0, 114.0]),
+    )[0]
+
+    itf_up = np.linspace(100.0, 150.0, 60)
+    plan = DemandSupplyEngine.build_multi_timeframe_plan(
+        TradingStyle.MIT, 120.0, htf_demand, htf_supply, itf_up, [ltf_zone_valid, ltf_zone_invalid]
+    )
+
+    assert isinstance(plan, MultiTimeframePlan)
+    assert ltf_zone_valid in plan.eligible_execution_zones
+    assert ltf_zone_invalid in plan.rejected_boundary_zones
+    assert len(plan.eligible_execution_zones) == 1
+    assert len(plan.rejected_boundary_zones) == 1
+
+
+def test_episode_07_all_time_high_shorting_prohibition():
+    """
+    Episode 7 Concept 8: Federal Bank ATH Case Study.
+    At All-Time Highs, no overhead supply exists. Shorting is strictly prohibited!
+    """
+    engine = DemandSupplyEngine()
+    htf_demand = engine.scan_for_zones(
+        np.array([120.0, 95.0, 100.0]),
+        np.array([121.0, 102.0, 125.0]),
+        np.array([94.0, 90.0, 99.0]),
+        np.array([95.0, 100.0, 124.0]),
+    )[0]
+
+    itf_up = np.linspace(100.0, 150.0, 60)
+
+    # When at ATH (htf_supply is None)
+    plan_ath = DemandSupplyEngine.build_multi_timeframe_plan(
+        TradingStyle.MIT, 250.0, htf_demand, None, itf_up, []
+    )
+    assert plan_ath.curve_position == CurvePosition.ALL_TIME_HIGH
+    assert plan_ath.action_bias == TradeActionBias.BUY_ONLY
+    assert "shorting is strictly prohibited" in plan_ath.rationale.lower()
+
 
 
