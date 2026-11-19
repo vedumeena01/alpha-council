@@ -117,7 +117,7 @@ def test_pre_trade_reduce_only_bypasses_limits():
     assert not entry_val.is_approved
     assert entry_val.rejection_code == "ERR_RATE_LIMIT"
 
-    # Reduce-only exit order MUST NEVER be blocked by rate limiter or concentration!
+    # Reduce-only exit order MUST NEVER be blocked by rate limiter, sector cap, or open risk!
     exit_val = engine.validate_order(
         symbol="TCS",
         proposed_quantity=50,
@@ -125,6 +125,8 @@ def test_pre_trade_reduce_only_bypasses_limits():
         current_equity=1_000_000.0,
         current_position_shares=50,
         is_reduce_only=True,
+        current_sector_notional=500_000.0,  # 50% sector exposure (would block entry)
+        current_portfolio_open_risk_pct=0.05,  # 5.0% open risk (would block entry)
     )
     assert exit_val.is_approved
     assert exit_val.adjusted_quantity == 50
