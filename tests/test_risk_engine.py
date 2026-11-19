@@ -171,3 +171,59 @@ def test_intraday_kill_switch_halt_on_2_percent():
     switch.risk_committee_unfreeze(authorized_by="Chief_Risk_Officer", reason="Circuit breaker audit cleared")
     assert not switch.is_strategy_frozen
     assert not switch.is_session_halted
+
+
+def test_pre_trade_risk_sector_concentration_cap_30_pct():
+    """Verifies that proposed order is rejected if sector notional exposure exceeds 30%."""
+    engine = PreTradeRiskEngine(max_sector_pct=0.30)
+    equity = 1_000_000.0  # ₹10 Lakhs, max sector = ₹3 Lakhs
+
+    # Existing banking sector notional = ₹2.5 Lakhs. Proposed HDFCBANK = ₹1.0 Lakh (Total = ₹3.5 Lakhs > ₹3.0 Lakhs)
+    res = engine.validate_order(
+        symbol="HDFCBANK",
+        proposed_quantity=60,
+        entry_price=1600.0,  # ₹96,000 notional
+        current_equity=equity,
+        current_sector_notional=250_000.0,
+    )
+    assert not res.is_approved
+    assert "SECTOR_CONCENTRATION_EXCEEDED" in res.reason
+
+
+def test_pre_trade_risk_portfolio_max_concurrent_open_risk_cap_3_pct():
+    """Verifies that portfolio open risk is hard-capped at 3.0% across all concurrent positions."""
+    engine = PreTradeRiskEngine(max_total_open_risk_pct=0.03)
+    equity = 1_000_000.0
+
+    # Current open risk = 2.5%. Proposed trade risk = 1.0% (Total = 3.5% > 3.0%)
+    res = engine.validate_order(
+        symbol="SBIN",
+        proposed_quantity=100,
+        entry_price=800.0,
+        stop_loss_price=700.0,  # Risk = 100 * 100 = ₹10,000 (1.0%)
+        current_equity=equity,
+        current_portfolio_open_risk_pct=0.025,
+    )
+    assert not res.is_approved
+    assert "PORTFOLIO_RISK_CAP_EXCEEDED" in res.reason
+
+
+def test_pre_trade_risk_gap_stress_testing_2x_stop_slippage():
+    """Verifies that position sizing scales down if a 2x stop gap-down exceeds 2.0% equity tolerance."""
+    engine = PreTradeRiskEngine()
+    equity = 1_000_000.0  # Max gap-stress loss allowed = 2.0% = ₹20,000
+
+    # Entry 1000, Stop 900 (Risk per share = ₹100, 2x gap-stress = ₹200/share)
+    # Proposed 200 shares -> Stressed loss = 200 * ₹200 = ₹40,000 (> ₹20,000)
+    # Must be capped to 100 shares!
+    res = engine.validate_order(
+        symbol="TATASTEEL",
+        proposed_quantity=200,
+        entry_price=1000.0,
+        stop_loss_price=900.0,
+        current_equity=equity,
+        max_gap_stress_pct=0.02,
+    )
+    assert res.is_approved
+    assert res.adjusted_quantity == 100
+    assert "GAP_STRESS_APPLIED" in res.reason

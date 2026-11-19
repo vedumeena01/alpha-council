@@ -26,9 +26,13 @@ class PreTradeRiskEngine:
     def __init__(
         self,
         max_single_stock_pct: float = 0.20,
+        max_sector_pct: float = 0.30,
+        max_total_open_risk_pct: float = 0.03,
         max_orders_per_sec: int = 10,
     ):
         self.max_single_stock_pct = max_single_stock_pct
+        self.max_sector_pct = max_sector_pct
+        self.max_total_open_risk_pct = max_total_open_risk_pct
         self.max_orders_per_sec = max_orders_per_sec
         self.order_timestamps = []
 
@@ -42,6 +46,11 @@ class PreTradeRiskEngine:
         is_reduce_only: bool = False,
         is_simulation_mode: bool = False,
         current_time: Optional[float] = None,
+        current_sector_notional: float = 0.0,
+        current_portfolio_open_risk_pct: float = 0.0,
+        proposed_trade_risk_pct: float = 0.0,
+        stop_loss_price: Optional[float] = None,
+        max_gap_stress_pct: float = 0.02,
     ) -> RiskValidationResult:
         """
         Validates proposed trade against hard pre-trade parameters.
@@ -122,6 +131,45 @@ class PreTradeRiskEngine:
                 adjusted_quantity=capped_qty,
                 reason=f"APPROVED_WITH_CAPPING: Quantity capped from {proposed_quantity} to {capped_qty} shares (20% notional ceiling)",
             )
+
+        # 6. Sector Concentration Cap (Existing Sector Notional + Proposed Notional <= 30%)
+        total_sector_notional = current_sector_notional + proposed_notional
+        max_sector_notional_allowed = current_equity * self.max_sector_pct
+        if total_sector_notional > max_sector_notional_allowed:
+            return RiskValidationResult(
+                is_approved=False,
+                adjusted_quantity=0,
+                reason=f"SECTOR_CONCENTRATION_EXCEEDED: Sector exposure ₹{total_sector_notional:,.2f} exceeds 30% ceiling (Max: ₹{max_sector_notional_allowed:,.2f})",
+                rejection_code="ERR_SECTOR_CONCENTRATION",
+            )
+
+        # 7. Portfolio Max Concurrent Open Risk Cap (Current Open Risk + Proposed Trade Risk <= 3.0%)
+        effective_trade_risk_pct = proposed_trade_risk_pct
+        if effective_trade_risk_pct <= 0.0 and stop_loss_price is not None and stop_loss_price > 0:
+            trade_loss = proposed_quantity * abs(entry_price - stop_loss_price)
+            effective_trade_risk_pct = trade_loss / current_equity
+
+        if current_portfolio_open_risk_pct + effective_trade_risk_pct > self.max_total_open_risk_pct + 1e-6:
+            return RiskValidationResult(
+                is_approved=False,
+                adjusted_quantity=0,
+                reason=f"PORTFOLIO_RISK_CAP_EXCEEDED: Open risk ({current_portfolio_open_risk_pct*100:.1f}% + {effective_trade_risk_pct*100:.1f}%) exceeds 3.0% hard ceiling",
+                rejection_code="ERR_MAX_OPEN_RISK",
+            )
+
+        # 8. Gap-Stress Test: 2x Stop-Loss Slippage Stress (Loss must not exceed 2.0% equity)
+        if stop_loss_price is not None and stop_loss_price > 0:
+            nominal_risk_per_share = abs(entry_price - stop_loss_price)
+            stressed_loss_per_share = nominal_risk_per_share * 2.0  # 2x stop slippage gap stress
+            total_stressed_loss = proposed_quantity * stressed_loss_per_share
+            if total_stressed_loss > current_equity * max_gap_stress_pct:
+                stressed_capped_qty = int((current_equity * max_gap_stress_pct) // stressed_loss_per_share)
+                return RiskValidationResult(
+                    is_approved=True if stressed_capped_qty > 0 else False,
+                    adjusted_quantity=stressed_capped_qty,
+                    reason=f"GAP_STRESS_APPLIED: Quantity scaled down to {stressed_capped_qty} shares to survive 2x stop gap-down within 2.0% equity loss",
+                    rejection_code=None if stressed_capped_qty > 0 else "ERR_GAP_STRESS_EXCEEDED",
+                )
 
         return RiskValidationResult(
             is_approved=True,
