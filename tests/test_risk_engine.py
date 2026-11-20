@@ -110,6 +110,44 @@ def test_sizing_calibrated_kelly_transition():
     assert res_kelly.shares_quantity > 0
 
 
+def test_sizing_production_mode_enforces_200_threshold():
+    from alphacouncil.config import PROD_THRESHOLD
+
+    # Production mode enforces cold_start_trade_threshold = 200
+    engine_prod = PositionSizingEngine(is_production=True)
+    assert engine_prod.cold_start_trade_threshold == PROD_THRESHOLD
+
+    # 60 trades is still COLD_START under production mode (< 200)
+    res_cold = engine_prod.compute_size(
+        symbol="RELIANCE",
+        entry_price=1000.0,
+        stop_price=980.0,
+        target_price=1040.0,
+        atr14=15.0,
+        realized_annual_vol=0.15,
+        current_equity=10_000_000.0,
+        historical_closed_trades_count=60,
+        rolling_bss=0.12,
+        estimated_win_prob=0.60,
+    )
+    assert res_cold.regime_mode == "COLD_START"
+
+    # Crosses 200 trades -> transitions to CALIBRATED_KELLY
+    res_cal = engine_prod.compute_size(
+        symbol="RELIANCE",
+        entry_price=1000.0,
+        stop_price=980.0,
+        target_price=1040.0,
+        atr14=15.0,
+        realized_annual_vol=0.15,
+        current_equity=10_000_000.0,
+        historical_closed_trades_count=205,
+        rolling_bss=0.12,
+        estimated_win_prob=0.60,
+    )
+    assert res_cal.regime_mode == "CALIBRATED_KELLY"
+
+
 def test_sizing_nan_fail_closed():
     engine = PositionSizingEngine()
     # NaN ATR must fail closed, not skip noise trap and size up!

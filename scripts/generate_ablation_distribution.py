@@ -49,7 +49,18 @@ def run_ablation_distribution(
     n_trials: int = 150,
 ) -> Dict[str, Dict[str, List[float]]]:
     """Runs ablation suite across N seeds and returns structured stats."""
-    stats = {c: {"trades": [], "sharpe": [], "dsr": [], "profit_factor": [], "win_rate": []} for c in CONFIGS}
+    stats = {
+        c: {
+            "trades": [],
+            "sharpe": [],
+            "dsr": [],
+            "profit_factor": [],
+            "win_rate": [],
+            "gross": [],
+            "friction": [],
+        }
+        for c in CONFIGS
+    }
 
     for s in range(1, n_seeds + 1):
         feed = MarketDataFeed(seed=s)
@@ -63,6 +74,8 @@ def run_ablation_distribution(
             stats[c]["trades"].append(n_trades)
             stats[c]["sharpe"].append(res.metrics.sharpe_ratio)
             stats[c]["dsr"].append(res.metrics.deflated_sharpe_ratio)
+            stats[c]["gross"].append(sum(t.gross_pnl_inr for t in res.trades))
+            stats[c]["friction"].append(sum(t.friction_inr for t in res.trades))
 
             # Profit factor & win rate
             wins = [t for t in res.trades if t.net_pnl_inr > 0]
@@ -83,8 +96,8 @@ def format_markdown_table(stats: Dict[str, Dict[str, List[float]]], n_seeds: int
     lines = [
         f"### Empirical Multi-Seed Ablation Distribution ({n_seeds} Seeds on {universe_label})",
         "",
-        "| Configuration | Description | Median Trades | Sharpe Min / Median / Max | Median DSR | Win Rate Med | PF Med | Seeds Sharpe > 0 |",
-        "| :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: |",
+        "| Configuration | Description | Median Trades | Sharpe Min / Median / Max | Median DSR | Mean Gross PnL | Mean Friction | Win Rate | Seeds Sharpe > 0 |",
+        "| :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |",
     ]
 
     for c in CONFIGS:
@@ -95,12 +108,13 @@ def format_markdown_table(stats: Dict[str, Dict[str, List[float]]], n_seeds: int
         sh_max = float(np.max(stats[c]["sharpe"]))
         dsr_med = float(np.median(stats[c]["dsr"]))
         wr_med = float(np.median(stats[c]["win_rate"]))
-        pf_med = float(np.median(stats[c]["profit_factor"]))
+        gr_mean = float(np.mean(stats[c]["gross"]))
+        fr_mean = float(np.mean(stats[c]["friction"]))
         pos_sh = sum(1 for x in stats[c]["sharpe"] if x > 0)
         pos_pct = (pos_sh / n_seeds) * 100.0
 
         lines.append(
-            f"| `{c}` | {desc} | {trades_med} | {sh_min:.2f} / **{sh_med:.2f}** / {sh_max:.2f} | {dsr_med:.4f} | {wr_med:.1f}% | {pf_med:.2f} | {pos_sh}/{n_seeds} ({pos_pct:.0f}%) |"
+            f"| `{c}` | {desc} | {trades_med} | {sh_min:.2f} / **{sh_med:.2f}** / {sh_max:.2f} | {dsr_med:.4f} | ₹{gr_mean:,.0f} | ₹{fr_mean:,.0f} | {wr_med:.1f}% | {pos_sh}/{n_seeds} ({pos_pct:.0f}%) |"
         )
 
     return "\n".join(lines)

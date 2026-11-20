@@ -43,14 +43,19 @@ class PositionSizingEngine:
         max_risk_ceiling: float = 0.015,    # 1.5% max risk
         max_notional_pct: float = 0.20,     # 20% max single-stock notional
         min_atr_multiple: float = 0.25,      # Skip if stop < 0.25 * ATR (filters micro-noise without over-discarding sweeps)
-        cold_start_trade_threshold: int = HARNESS_KELLY_THRESHOLD, # Minimum closed trades to exit cold start (50 for test harness; 200 for institutional prod)
+        cold_start_trade_threshold: Optional[int] = None,
+        is_production: bool = False,
     ):
         self.base_risk_fraction = base_risk_fraction
         self.target_annual_vol = target_annual_vol
         self.max_risk_ceiling = max_risk_ceiling
         self.max_notional_pct = max_notional_pct
         self.min_atr_multiple = min_atr_multiple
-        self.cold_start_trade_threshold = cold_start_trade_threshold
+        self.is_production = is_production
+        if cold_start_trade_threshold is not None:
+            self.cold_start_trade_threshold = cold_start_trade_threshold
+        else:
+            self.cold_start_trade_threshold = PROD_THRESHOLD if is_production else HARNESS_KELLY_THRESHOLD
 
     @staticmethod
     def calculate_brier_skill_score(
