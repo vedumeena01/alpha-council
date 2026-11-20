@@ -145,14 +145,17 @@ class MarketDataFeed:
         initial_price: float = 2500.0,
         annual_vol: float = 0.22,
         base_adv: float = 1_000_000.0,
+        annual_drift: float = 0.0,
     ) -> List[Bar]:
         """
         Generates realistic daily OHLCV series including structural swing pivots,
         liquidity sweeps, and point-in-time ATR / circuit limits.
+        Default annual_drift=0.0 guarantees an unbiased zero-drift martingale random walk
+        with zero planted economic alpha or long-only equity beta.
         """
         dt = 1.0 / 252.0
         daily_vol = annual_vol * np.sqrt(dt)
-        drift = 0.08 * dt  # 8% annualized drift
+        drift = annual_drift * dt  # 0.0 by default for pure zero-drift martingale
 
         # Sequential Chained Martingale Jump-Diffusion
         # Connects each bar's open directly to the prior bar's close, guaranteeing
@@ -240,7 +243,7 @@ class MarketDataFeed:
         return bars
 
     def get_multi_symbol_universe(
-        self, symbols: List[str], n_bars: int = 300
+        self, symbols: List[str], n_bars: int = 300, annual_drift: float = 0.0
     ) -> Dict[str, List[Bar]]:
         """Generates historical data across the entire specified portfolio universe."""
         base_prices = {
@@ -258,7 +261,9 @@ class MarketDataFeed:
         dataset = {}
         for sym in symbols:
             px = base_prices.get(sym, 1000.0)
-            dataset[sym] = self.generate_series(symbol=sym, n_bars=n_bars, initial_price=px)
+            dataset[sym] = self.generate_series(
+                symbol=sym, n_bars=n_bars, initial_price=px, annual_drift=annual_drift
+            )
         return dataset
 
 ```
@@ -6259,6 +6264,11 @@ class PositionSizingEngine:
         self.min_atr_multiple = min_atr_multiple
         self.is_production = is_production
         if cold_start_trade_threshold is not None:
+            if is_production and cold_start_trade_threshold < PROD_THRESHOLD:
+                raise ValueError(
+                    f"Production mode requires at least PROD_THRESHOLD ({PROD_THRESHOLD}) trades; "
+                    f"cannot override threshold to {cold_start_trade_threshold}"
+                )
             self.cold_start_trade_threshold = cold_start_trade_threshold
         else:
             self.cold_start_trade_threshold = PROD_THRESHOLD if is_production else HARNESS_KELLY_THRESHOLD

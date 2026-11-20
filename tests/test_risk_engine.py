@@ -148,6 +148,23 @@ def test_sizing_production_mode_enforces_200_threshold():
     assert res_cal.regime_mode == "CALIBRATED_KELLY"
 
 
+def test_sizing_production_mode_rejects_sub_200_override():
+    import pytest
+    from alphacouncil.config import PROD_THRESHOLD
+
+    # Explicit threshold >= PROD_THRESHOLD is allowed in production
+    eng_ok = PositionSizingEngine(is_production=True, cold_start_trade_threshold=250)
+    assert eng_ok.cold_start_trade_threshold == 250
+
+    # Overriding to < PROD_THRESHOLD in production must raise ValueError
+    with pytest.raises(ValueError, match="Production mode requires at least PROD_THRESHOLD"):
+        PositionSizingEngine(is_production=True, cold_start_trade_threshold=10)
+
+    # In non-production (e.g. test harness), overriding < 200 is allowed
+    eng_harness = PositionSizingEngine(is_production=False, cold_start_trade_threshold=10)
+    assert eng_harness.cold_start_trade_threshold == 10
+
+
 def test_sizing_nan_fail_closed():
     engine = PositionSizingEngine()
     # NaN ATR must fail closed, not skip noise trap and size up!

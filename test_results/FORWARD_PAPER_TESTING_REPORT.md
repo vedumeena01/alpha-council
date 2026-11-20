@@ -4,7 +4,7 @@
 > **Starting Capital:** ₹10,00,000 (₹10.0 Lakhs)  
 > **Execution Strategy:** GTF Demand & Supply Zone Price Action with Sector Support Gate  
 > **Risk Management Engine:** Constitution Draft v1.2 (`PreTradeRiskEngine`, `IndianMarketFrictionModel`, `IntradayKillSwitch`)  
-> **Market Data Environment:** Calibrated Synthetic NSE Jump-Diffusion Feed (Unbiased Chained Martingale with $|\rho_1| < 0.05$)  
+> **Market Data Environment:** Calibrated Synthetic NSE Jump-Diffusion Feed (Unbiased Chained Martingale with $|\rho_1| < 0.05$, zero annualized drift $\mu=0.0$)  
 > **Audit Status:** ✅ **SIMULATED WALK-FORWARD BENCHMARK COMPLETED (Zero Lookahead, Realistic Pullback Fills & Gap Slippage)**  
 
 > [!NOTE]

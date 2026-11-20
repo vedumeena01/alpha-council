@@ -53,6 +53,11 @@ class PositionSizingEngine:
         self.min_atr_multiple = min_atr_multiple
         self.is_production = is_production
         if cold_start_trade_threshold is not None:
+            if is_production and cold_start_trade_threshold < PROD_THRESHOLD:
+                raise ValueError(
+                    f"Production mode requires at least PROD_THRESHOLD ({PROD_THRESHOLD}) trades; "
+                    f"cannot override threshold to {cold_start_trade_threshold}"
+                )
             self.cold_start_trade_threshold = cold_start_trade_threshold
         else:
             self.cold_start_trade_threshold = PROD_THRESHOLD if is_production else HARNESS_KELLY_THRESHOLD
