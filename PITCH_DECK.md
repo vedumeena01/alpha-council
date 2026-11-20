@@ -210,7 +210,7 @@ alphacouncil/
 ```
 
 ### Verified System Architecture & Test Coverage:
-- **Test Suite:** `pytest -v` $\to$ **133 deterministic unit and integration tests passing (100%)**.
+- **Test Suite:** `pytest -v` $\to$ **140 deterministic unit and integration tests passing (100%)**.
 - **Code Quality:** `ruff check .` $\to$ **0 errors, 0 warnings**.
 - **CI Matrix:** GitHub Actions passing on Python 3.10, 3.11, 3.12, 3.13.
 - **Code Hygiene:** `ruff check .` $\to$ **All checks passed (0 lint errors)**.

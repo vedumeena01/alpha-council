@@ -33,8 +33,8 @@ htmlcov/
 .ruff_cache/
 
 # Temporary Scratch Scripts & Builds
-test_*.py
-run_*.py
+/test_*.py
+/run_*.py
 pack_zip.py
 calc_stats.py
 update_consolidated.py

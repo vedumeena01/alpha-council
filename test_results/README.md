@@ -36,10 +36,10 @@
 ## 🔬 System Health & Test Coverage Progress
 
 ```text
-Modules: zone_engine.py + sector_engine.py + pattern_engine.py + gap_engine.py + trap_and_pattern_engine.py + scanner_and_trailing_engine.py + gtf_risk.py + paper_trader.py
-Total Suite Tests: 133 (100% Passed)
+Modules: zone_engine.py + sector_engine.py + pattern_engine.py + gap_engine.py + trap_and_pattern_engine.py + scanner_and_trailing_engine.py + gtf_risk.py + paper_trader.py + dhan_adapter.py
+Total Suite Tests: 140 (100% Passed)
 Cumulative Zone, Sector, Pattern, Gap, Trap, Trailing & Forward Tests: 104 (100% Passed)
-Risk & Execution Guardrail Tests: 29 (100% Passed)
+Risk & Execution Guardrail Tests: 36 (100% Passed)
 Linter Status: Ruff 0 errors, 0 warnings
 CI Status: GitHub Actions 100% Green (Python 3.10, 3.11, 3.12, 3.13)
 ```
