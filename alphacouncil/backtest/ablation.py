@@ -4,7 +4,8 @@ Codifies Section 8 of RFC v5.0, proving whether empirical alpha originates from
 the quantitative core (H1), the NLP sentiment factor (H2), or the risk engine.
 """
 
-from typing import Dict, List
+from typing import Dict, List, Optional
+from alphacouncil.config import AlphaCouncilConfig
 from alphacouncil.data.feed import Bar
 from alphacouncil.backtest.engine import BacktestEngine, BacktestResult
 
@@ -14,9 +15,15 @@ class AblationSuiteRunner:
     Executes the 7 ablation configurations and passive benchmarks across the exact same dataset.
     """
 
-    def __init__(self, n_trials_logged: int = 150, seed: int = 42):
+    def __init__(
+        self,
+        n_trials_logged: int = 150,
+        seed: int = 42,
+        config: Optional[AlphaCouncilConfig] = None,
+    ):
         self.n_trials_logged = n_trials_logged
         self.seed = seed
+        self.config = config or AlphaCouncilConfig()
 
     def run_full_suite(
         self, universe_data: Dict[str, List[Bar]]
@@ -28,6 +35,7 @@ class AblationSuiteRunner:
 
         # 1. alpha_Null: Random Coin Flip + Vol-Targeting (Isolates pure sizing contribution)
         eng_null = BacktestEngine(
+            config=self.config,
             use_sweep_signal=False,
             random_entry=True,
             use_vol_sizing=True,
@@ -43,6 +51,7 @@ class AblationSuiteRunner:
 
         # 2. alpha_Null_Time: Random Entry at Sweep Timing (Isolates filter vs signal alpha)
         eng_null_time = BacktestEngine(
+            config=self.config,
             use_sweep_signal=False,
             random_entry=True,
             use_vol_sizing=True,
@@ -58,6 +67,7 @@ class AblationSuiteRunner:
 
         # 3. alpha_Null_SMC: Random Entry + ATR Invalidation Stop (Tests stop loss edge alone)
         eng_null_smc = BacktestEngine(
+            config=self.config,
             use_sweep_signal=False,
             random_entry=True,
             use_vol_sizing=True,
@@ -73,6 +83,7 @@ class AblationSuiteRunner:
 
         # 4. alpha_Tech: Baseline Sweep Signal Alone ($H_1$) + Fixed 1% Risk
         eng_tech = BacktestEngine(
+            config=self.config,
             use_sweep_signal=True,
             random_entry=False,
             use_vol_sizing=False,
@@ -88,6 +99,7 @@ class AblationSuiteRunner:
 
         # 5. alpha_Tech_Risk: Sweep Detector ($H_1$) + Vol-Targeting + ATR Stops
         eng_tech_risk = BacktestEngine(
+            config=self.config,
             use_sweep_signal=True,
             random_entry=False,
             use_vol_sizing=True,
@@ -103,6 +115,7 @@ class AblationSuiteRunner:
 
         # 6. alpha_Tech_Fund: Sweep Detector ($H_1$) + Point-in-Time Fundamental Screening
         eng_tech_fund = BacktestEngine(
+            config=self.config,
             use_sweep_signal=True,
             random_entry=False,
             use_vol_sizing=True,
@@ -118,6 +131,7 @@ class AblationSuiteRunner:
 
         # 7. alpha_Council: Full Integrated Institutional System (H1 + H2 + Meta-Labeling + Kelly)
         eng_council = BacktestEngine(
+            config=self.config,
             use_sweep_signal=True,
             random_entry=False,
             use_vol_sizing=True,

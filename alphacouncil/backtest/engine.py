@@ -102,7 +102,18 @@ class BacktestEngine:
         self.circuit_guard = CircuitBandGuard(proximity_threshold_pct=0.015)
         self.kill_switch = IntradayKillSwitch()
         self.meta_labeler = LopezDePradoMetaLabeler()
-        self.friction_model = IndianMarketFrictionModel()
+        self.friction_model = IndianMarketFrictionModel(
+            stt_rate=config.fees.stt_delivery_rate,
+            brokerage_rate=config.fees.brokerage_rate,
+            brokerage_cap=config.fees.brokerage_per_order_cap,
+            nse_txn_rate=config.fees.exchange_txn_charge_rate,
+            sebi_rate=config.fees.sebi_turnover_rate,
+            stamp_duty_rate=config.fees.stamp_duty_buy_rate,
+            gst_rate=config.fees.gst_rate,
+            gamma_impact=config.fees.market_impact_gamma,
+            max_adv_participation=config.fees.max_adv_participation,
+            dp_charge_per_debit=0.0 if config.fees.brokerage_rate == 0.0 else 15.93,
+        )
 
     def run(
         self,

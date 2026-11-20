@@ -153,12 +153,12 @@ def test_sizing_production_mode_rejects_sub_200_override():
     from alphacouncil.config import PROD_THRESHOLD
 
     # Explicit threshold >= PROD_THRESHOLD is allowed in production
-    eng_ok = PositionSizingEngine(is_production=True, cold_start_trade_threshold=250)
-    assert eng_ok.cold_start_trade_threshold == 250
+    eng_ok = PositionSizingEngine(is_production=True, cold_start_trade_threshold=PROD_THRESHOLD + 50)
+    assert eng_ok.cold_start_trade_threshold == PROD_THRESHOLD + 50
 
     # Overriding to < PROD_THRESHOLD in production must raise ValueError
     with pytest.raises(ValueError, match="Production mode requires at least PROD_THRESHOLD"):
-        PositionSizingEngine(is_production=True, cold_start_trade_threshold=10)
+        PositionSizingEngine(is_production=True, cold_start_trade_threshold=PROD_THRESHOLD - 1)
 
     # In non-production (e.g. test harness), overriding < 200 is allowed
     eng_harness = PositionSizingEngine(is_production=False, cold_start_trade_threshold=10)

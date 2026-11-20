@@ -23,3 +23,9 @@
    - Revised Takeaway #2 to state "shows no statistically detectable difference at $n=30$" instead of "proves purely within noise".
    - Documented paired statistics for both 5-symbol and 25-symbol universes with standard errors and sign counts.
    - Clarified "trade count / trade frequency compression (81.5% reduction, 92 vs 497 trades)" rather than equating loosely to notional turnover.
+5. **Pessimistic Fill Convention & Zero-Friction Decoupling:**
+   - Documented in Slide 5 that `alpha_Null` gross negative drag (-₹249k on 25 symbols) originates from engine's conservative fill rules (stop-first tie-break and gap-down penalty without gap-up bonus).
+   - Decoupled friction drag (70–85% on Null, 85–>95% on Tech) from fill-convention drag via zero-friction benchmark (`alpha_Null` median Sharpe rebounds to -0.21 on 25 symbols and -0.07 on 5 symbols).
+6. **Linter & Test Rigor:**
+   - Cleaned unused import in `tests/test_risk_engine.py` by actively asserting against `PROD_THRESHOLD + 50` and `PROD_THRESHOLD - 1`.
+   - 133/133 tests green, Ruff clean across all directories (`alphacouncil`, `tests`, `scripts`).
