@@ -8,8 +8,9 @@ caches, and build artifacts.
 import os
 import zipfile
 
-ZIP_DESTINATION = r"C:\Users\vedpr\OneDrive\Desktop\alpha_council_complete_codebase.zip"
 REPO_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+DESKTOP_DIR = os.path.abspath(os.path.join(REPO_DIR, ".."))
+ZIP_DESTINATION = os.path.join(DESKTOP_DIR, "alpha_council_complete_codebase.zip")
 
 EXCLUDE_DIRS = {
     ".git",
@@ -22,7 +23,7 @@ EXCLUDE_DIRS = {
     "alpha_council.egg-info",
 }
 
-EXCLUDE_EXTENSIONS = {".pyc", ".pyo"}
+EXCLUDE_EXTENSIONS = {".pyc", ".pyo", ".zip"}
 
 EXCLUDE_EXACT_FILES = {
     "pack_zip.py",

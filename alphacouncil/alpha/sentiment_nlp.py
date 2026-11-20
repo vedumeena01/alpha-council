@@ -6,9 +6,10 @@ with pre-2020 frozen weights to guarantee strictly clean out-of-sample inference
 Includes the Binomial Contamination Audit Harness and Synthetic Anonymization from trading-agents-lab.
 """
 
+import hashlib
+import math
 from dataclasses import dataclass
 from typing import List, Tuple
-import math
 import numpy as np
 
 
@@ -118,7 +119,8 @@ class FinBertSentimentExtractor:
         Synthetic Anonymization Mode (trading-agents-lab pattern).
         Strips ticker symbols, normalizes time indices, and rebases prices to 100.0.
         """
-        synthetic_symbol = f"SYNTH_{hash(symbol) % 10000:04d}"
+        sym_digest = int(hashlib.sha256(symbol.encode("utf-8")).hexdigest(), 16)
+        synthetic_symbol = f"SYNTH_{sym_digest % 10000:04d}"
         normalized_indices = list(range(len(dates)))
         rebased_prices = [round((p / prices[0]) * 100.0, 2) for p in prices]
         return synthetic_symbol, normalized_indices, rebased_prices

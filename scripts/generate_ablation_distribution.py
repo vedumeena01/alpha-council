@@ -110,16 +110,33 @@ def main():
     parser = argparse.ArgumentParser(description="AlphaCouncil Multi-Seed Ablation Distribution Generator")
     parser.add_argument("--seeds", type=int, default=30, help="Number of random seeds to evaluate")
     parser.add_argument("--bars", type=int, default=250, help="Bars per symbol (default 250)")
-    parser.add_argument("--universe", choices=["5", "25"], default="5", help="Universe size: 5 or 25 symbols")
+    parser.add_argument("--universe", choices=["5", "25", "both"], default="5", help="Universe size: 5, 25, or both")
     args = parser.parse_args()
 
-    symbols = DEFAULT_SYMBOLS_5 if args.universe == "5" else DEFAULT_SYMBOLS_25
-    u_label = f"{len(symbols)} NSE Constituents, {args.bars} bars"
-    print(f"Executing {args.seeds} seeds on {u_label}...")
+    if args.universe == "both":
+        # Universe 1: 5 symbols, 250 bars
+        u1_symbols = DEFAULT_SYMBOLS_5
+        u1_label = "5 NSE Constituents, 250 bars"
+        print(f"Executing {args.seeds} seeds on {u1_label}...")
+        stats1 = run_ablation_distribution(u1_symbols, n_bars=250, n_seeds=args.seeds)
+        md1 = format_markdown_table(stats1, args.seeds, u1_label)
+        print("\n" + md1 + "\n")
 
-    stats = run_ablation_distribution(symbols, n_bars=args.bars, n_seeds=args.seeds)
-    md = format_markdown_table(stats, args.seeds, u_label)
-    print("\n" + md)
+        # Universe 2: 25 symbols, 500 bars
+        u2_symbols = DEFAULT_SYMBOLS_25
+        u2_label = "25 NSE Constituents, 500 bars"
+        print(f"Executing {args.seeds} seeds on {u2_label}...")
+        stats2 = run_ablation_distribution(u2_symbols, n_bars=500, n_seeds=args.seeds)
+        md2 = format_markdown_table(stats2, args.seeds, u2_label)
+        print("\n" + md2)
+    else:
+        symbols = DEFAULT_SYMBOLS_5 if args.universe == "5" else DEFAULT_SYMBOLS_25
+        u_label = f"{len(symbols)} NSE Constituents, {args.bars} bars"
+        print(f"Executing {args.seeds} seeds on {u_label}...")
+
+        stats = run_ablation_distribution(symbols, n_bars=args.bars, n_seeds=args.seeds)
+        md = format_markdown_table(stats, args.seeds, u_label)
+        print("\n" + md)
 
 
 if __name__ == "__main__":

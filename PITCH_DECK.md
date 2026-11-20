@@ -128,23 +128,37 @@ Lower Circuit (-10%/-20%)  ─────────────────�
 
 ## Slide 5: Architectural Ablation: Isolating Alpha & Risk Mechanics
 
-AlphaCouncil executes an automated 7-model orthogonal ablation suite across identical multi-asset feeds. Rather than displaying hand-typed single-seed numbers or hypothetical ranges, the metrics below are **empirically generated via `scripts/generate_ablation_distribution.py` across 30 random seeds** ($N_{\text{trials}} = 150$):
+AlphaCouncil executes an automated 7-model orthogonal ablation suite across identical multi-asset feeds. Rather than displaying hand-typed numbers, hypothetical ranges, or cherry-picked single seeds, the distributions below are **empirically generated via `scripts/generate_ablation_distribution.py` across 30 random seeds** ($N_{\text{trials}} = 150$) for both benchmark universes:
+
+### Universe 1: Standard Verification (30 Seeds on 5 NSE Constituents, 250 bars)
 
 | Configuration | Architectural Role | Median Trades | Sharpe Min / Median / Max | Median DSR | Win Rate Med | PF Med | Seeds Sharpe > 0 |
 | :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: |
-| **`alpha_Null`** | Random Coin Flip + Vol Sizing | 54 | -2.78 / **-1.21** / 1.34 | 0.0010 | 25.3% | 0.99 | 3/30 (10%) |
-| **`alpha_Null_Time`** | Random Entry at Setup Timings | 54 | -3.73 / **-1.48** / 0.57 | 0.0010 | 27.5% | 0.84 | 4/30 (13%) |
-| **`alpha_Null_SMC`** | Random Entry + ATR Stops | 37 | -2.64 / **-0.77** / 2.41 | 0.0010 | 35.2% | 0.98 | 6/30 (20%) |
-| **`alpha_Tech`** | Sweep Signal Alone ($H_1$) | 11 | -2.96 / **-0.26** / 1.48 | 0.0030 | 33.3% | 1.17 | 10/30 (33%) |
-| **`alpha_Tech_Risk`** | Sweep + Vol-Sizing + ATR Stops | 9 | -2.84 / **-0.19** / 1.65 | 0.0030 | 36.4% | 1.13 | 12/30 (40%) |
-| **`alpha_Tech_Fund`** | Sweep + PIT Filter + ATR Stops | 9 | -2.84 / **-0.19** / 1.65 | 0.0030 | 36.4% | 1.13 | 12/30 (40%) |
-| **`alpha_Council`** | Full System (H1 + H2 + Meta + Kelly) | 9 | -2.91 / **-0.14** / 2.03 | 0.0045 | 34.8% | 1.15 | 13/30 (43%) |
+| **`alpha_Null`** | Random Coin Flip + Vol Sizing | 53 | -2.59 / **-1.06** / 0.54 | 0.0010 | 24.6% | 0.98 | 3/30 (10%) |
+| **`alpha_Null_Time`** | Random Entry + PIT Filter | 51 | -3.31 / **-1.25** / 1.11 | 0.0010 | 25.7% | 0.97 | 5/30 (17%) |
+| **`alpha_Null_SMC`** | Random Entry + ATR Stops | 36 | -2.56 / **-0.51** / 1.26 | 0.0010 | 37.6% | 1.11 | 7/30 (23%) |
+| **`alpha_Tech`** | Sweep Signal Alone ($H_1$) | 11 | -2.96 / **-0.23** / 1.48 | 0.0030 | 33.3% | 1.17 | 10/30 (33%) |
+| **`alpha_Tech_Risk`** | Sweep + Vol-Sizing + ATR Stops | 9 | -2.84 / **-0.20** / 1.65 | 0.0030 | 36.4% | 1.12 | 11/30 (37%) |
+| **`alpha_Tech_Fund`** | Sweep + PIT Filter + ATR Stops | 8 | -2.84 / **-0.46** / 1.65 | 0.0010 | 34.8% | 0.97 | 11/30 (37%) |
+| **`alpha_Council`** | Full System (H1 + H2 + Meta + Kelly) | 8 | -2.83 / **-0.46** / 1.06 | 0.0010 | 33.3% | 0.95 | 9/30 (30%) |
+
+### Universe 2: Expanded Scale & Kelly Threshold (30 Seeds on 25 NSE Constituents, 500 bars)
+
+| Configuration | Architectural Role | Median Trades | Sharpe Min / Median / Max | Median DSR | Win Rate Med | PF Med | Seeds Sharpe > 0 |
+| :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: |
+| **`alpha_Null`** | Random Coin Flip + Vol Sizing | 527 | -4.25 / **-2.29** / -0.58 | 0.0010 | 27.4% | 0.99 | 0/30 (0%) |
+| **`alpha_Null_Time`** | Random Entry + PIT Filter | 518 | -3.29 / **-2.12** / -0.67 | 0.0010 | 27.9% | 1.03 | 0/30 (0%) |
+| **`alpha_Null_SMC`** | Random Entry + ATR Stops | 366 | -2.85 / **-1.23** / -0.01 | 0.0010 | 35.9% | 1.08 | 0/30 (0%) |
+| **`alpha_Tech`** | Sweep Signal Alone ($H_1$) | 109 | -2.35 / **-0.76** / 0.72 | 0.0010 | 31.7% | 1.05 | 8/30 (27%) |
+| **`alpha_Tech_Risk`** | Sweep + Vol-Sizing + ATR Stops | 88 | -2.11 / **-0.48** / 0.98 | 0.0010 | 36.2% | 1.14 | 8/30 (27%) |
+| **`alpha_Tech_Fund`** | Sweep + PIT Filter + ATR Stops | 87 | -2.09 / **-0.56** / 1.10 | 0.0010 | 36.1% | 1.10 | 8/30 (27%) |
+| **`alpha_Council`** | Full System (H1 + H2 + Meta + Kelly) | 88 | -2.28 / **-0.58** / 1.04 | 0.0010 | 35.1% | 1.08 | 4/30 (13%) |
 
 > [!NOTE]
 > **Empirical Truth & Quantitative Takeaways from Multi-Seed Testing:**
-> 1. **DSR on Synthetic Martingales is ~0.001:** Because the synthetic market feed is an unbiased martingale with zero planted economic alpha, the Marcos López de Prado Deflated Sharpe Ratio (DSR) correctly and ruthlessly rejects claims of statistical significance (DSR $\approx 0.0010 - 0.0045$). Proving statistically significant institutional DSR requires execution on real historical exchange tick feeds.
-> 2. **Progressive Risk Truncation:** Moving from naive coin-flip (`alpha_Null`) to full risk controls (`alpha_Council`) mechanically lifts median Sharpe from **-1.21 to -0.14** and increases the frequency of profitable seeds from **10% to 43%**, proving that risk controls successfully truncate downside left-tail bleed.
-> 3. **Trade Frequency & Universe Scaling:** On 5 symbols / 250 bars (1,250 bar-days), swing setups produce ~9–11 trades. On 25 symbols / 500 bars (12,500 bar-days), trade count expands to 86–111 trades, successfully crossing the 50-trade Kelly calibration threshold. Parameters (`lookback=15, volume_factor=1.2`) are explicitly documented as **synthetic benchmark exercisers**, since i.i.d. synthetic volume cannot model real market order-flow volume spikes.
+> 1. **Zero-Alpha Feed Behavior & DSR (~0.0010):** Because the synthetic market generator is an unbiased martingale with zero planted economic alpha, every model configuration produces a negative net median Sharpe after statutory Indian transaction friction (STT, exchange turnover, GST, stamp duty, and Almgren-Chriss impact). The Marcos López de Prado Deflated Sharpe Ratio (DSR) correctly and ruthlessly rejects claims of statistical significance ($\text{DSR} \approx 0.0010$), confirming that the evaluation framework does not produce false-positive alpha on synthetic noise.
+> 2. **Turnover Compression vs Friction Drag:** Moving from unconstrained coin-flip execution (`alpha_Null`, 527 trades on 25 symbols) to selective technical sweep filtering (`alpha_Tech_Risk`, 88 trades) significantly compresses unnecessary churn, reducing friction drag from **Sharpe −2.29 to −0.48** (25 symbols) and **−1.06 to −0.20** (5 symbols). However, full council (`alpha_Council`, median Sharpe −0.58 on 25 symbols, −0.46 on 5 symbols) does not fabricate positive edge out of zero-alpha noise; institutional outperformance requires real exchange feeds with genuine non-zero order-flow imbalance.
+> 3. **Kelly Calibration Threshold Scaling:** On 5 symbols / 250 bars (1,250 bar-days), swing setups produce ~8–11 trades, safely retaining the system in conservative volatility-targeting mode. On the 25-symbol expanded universe (12,500 bar-days), trade count expands to 87–109 trades, successfully crossing the test harness calibration threshold (`cold_start_trade_threshold = 50`). Production live deployment enforces `PROD_THRESHOLD = 200` trades. Parameters (`lookback=15, volume_factor=1.2`) are explicitly documented as **synthetic benchmark exercisers**, since i.i.d. synthetic volume cannot model real market order-flow volume spikes.
 
 ---
 

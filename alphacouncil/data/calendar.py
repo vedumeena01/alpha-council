@@ -7,6 +7,7 @@ retrospective announcement leakage and enforce the 24-hour pre-earnings liquidat
 from dataclasses import dataclass
 from typing import Dict, List, Optional
 import datetime
+import hashlib
 
 
 @dataclass
@@ -123,8 +124,8 @@ class PointInTimeCalendar:
         if self.is_earnings_within_window(symbol, current_date, days_ahead=5):
             return f"{symbol} corporate release: board scheduled to review EBITDA growth and capex guidance."
 
-        # Periodic financial disclosures based on date hash
-        date_hash = sum(ord(c) for c in (symbol + current_date))
+        # Periodic financial disclosures based on deterministic SHA-256 hash (PYTHONHASHSEED independent)
+        date_hash = int(hashlib.sha256((symbol + current_date).encode("utf-8")).hexdigest(), 16)
         if date_hash % 9 == 0:
             return f"{symbol} quarterly operational update: order book record and market share gain across key divisions."
         elif date_hash % 11 == 0:

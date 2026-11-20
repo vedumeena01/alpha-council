@@ -55,6 +55,11 @@ class StatutoryFeeConfig(BaseModel):
     max_adv_participation: float = Field(default=0.025, description="2.5% maximum interval ADV participation")
 
 
+PROD_THRESHOLD: int = 200          # Mandatory institutional production standard (asymptotic sample significance)
+PROD_KELLY_THRESHOLD: int = 200    # Production trade threshold for unconstrained Kelly sizing
+HARNESS_KELLY_THRESHOLD: int = 50  # Test harness threshold to exercise calibration code path
+
+
 class RiskParameters(BaseModel):
     """Institutional Risk Limits and Guardrail Configuration."""
     base_risk_fraction: float = Field(default=0.010, description="1.0% base equity risk per trade")
@@ -67,7 +72,7 @@ class RiskParameters(BaseModel):
     mwpl_ban_entry_threshold: float = Field(default=0.95, description="95% MWPL F&O derivative hedge ban entry")
     mwpl_ban_exit_threshold: float = Field(default=0.80, description="80% MWPL F&O derivative hedge ban exit")
     min_atr_stop_multiple: float = Field(default=0.25, description="Skip setup if stop distance < 0.25 * ATR14 (micro-noise filter)")
-    cold_start_trade_threshold: int = Field(default=50, description="Test harness threshold: 50 trades. Asymptotic institutional production standard is 200 trades.")
+    cold_start_trade_threshold: int = Field(default=HARNESS_KELLY_THRESHOLD, description="Test harness threshold: 50 trades. Asymptotic institutional production standard is PROD_THRESHOLD = 200 trades.")
     rolling_calibration_window: int = Field(default=250, description="Rolling window for Brier Skill Score")
 
 
@@ -272,6 +277,7 @@ retrospective announcement leakage and enforce the 24-hour pre-earnings liquidat
 from dataclasses import dataclass
 from typing import Dict, List, Optional
 import datetime
+import hashlib
 
 
 @dataclass
@@ -388,8 +394,8 @@ class PointInTimeCalendar:
         if self.is_earnings_within_window(symbol, current_date, days_ahead=5):
             return f"{symbol} corporate release: board scheduled to review EBITDA growth and capex guidance."
 
-        # Periodic financial disclosures based on date hash
-        date_hash = sum(ord(c) for c in (symbol + current_date))
+        # Periodic financial disclosures based on deterministic SHA-256 hash (PYTHONHASHSEED independent)
+        date_hash = int(hashlib.sha256((symbol + current_date).encode("utf-8")).hexdigest(), 16)
         if date_hash % 9 == 0:
             return f"{symbol} quarterly operational update: order book record and market share gain across key divisions."
         elif date_hash % 11 == 0:
@@ -3828,9 +3834,10 @@ with pre-2020 frozen weights to guarantee strictly clean out-of-sample inference
 Includes the Binomial Contamination Audit Harness and Synthetic Anonymization from trading-agents-lab.
 """
 
+import hashlib
+import math
 from dataclasses import dataclass
 from typing import List, Tuple
-import math
 import numpy as np
 
 
@@ -3940,7 +3947,8 @@ class FinBertSentimentExtractor:
         Synthetic Anonymization Mode (trading-agents-lab pattern).
         Strips ticker symbols, normalizes time indices, and rebases prices to 100.0.
         """
-        synthetic_symbol = f"SYNTH_{hash(symbol) % 10000:04d}"
+        sym_digest = int(hashlib.sha256(symbol.encode("utf-8")).hexdigest(), 16)
+        synthetic_symbol = f"SYNTH_{sym_digest % 10000:04d}"
         normalized_indices = list(range(len(dates)))
         rebased_prices = [round((p / prices[0]) * 100.0, 2) for p in prices]
         return synthetic_symbol, normalized_indices, rebased_prices
@@ -6204,6 +6212,9 @@ Codifies Section 4A of RFC v5.0 with zero unit mismatch.
 from dataclasses import dataclass
 from typing import List, Optional
 import numpy as np
+from alphacouncil.config import PROD_THRESHOLD, HARNESS_KELLY_THRESHOLD
+
+__all__ = ["PositionSizingEngine", "SizingCalculation", "PROD_THRESHOLD", "HARNESS_KELLY_THRESHOLD"]
 
 
 @dataclass
@@ -6238,7 +6249,7 @@ class PositionSizingEngine:
         max_risk_ceiling: float = 0.015,    # 1.5% max risk
         max_notional_pct: float = 0.20,     # 20% max single-stock notional
         min_atr_multiple: float = 0.25,      # Skip if stop < 0.25 * ATR (filters micro-noise without over-discarding sweeps)
-        cold_start_trade_threshold: int = 50, # Minimum closed trades to exit cold start (50 for test harness; 200 for institutional prod)
+        cold_start_trade_threshold: int = HARNESS_KELLY_THRESHOLD, # Minimum closed trades to exit cold start (50 for test harness; 200 for institutional prod)
     ):
         self.base_risk_fraction = base_risk_fraction
         self.target_annual_vol = target_annual_vol
