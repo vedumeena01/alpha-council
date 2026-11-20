@@ -81,7 +81,7 @@ def run_predictive_dashboard():
                     "quality": "HIGH PRIORITY (Trend Aligned)",
                 })
             else:
-                action = f"AVOID (Counter-Trend Bearish)"
+                action = "AVOID (Counter-Trend Bearish)"
         else:
             zone_str = "No Fresh Zone Below CMP"
             rrr_str = "N/A"
