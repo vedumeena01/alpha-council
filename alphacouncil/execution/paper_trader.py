@@ -19,8 +19,9 @@ Executes Constitution Draft v1.2 under realistic Indian market microstructure:
   * Drawdown Circuit Breakers (2% Intraday Halt, 6% Monthly Freeze).
 """
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, asdict
 from enum import Enum
+import json
 from typing import Dict, List, Optional, Tuple
 import numpy as np
 
@@ -267,7 +268,9 @@ class ForwardPaperTestingEngine:
             # If opening price gaps below active stop-loss, broker fills at OPEN price!
             if bar.open <= pos.current_stop_loss:
                 gap_slip = (pos.current_stop_loss - bar.open) * pos.shares
-                symbols_to_close.append((symbol, bar.open, ExitReason.GAP_DOWN_STOP_SLIP, gap_slip))
+                is_trailed = pos.is_risk_free_trailed or (pos.current_stop_loss > pos.entry_price)
+                reason = ExitReason.TRAILING_STOP_EXIT if (is_trailed and bar.open >= pos.entry_price) else ExitReason.GAP_DOWN_STOP_SLIP
+                symbols_to_close.append((symbol, bar.open, reason, gap_slip))
                 continue
 
             # 3. Intraday Target Hit (High reached target)
@@ -277,7 +280,9 @@ class ForwardPaperTestingEngine:
 
             # 4. Intraday Stop-Loss Hit (Low breached stop-loss)
             if bar.low <= pos.current_stop_loss:
-                symbols_to_close.append((symbol, pos.current_stop_loss, ExitReason.STOP_LOSS_HIT, 0.0))
+                is_trailed = pos.is_risk_free_trailed or (pos.current_stop_loss >= pos.entry_price)
+                reason = ExitReason.TRAILING_STOP_EXIT if is_trailed else ExitReason.STOP_LOSS_HIT
+                symbols_to_close.append((symbol, pos.current_stop_loss, reason, 0.0))
                 continue
 
             # 5. Dynamic Trailing Stop-Loss Ratcheting
@@ -642,3 +647,20 @@ class ForwardPaperTestingEngine:
             circuit_breakers_tripped=circuit_breakers_count,
             trade_journal=self.completed_trades,
         )
+
+    def export_journal_to_json(self, filepath: str) -> None:
+        """Serializes all completed trade audit records to structured JSON."""
+        class NpEncoder(json.JSONEncoder):
+            def default(self, obj):
+                if isinstance(obj, (np.bool_, bool)):
+                    return bool(obj)
+                if isinstance(obj, np.integer):
+                    return int(obj)
+                if isinstance(obj, np.floating):
+                    return float(obj)
+                if isinstance(obj, np.ndarray):
+                    return obj.tolist()
+                return super().default(obj)
+
+        with open(filepath, "w", encoding="utf-8") as f:
+            json.dump([asdict(t) for t in self.completed_trades], f, indent=2, cls=NpEncoder)

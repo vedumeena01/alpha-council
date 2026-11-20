@@ -111,8 +111,11 @@ class PreTradeRiskEngine:
             )
 
         # 5. Single-Stock Concentration Cap (Existing Position + Proposed Order <= 20% Notional)
+        effective_quantity = proposed_quantity
+        capping_reasons = []
+
         existing_notional = max(0, current_position_shares) * entry_price
-        proposed_notional = proposed_quantity * entry_price
+        proposed_notional = effective_quantity * entry_price
         total_proposed_notional = existing_notional + proposed_notional
         max_notional_allowed = current_equity * self.max_single_stock_pct
 
@@ -126,14 +129,12 @@ class PreTradeRiskEngine:
                     reason=f"CONCENTRATION_EXCEEDED: Position already at or exceeds 20% cap (Max: ₹{max_notional_allowed:,.2f})",
                     rejection_code="ERR_CONCENTRATION",
                 )
-            return RiskValidationResult(
-                is_approved=True,
-                adjusted_quantity=capped_qty,
-                reason=f"APPROVED_WITH_CAPPING: Quantity capped from {proposed_quantity} to {capped_qty} shares (20% notional ceiling)",
-            )
+            effective_quantity = capped_qty
+            capping_reasons.append(f"Capped from {proposed_quantity} to {capped_qty} shares (20% notional ceiling)")
 
         # 6. Sector Concentration Cap (Existing Sector Notional + Proposed Notional <= 30%)
-        total_sector_notional = current_sector_notional + proposed_notional
+        proposed_sector_notional = effective_quantity * entry_price
+        total_sector_notional = current_sector_notional + proposed_sector_notional
         max_sector_notional_allowed = current_equity * self.max_sector_pct
         if total_sector_notional > max_sector_notional_allowed:
             return RiskValidationResult(
@@ -146,7 +147,7 @@ class PreTradeRiskEngine:
         # 7. Portfolio Max Concurrent Open Risk Cap (Current Open Risk + Proposed Trade Risk <= 3.0%)
         effective_trade_risk_pct = proposed_trade_risk_pct
         if effective_trade_risk_pct <= 0.0 and stop_loss_price is not None and stop_loss_price > 0:
-            trade_loss = proposed_quantity * abs(entry_price - stop_loss_price)
+            trade_loss = effective_quantity * abs(entry_price - stop_loss_price)
             effective_trade_risk_pct = trade_loss / current_equity
 
         if current_portfolio_open_risk_pct + effective_trade_risk_pct > self.max_total_open_risk_pct + 1e-6:
@@ -161,15 +162,33 @@ class PreTradeRiskEngine:
         if stop_loss_price is not None and stop_loss_price > 0:
             nominal_risk_per_share = abs(entry_price - stop_loss_price)
             stressed_loss_per_share = nominal_risk_per_share * 2.0  # 2x stop slippage gap stress
-            total_stressed_loss = proposed_quantity * stressed_loss_per_share
+            total_stressed_loss = effective_quantity * stressed_loss_per_share
             if total_stressed_loss > current_equity * max_gap_stress_pct:
                 stressed_capped_qty = int((current_equity * max_gap_stress_pct) // stressed_loss_per_share)
-                return RiskValidationResult(
-                    is_approved=True if stressed_capped_qty > 0 else False,
-                    adjusted_quantity=stressed_capped_qty,
-                    reason=f"GAP_STRESS_APPLIED: Quantity scaled down to {stressed_capped_qty} shares to survive 2x stop gap-down within 2.0% equity loss",
-                    rejection_code=None if stressed_capped_qty > 0 else "ERR_GAP_STRESS_EXCEEDED",
-                )
+                if stressed_capped_qty <= 0:
+                    return RiskValidationResult(
+                        is_approved=False,
+                        adjusted_quantity=0,
+                        reason="ERR_GAP_STRESS_EXCEEDED: Position cannot survive 2x stop gap-down within 2.0% equity loss",
+                        rejection_code="ERR_GAP_STRESS_EXCEEDED",
+                    )
+                effective_quantity = min(effective_quantity, stressed_capped_qty)
+                capping_reasons.append(f"GAP_STRESS_APPLIED: Capped to {effective_quantity} shares (2x stop gap-down 2.0% equity limit)")
+
+        if effective_quantity <= 0:
+            return RiskValidationResult(
+                is_approved=False,
+                adjusted_quantity=0,
+                reason="ORDER_DISALLOWED: Effective quantity reduced to 0 by pre-trade risk gates",
+                rejection_code="ERR_RISK_GATES_ZERO_QTY",
+            )
+
+        if capping_reasons:
+            return RiskValidationResult(
+                is_approved=True,
+                adjusted_quantity=effective_quantity,
+                reason="APPROVED_WITH_CAPPING: " + "; ".join(capping_reasons),
+            )
 
         return RiskValidationResult(
             is_approved=True,

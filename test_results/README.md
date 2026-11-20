@@ -28,7 +28,7 @@
 | **18** | Gap Theory (Structural & Behavioral, 4 Applications, Disappearing & Window Gap) | 7 | **100%** (7/7) | 0.41s | Inside vs. Outside Gap, Novice vs. Pro Gap, App 1 (Novice in Zone, +1 Score), App 2 (Novice in Pro Gap, +2 Score), App 3 (Pro Out Confirm), App 4 (Master Setup), Window Gap (Elevated vs. Disciplined Base), Disappearing Gap & Myth Debunking | [`EPISODE_18_TEST_RESULTS.md`](EPISODE_18_TEST_RESULTS.md) |
 | **19** | Market Traps & Truth Behind Conventional Patterns (LOTL, Bull/Bear Traps, H&S, Flags, RSI) | 7 | **100%** (7/7) | 0.42s | LOTL Stop-Loss Mandate, Balanced Middle Entry, 3+ Stacking Limit, Cross-Wave LOTL, Bull & Bear Trap Detectors, H&S / Double Bottom / Cup & Handle / Channel Truth, Overbought Uptrend Trap & RSI +1 Bonus | [`EPISODE_19_TEST_RESULTS.md`](EPISODE_19_TEST_RESULTS.md) |
 | **20** | Putting It All Together (Dynamic Demand Trailing, 52W High Scanner & Grand Synthesis) | 7 | **100%** (7/7) | 0.41s | Weekly Demand-Anchored Dynamic Trailing, Confirmed Candle Close Exit, 52W High Approaching Shortcut, 30m Daily Stock Scanner, Price Alert Mandate ($PL + 2.0$), 7/7 Baseline Priority Rule & 15-Point Top-Down Synthesis | [`EPISODE_20_TEST_RESULTS.md`](EPISODE_20_TEST_RESULTS.md) |
-| **Sim** | **Empirical Forward Paper Testing Engine (92-Trade Walk-Forward)** | **2** | **100%** (2/2) | **0.55s** | **Strict Pre-Trade Risk (30% Sector, 3% Open Risk, 2x Gap Stress), Pending Limit Pullback Execution, Zero Lookahead Bias, LODR 29 Earnings Liquidation, Dynamic Trailing Ratchet, Statutory Friction Drag** | [`FORWARD_PAPER_TESTING_REPORT.md`](FORWARD_PAPER_TESTING_REPORT.md) |
+| **Sim** | **Empirical Forward Paper Testing Engine (48-Trade Walk-Forward)** | **2** | **100%** (2/2) | **0.55s** | **Strict Pre-Trade Risk (30% Sector, 3% Open Risk, 2x Gap Stress), Pending Limit Pullback Execution, Zero Lookahead Bias, LODR 29 Earnings Liquidation, Dynamic Trailing Ratchet, Statutory Friction Drag** | [`FORWARD_PAPER_TESTING_REPORT.md`](FORWARD_PAPER_TESTING_REPORT.md) |
 | **Total** | **All Episodes & Forward Simulation (Grand Curriculum Complete!)** | **104** | **100%** (104/104) | **1.50s** | **Full GTF Price Action, Risk, Execution Stances, Confirmation Reversal, 15-Point Master Revision, Sectoral, Candlestick Pattern Truth, Gap Theory, Market Traps, Dynamic Trailing, Scanner & Forward Paper Execution (`zone_engine.py` + `sector_engine.py` + `pattern_engine.py` + `gap_engine.py` + `trap_and_pattern_engine.py` + `scanner_and_trailing_engine.py` + `gtf_risk.py` + `paper_trader.py`)** | - |
 
 ---
@@ -37,17 +37,17 @@
 
 ```text
 Modules: zone_engine.py + sector_engine.py + pattern_engine.py + gap_engine.py + trap_and_pattern_engine.py + scanner_and_trailing_engine.py + gtf_risk.py + paper_trader.py
-Total Suite Tests: 126 (100% Passed)
+Total Suite Tests: 130 (100% Passed)
 Cumulative Zone, Sector, Pattern, Gap, Trap, Trailing & Forward Tests: 104 (100% Passed)
-Risk & Execution Guardrail Tests: 22 (100% Passed)
+Risk & Execution Guardrail Tests: 26 (100% Passed)
 Linter Status: Ruff 0 errors, 0 warnings
-CI Status: GitHub Actions 100% Green (Python 3.11 & 3.12)
+CI Status: GitHub Actions 100% Green (Python 3.10, 3.11, 3.12, 3.13)
 ```
 
 ---
 
 ## 🗂️ File Directory
-- [`FORWARD_PAPER_TESTING_REPORT.md`](FORWARD_PAPER_TESTING_REPORT.md) - **Empirical 92-Trade Walk-Forward Paper Testing Audit Report (+9.68% Net PnL, 38.04% Win Rate, 2.73x Asymmetry, ₹49,598 Statutory Drag, ₹28,012 Gap Drag).**
+- [`FORWARD_PAPER_TESTING_REPORT.md`](FORWARD_PAPER_TESTING_REPORT.md) - **Simulated Walk-Forward Paper Testing Audit Report (+1.48% Net PnL, 37.50% Win Rate, 2.31x Asymmetry, ₹24,908 Statutory Drag, ₹16,929 Gap Drag).**
 - [`paper_trading_journal.json`](paper_trading_journal.json) - **Machine-readable trade journal with granular tick-by-tick logs for all 92 closed trades.**
 - [`EPISODE_01_TEST_RESULTS.md`](EPISODE_01_TEST_RESULTS.md) - Session partitions & candle anatomy.
 - [`EPISODE_02_TEST_RESULTS.md`](EPISODE_02_TEST_RESULTS.md) - 50% candle classification.

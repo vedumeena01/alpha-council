@@ -3,7 +3,7 @@
 # ⚡ AlphaCouncil (α-Council)
 ### *Autonomous Multi-Agent Quantitative Trading System for Indian Equities (NSE/BSE)*
 
-[![Build & Tests](https://img.shields.io/badge/pytest-24%2F24%20passing-brightgreen?style=for-the-badge&logo=pytest&logoColor=white)](https://github.com/vedumeena01/alpha-council/actions)
+[![Build & Tests](https://img.shields.io/badge/pytest-130%2F130%20passing-brightgreen?style=for-the-badge&logo=pytest&logoColor=white)](https://github.com/vedumeena01/alpha-council/actions)
 [![Code Quality](https://img.shields.io/badge/ruff-0%20errors-000000?style=for-the-badge&logo=ruff&logoColor=white)](https://github.com/astral-sh/ruff)
 [![Python Version](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12%20%7C%203.13-blue?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
 [![Market](https://img.shields.io/badge/Exchange-NSE%20%2F%20BSE-FF6F00?style=for-the-badge&logo=googlefinance&logoColor=white)](https://www.nseindia.com)
@@ -287,19 +287,26 @@ alpha-council/
 │   │   └── demo.py              # Live Terminal Dashboard Launcher (`python -m alphacouncil.cli.demo`)
 │   ├── run_council.py           # Master End-to-End Pipeline & Interactive Pitch Runner
 │   └── config.py                # Global Parameter & Statutory Fee Manifest
-├── tests/                       # Unit & Integration Quantitative Test Suite (19/19 Passed)
+├── tests/                       # Unit & Integration Quantitative Test Suite (130/130 Passed)
 │   ├── test_ablation.py         # 7-Model Ablation Suite Integrity Tests
 │   ├── test_alpha_models.py     # Triple Barrier & FinBERT Sentiment Tests
 │   ├── test_friction_model.py   # Oct 1 2024 SEBI Statutory Fee & Slippage Tests
 │   ├── test_oms.py              # OMS GTT Sync & Orphan Stop Cancellation Tests
-│   ├── test_risk_engine.py      # Pre-Trade Fail-Closed & Kill Switch Halt Tests
-│   └── test_sweep_detector.py   # Lookahead-Free Sweep Detection & Gap-Down Tests
+│   ├── test_risk_engine.py      # Pre-Trade Fail-Closed, Concentration & Kill Switch Tests
+│   ├── test_sweep_detector.py   # Lookahead-Free Sweep Detection & Gap-Down Tests
+│   ├── test_zone_engine.py      # 102 Tests Covering Episodes 01-20 Institutional GTF Systems
+│   └── test_paper_trader.py     # Forward Paper Trading Engine Microstructure & Gap Fills
 ├── TRADING_AI_PROPOSAL_REPORT.md# RFC v5.0 Master Quantitative Whitepaper
 ├── PITCH_DECK.md                # 9-Slide Architecture & Strategy Overview
 ├── CODE_REVIEW_REPORT.md        # Internal Quantitative Audit & Code Review
 ├── SYSTEM_CONS_AND_LIMITATIONS.md# Exhaustive Cons, Failure Modes & Defense Guide
+├── test_results/                # Master Test Registry & Empirical Journal Logs
+│   ├── README.md                # Master Comparison Matrix across all 20 Episodes
+│   ├── FORWARD_PAPER_TESTING_REPORT.md # Simulated Walk-Forward Audit Report
+│   └── paper_trading_journal.json      # Structured Tick-by-Tick Audit Logs (48 Trades)
 ├── docs/
-│   └── CONSOLIDATED_CODEBASE.md # Single-Document Reference for Code Reviewers
+│   └── CONSOLIDATED_CODEBASE.md # Pointer to Root Single-Document Codebase
+├── CONSOLIDATED_CODEBASE.md     # Single-Document Reference for Code Reviewers
 ├── pyproject.toml               # Modern Build System & Dependency Manifest
 └── README.md                    # Institutional Project Documentation
 ```
@@ -324,7 +331,7 @@ pip install -e .
 pip install pytest ruff rich numpy
 ```
 
-### 2. Run Test Suite (19/19 Deterministic Checks)
+### 2. Run Test Suite (130/130 Deterministic Checks)
 
 ```bash
 pytest -v
@@ -332,27 +339,7 @@ pytest -v
 
 Expected output:
 ```text
-tests/test_ablation.py::test_ablation_suite_full_execution PASSED        [  5%]
-tests/test_alpha_models.py::test_triple_barrier_stop_loss_hit PASSED     [ 10%]
-tests/test_alpha_models.py::test_triple_barrier_take_profit_hit PASSED   [ 15%]
-tests/test_alpha_models.py::test_finbert_sentiment_and_anonymization PASSED [ 21%]
-tests/test_friction_model.py::test_statutory_friction_exact_calculation PASSED [ 26%]
-tests/test_oms.py::test_oms_bracket_entry_and_partial_fill_sync PASSED   [ 31%]
-tests/test_oms.py::test_oms_cancel_entry_and_orphaned_stops PASSED       [ 36%]
-tests/test_oms.py::test_oms_deterministic_idempotency_replay PASSED      [ 42%]
-tests/test_risk_engine.py::test_pre_trade_risk_fail_closed_on_zero_equity PASSED [ 47%]
-tests/test_risk_engine.py::test_pre_trade_risk_single_stock_notional_cap PASSED [ 52%]
-tests/test_risk_engine.py::test_sizing_invalidation_noise_trap_skipped PASSED [ 57%]
-tests/test_risk_engine.py::test_sizing_cold_start_and_defensive_modes PASSED [ 63%]
-tests/test_risk_engine.py::test_sizing_nan_fail_closed PASSED            [ 68%]
-tests/test_risk_engine.py::test_pre_trade_reduce_only_bypasses_limits PASSED [ 73%]
-tests/test_risk_engine.py::test_circuit_proximity_long_ingress_blocked PASSED [ 78%]
-tests/test_risk_engine.py::test_intraday_kill_switch_halt_on_2_percent PASSED [ 84%]
-tests/test_sweep_detector.py::test_sweep_detector_requires_minimum_bars PASSED [ 89%]
-tests/test_sweep_detector.py::test_sweep_detector_gap_down_invalidation PASSED [ 94%]
-tests/test_sweep_detector.py::test_sweep_detector_valid_bullish_sweep PASSED [100%]
-
-============================= 19 passed in 0.36s ==============================
+============================= 130 passed in 8.42s =============================
 ```
 
 ### 3. Launch Interactive Terminal Demo

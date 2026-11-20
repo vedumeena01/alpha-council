@@ -51,23 +51,10 @@ class MarketDataFeed:
         daily_vol = annual_vol * np.sqrt(dt)
         drift = 0.08 * dt  # 8% annualized drift
 
-        prices = [initial_price]
-        volumes = [base_adv]
-
-        # Simulate price path with occasional jump-diffusion
-        for _ in range(n_bars - 1):
-            shock = self.rng.standard_normal()
-            jump = 0.0
-            if self.rng.random() < 0.05:  # 5% chance of sudden news jump
-                jump = self.rng.normal(0.0, daily_vol * 2.5)
-
-            ret = drift + daily_vol * shock + jump
-            next_price = max(10.0, prices[-1] * np.exp(ret))
-            prices.append(next_price)
-
-            # Lognormal volume variation
-            vol_multiplier = np.exp(self.rng.normal(0.0, 0.35))
-            volumes.append(max(10_000.0, base_adv * vol_multiplier))
+        # Sequential Chained Martingale Jump-Diffusion
+        # Connects each bar's open directly to the prior bar's close, guaranteeing
+        # that E[r_t * r_{t-1}] = 0 (unbiased martingale random walk with no artificial autocorrelation).
+        curr_close = initial_price
 
         # Trading day calendar (excluding weekends)
         cur_d = datetime.date(2025, 1, 1)
@@ -82,21 +69,36 @@ class MarketDataFeed:
         highs = []
         lows = []
         closes = []
+        volumes = []
 
         for i in range(n_bars):
-            center = prices[i]
-            intraday_rng = self.rng.uniform(0.012, 0.035) * center
+            # Overnight return + occasional corporate earnings / macro jump
+            if i == 0:
+                p_open = initial_price
+            else:
+                overnight_shock = self.rng.standard_normal() * (daily_vol * 0.35)
+                jump = self.rng.normal(0.0, daily_vol * 2.5) if self.rng.random() < 0.05 else 0.0
+                p_open = max(10.0, curr_close * np.exp(overnight_shock + jump))
 
-            # Realistic Open/High/Low/Close distribution
-            p_open = center + self.rng.uniform(-0.3, 0.3) * intraday_rng
-            p_high = max(p_open, center + self.rng.uniform(0.2, 0.7) * intraday_rng)
-            p_low = min(p_open, center - self.rng.uniform(0.2, 0.7) * intraday_rng)
-            p_close = self.rng.uniform(p_low, p_high)
+            # Intraday price path evolution
+            intraday_shock = self.rng.standard_normal() * (daily_vol * 0.93)
+            p_close = max(10.0, p_open * np.exp(drift + intraday_shock))
 
-            # Unbiased stochastic price bars (No planted artificial drift)
+            # Realistic upper and lower wicks
+            high_wick = abs(self.rng.standard_normal()) * (daily_vol * 0.40) * p_open
+            low_wick = abs(self.rng.standard_normal()) * (daily_vol * 0.40) * p_open
+            p_high = max(p_open, p_close) + high_wick
+            p_low = max(5.0, min(p_open, p_close) - low_wick)
+
+            # Lognormal volume variation
+            vol_multiplier = np.exp(self.rng.normal(0.0, 0.35))
+            vol = max(10_000.0, base_adv * vol_multiplier)
+
+            curr_close = p_close
             highs.append(p_high)
             lows.append(p_low)
             closes.append(p_close)
+            volumes.append(vol)
 
             # Rolling 14-day ATR calculation
             if i >= 14:

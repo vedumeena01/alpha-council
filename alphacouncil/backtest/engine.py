@@ -117,6 +117,7 @@ class BacktestEngine:
         skipped_noise = 0
         prev_month = ""
 
+        # Mark daily session
         self.kill_switch.reset_daily_session(cash)
 
         for day in range(25, n_bars):
@@ -126,11 +127,13 @@ class BacktestEngine:
                 current_bar = universe_data[sym][day]
                 current_portfolio_value += pos["shares"] * current_bar.open
 
-            # Calendar Month Transition Check for Monthly HWM Reset
+            # Calendar Month Transition Check for Monthly HWM Reset vs Daily Reset
             current_date_str = universe_data[symbols[0]][day].timestamp
             current_month = current_date_str[:7]
             if prev_month and current_month != prev_month:
                 self.kill_switch.reset_monthly_session(current_portfolio_value)
+            else:
+                self.kill_switch.reset_daily_session(current_portfolio_value)
             prev_month = current_month
 
             # Check Kill Switch
@@ -157,6 +160,7 @@ class BacktestEngine:
                             "stop_price": order["stop_price"],
                             "target_price": order["target_price"],
                             "entry_day": day,
+                            "max_hold_days": order.get("max_hold_days", 5),
                             "alpha_scale": order["alpha_scale"],
                             "annual_vol": order["annual_vol"],
                             "adv20": bar.adv20,
@@ -192,17 +196,17 @@ class BacktestEngine:
                     exit_price = bar.close
                     reason = "LOWER_CIRCUIT_EMERGENCY"
 
-                # Check 3C: Triple Barrier Path Evaluation
+                # Check 3C: Triple Barrier Path Evaluation (accounting for overnight gap-down fills)
                 if not exit_triggered:
                     if bar.low <= pos["stop_price"]:
                         exit_triggered = True
-                        exit_price = pos["stop_price"]
-                        reason = "STOP_LOSS_HIT"
+                        exit_price = min(bar.open, pos["stop_price"])
+                        reason = "GAP_DOWN_STOP_SLIP" if bar.open < pos["stop_price"] else "STOP_LOSS_HIT"
                     elif bar.high >= pos["target_price"]:
                         exit_triggered = True
-                        exit_price = pos["target_price"]
+                        exit_price = max(bar.open, pos["target_price"]) if bar.open > pos["target_price"] else pos["target_price"]
                         reason = "PROFIT_TARGET_HIT"
-                    elif holding_days >= 5:
+                    elif holding_days >= pos.get("max_hold_days", 5):
                         exit_triggered = True
                         exit_price = bar.close
                         reason = "VERTICAL_BARRIER_TIME_EXPIRY"
@@ -281,10 +285,12 @@ class BacktestEngine:
                     if signal_val == 1:
                         total_signals += 1
 
-                        # Sentiment featurizer (zero by default unless active text feed exists)
-                        sentiment = 0.0
+                        # Sentiment featurizer via FinBertSentimentExtractor
                         if self.use_sentiment_nlp:
-                            sentiment = 0.05  # Slight positive orthogonal prior when NLP enabled
+                            headline = self.calendar.get_latest_headline(sym, bar_t.timestamp)
+                            sentiment = self.nlp.extract_sentiment(sym, headline)
+                        else:
+                            sentiment = 0.0
 
                         # Dynamic 50-SMA Trend Calculation
                         closes_hist = [b.close for b in bars]
@@ -307,7 +313,11 @@ class BacktestEngine:
                             stop_p = round(bar_t.low * 0.9995, 2)
                             d_stop = max(0.1, bar_t.close - stop_p)
                             target_p = round(bar_t.close + (2.0 * d_stop), 2)
-                            recent_closes = np.array([b.close for b in bars[-20:]])
+                            recent_closes = np.array([b.close for b in bars[-30:]])
+
+                            # Dynamic vertical barrier derived from Ornstein-Uhlenbeck half-life
+                            ou_hl = self.triple_barrier.calculate_ou_half_life(recent_closes)
+                            dynamic_max_hold = int(np.clip(round(ou_hl), 3, 10))
 
                             # Volatility targeting vs flat risk
                             if self.use_vol_sizing:
@@ -344,12 +354,29 @@ class BacktestEngine:
                                 skipped_noise += 1
 
                             if not sizing_res.is_aborted and sizing_res.shares_quantity > 0:
+                                # Calculate current portfolio open risk & sector notional
+                                current_open_risk_val = sum(
+                                    p["shares"] * max(0.0, p["entry_price"] - p["stop_price"])
+                                    for p in active_positions.values()
+                                )
+                                current_open_risk_pct = current_open_risk_val / (current_portfolio_value + 1e-8)
+
+                                sym_sector = self.calendar.get_sector(sym)
+                                current_sector_notional = sum(
+                                    p["shares"] * universe_data[s][day].close
+                                    for s, p in active_positions.items()
+                                    if self.calendar.get_sector(s) == sym_sector
+                                )
+
                                 # Pre-trade validation with simulation flag (cleanly bypasses wall-clock limiter)
                                 val = self.pre_trade.validate_order(
                                     symbol=sym,
                                     proposed_quantity=int(sizing_res.shares_quantity * meta_out.alpha_scale),
                                     entry_price=bar_t.close,
                                     current_equity=current_portfolio_value,
+                                    current_sector_notional=current_sector_notional,
+                                    current_portfolio_open_risk_pct=current_open_risk_pct,
+                                    stop_loss_price=stop_p,
                                     is_simulation_mode=True,
                                 )
                                 if val.is_approved and val.adjusted_quantity > 0:
@@ -358,6 +385,7 @@ class BacktestEngine:
                                         "quantity": val.adjusted_quantity,
                                         "stop_price": stop_p,
                                         "target_price": target_p,
+                                        "max_hold_days": dynamic_max_hold,
                                         "alpha_scale": meta_out.alpha_scale,
                                         "annual_vol": ann_vol,
                                         "predicted_win_prob": meta_out.predicted_win_prob,

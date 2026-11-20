@@ -229,3 +229,96 @@ def test_pre_trade_risk_gap_stress_testing_2x_stop_slippage():
     assert res.is_approved
     assert res.adjusted_quantity == 100
     assert "GAP_STRESS_APPLIED" in res.reason
+
+
+def test_pre_trade_risk_single_stock_capping_does_not_bypass_sector_cap():
+    """
+    CRITICAL FIX VERIFICATION:
+    If 20% single-stock notional cap binds, it must NOT return early and bypass
+    the downstream sector concentration, open risk, or gap stress gates!
+    """
+    engine = PreTradeRiskEngine(max_single_stock_pct=0.20, max_sector_pct=0.30)
+    equity = 1_000_000.0  # Max single stock = ₹2L, max sector = ₹3L
+
+    # Existing IT sector exposure = ₹2.5L (25%).
+    # Proposed INFY order: 400 shares @ ₹1000 = ₹4L (exceeds single stock 20%).
+    # If capped to 200 shares (₹2L), total sector notional would be ₹2.5L + ₹2.0L = ₹4.5L (> ₹3L ceiling)!
+    # Previously, early return approved 200 shares bypassing the sector cap.
+    # Now, sector cap must catch it and reject or enforce the sector ceiling!
+    res = engine.validate_order(
+        symbol="INFY",
+        proposed_quantity=400,
+        entry_price=1000.0,
+        current_equity=equity,
+        current_sector_notional=250_000.0,
+    )
+    assert not res.is_approved
+    assert "SECTOR_CONCENTRATION_EXCEEDED" in res.reason
+
+
+def test_kill_switch_sticky_session_halt():
+    """
+    Verifies that once an intraday session halt triggers (drawdown >= 2%),
+    the halt remains sticky for the rest of the day even if mid-market equity rebounds.
+    """
+    switch = IntradayKillSwitch(intraday_halt_threshold=0.02)
+    switch.reset_daily_session(1_000_000.0)
+
+    # 1. Equity drops to 975,000 (2.5% drawdown) -> Halted
+    s1 = switch.update_valuation(975_000.0)
+    assert s1.is_session_halted
+
+    # 2. Equity rebounds intraday to 990,000 (1.0% drawdown) -> Must REMAIN halted!
+    s2 = switch.update_valuation(990_000.0)
+    assert s2.is_session_halted
+    assert "SESSION_HALTED" in s2.action_taken
+
+    # 3. Next day 9:00 AM reset clears the halt
+    switch.reset_daily_session(990_000.0)
+    s3 = switch.update_valuation(990_000.0)
+    assert not s3.is_session_halted
+
+
+def test_kill_switch_monthly_reset_does_not_instant_rehalt():
+    """
+    Verifies that reset_monthly_session re-anchors both monthly_hwm and intraday_hwm
+    so that a portfolio entering a new month in drawdown does not instantly trigger a daily halt.
+    """
+    switch = IntradayKillSwitch(intraday_halt_threshold=0.02, monthly_freeze_threshold=0.06)
+    switch.reset_daily_session(1_000_000.0)
+
+    # Experienced a 5.0% drawdown in Month 1 (equity = 950,000)
+    switch.update_valuation(950_000.0)
+
+    # Month rollover: reset_monthly_session called with current equity 950,000
+    switch.reset_monthly_session(950_000.0)
+    assert switch.intraday_hwm == 950_000.0
+    assert switch.monthly_hwm == 950_000.0
+
+    # Valuation check at 950,000 must be NOMINAL, NOT halted!
+    s_new = switch.update_valuation(950_000.0)
+    assert not s_new.is_session_halted
+    assert not s_new.is_strategy_frozen
+    assert s_new.intraday_drawdown_pct == 0.0
+
+
+def test_kill_switch_risk_committee_audit_log():
+    """
+    Verifies that unfreezing produces an immutable, audit-trailed RiskAuditRecord.
+    """
+    switch = IntradayKillSwitch(monthly_freeze_threshold=0.06)
+    switch.reset_daily_session(1_000_000.0)
+    switch.update_valuation(930_000.0)  # 7% drawdown -> Frozen
+
+    assert switch.is_strategy_frozen
+
+    record = switch.risk_committee_unfreeze(
+        authorized_by="ChiefRiskOfficer_ID_8842",
+        reason="Macro volatility event resolved; capital allocated for defensive resumption.",
+        current_equity=930_000.0,
+    )
+    assert len(switch.audit_log) >= 1
+    assert record.authorized_by == "ChiefRiskOfficer_ID_8842"
+    assert record.prior_strategy_frozen is True
+    assert not switch.is_strategy_frozen
+

@@ -113,7 +113,7 @@ class PositionSizingEngine:
         stop_distance = max(0.01, entry_price - stop_price)
 
         # 1. Invalidation Rule (No Artificial Stop Expansion)
-        # If stop distance is less than 1.0 * ATR14, skip trade entirely as low-quality noise trap
+        # If stop distance is less than min_atr_multiple * ATR14 (default 0.25 * ATR14 per config.py), skip trade entirely as low-quality noise trap
         if stop_distance < (self.min_atr_multiple * atr14):
             return SizingCalculation(
                 symbol=symbol,
