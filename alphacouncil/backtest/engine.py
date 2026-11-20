@@ -71,6 +71,7 @@ class BacktestEngine:
         sweep_lookback: int = 15,
         sweep_volume_factor: float = 1.2,
         seed: Optional[int] = None,
+        tie_break: str = "stop_first",
     ):
         """
         Backtest engine with modular toggles for the 7-model orthogonal ablation suite.
@@ -86,6 +87,7 @@ class BacktestEngine:
         self.use_atr_stop = use_atr_stop
         self.random_entry = random_entry
         self.rng = np.random.default_rng(seed)
+        self.tie_break = tie_break
 
         # Subsystems
         self.calendar = PointInTimeCalendar()
@@ -215,13 +217,24 @@ class BacktestEngine:
                     exit_price = bar.close
                     reason = "LOWER_CIRCUIT_EMERGENCY"
 
-                # Check 3C: Triple Barrier Path Evaluation (accounting for overnight gap-down fills)
+                # Check 3C: Triple Barrier Path Evaluation (accounting for overnight gap-down fills and tie-breaks)
                 if not exit_triggered:
-                    if bar.low <= pos["stop_price"]:
+                    stop_touched = bar.low <= pos["stop_price"]
+                    target_touched = bar.high >= pos["target_price"]
+
+                    if stop_touched and target_touched:
+                        exit_triggered = True
+                        if self.tie_break == "close":
+                            exit_price = bar.close
+                            reason = "TIE_BREAK_BAR_CLOSE"
+                        else:  # "stop_first" (conservative default)
+                            exit_price = min(bar.open, pos["stop_price"])
+                            reason = "GAP_DOWN_STOP_SLIP" if bar.open < pos["stop_price"] else "STOP_LOSS_HIT"
+                    elif stop_touched:
                         exit_triggered = True
                         exit_price = min(bar.open, pos["stop_price"])
                         reason = "GAP_DOWN_STOP_SLIP" if bar.open < pos["stop_price"] else "STOP_LOSS_HIT"
-                    elif bar.high >= pos["target_price"]:
+                    elif target_touched:
                         exit_triggered = True
                         exit_price = max(bar.open, pos["target_price"]) if bar.open > pos["target_price"] else pos["target_price"]
                         reason = "PROFIT_TARGET_HIT"

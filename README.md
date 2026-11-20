@@ -3,7 +3,7 @@
 # ⚡ AlphaCouncil (α-Council)
 ### *Autonomous Multi-Agent Quantitative Trading System for Indian Equities (NSE/BSE)*
 
-[![Build & Tests](https://img.shields.io/badge/pytest-130%2F130%20passing-brightgreen?style=for-the-badge&logo=pytest&logoColor=white)](https://github.com/vedumeena01/alpha-council/actions)
+[![Build & Tests](https://img.shields.io/badge/pytest-133%2F133%20passing-brightgreen?style=for-the-badge&logo=pytest&logoColor=white)](https://github.com/vedumeena01/alpha-council/actions)
 [![Code Quality](https://img.shields.io/badge/ruff-0%20errors-000000?style=for-the-badge&logo=ruff&logoColor=white)](https://github.com/astral-sh/ruff)
 [![Python Version](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12%20%7C%203.13-blue?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
 [![Market](https://img.shields.io/badge/Exchange-NSE%20%2F%20BSE-FF6F00?style=for-the-badge&logo=googlefinance&logoColor=white)](https://www.nseindia.com)
@@ -287,7 +287,7 @@ alpha-council/
 │   │   └── demo.py              # Live Terminal Dashboard Launcher (`python -m alphacouncil.cli.demo`)
 │   ├── run_council.py           # Master End-to-End Pipeline & Interactive Pitch Runner
 │   └── config.py                # Global Parameter & Statutory Fee Manifest
-├── tests/                       # Unit & Integration Quantitative Test Suite (130/130 Passed)
+├── tests/                       # Unit & Integration Quantitative Test Suite (133/133 Passed)
 │   ├── test_ablation.py         # 7-Model Ablation Suite Integrity Tests
 │   ├── test_alpha_models.py     # Triple Barrier & FinBERT Sentiment Tests
 │   ├── test_friction_model.py   # Oct 1 2024 SEBI Statutory Fee & Slippage Tests
@@ -303,7 +303,7 @@ alpha-council/
 ├── test_results/                # Master Test Registry & Empirical Journal Logs
 │   ├── README.md                # Master Comparison Matrix across all 20 Episodes
 │   ├── FORWARD_PAPER_TESTING_REPORT.md # Simulated Walk-Forward Audit Report
-│   └── paper_trading_journal.json      # Structured Tick-by-Tick Audit Logs (48 Trades)
+│   └── paper_trading_journal.json      # Structured Tick-by-Tick Audit Logs (127 Trades)
 ├── docs/
 │   └── CONSOLIDATED_CODEBASE.md # Pointer to Root Single-Document Codebase
 ├── CONSOLIDATED_CODEBASE.md     # Single-Document Reference for Code Reviewers
@@ -331,7 +331,7 @@ pip install -e .
 pip install pytest ruff rich numpy
 ```
 
-### 2. Run Test Suite (130/130 Deterministic Checks)
+### 2. Run Test Suite (133/133 Deterministic Checks)
 
 ```bash
 pytest -v
@@ -339,7 +339,7 @@ pytest -v
 
 Expected output:
 ```text
-============================= 130 passed in 8.42s =============================
+============================= 133 passed in 8.42s =============================
 ```
 
 ### 3. Launch Interactive Terminal Demo

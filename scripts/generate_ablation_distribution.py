@@ -2,7 +2,7 @@
 Multi-Seed Empirical Ablation Distribution Generator.
 Executes the 7-Model Orthogonal Ablation Suite across N random seeds,
 computing empirical medians, spreads, deflated Sharpe ratios, and paired difference statistics.
-Saves raw per-seed data to test_results/ for auditability.
+Supports --zero-friction and --tie-break flags, and saves raw per-seed data to test_results/.
 """
 
 import argparse
@@ -12,6 +12,7 @@ import os
 from typing import Dict, List, Tuple
 import numpy as np
 
+from alphacouncil.config import AlphaCouncilConfig, StatutoryFeeConfig
 from alphacouncil.data.feed import MarketDataFeed
 from alphacouncil.backtest.ablation import AblationSuiteRunner
 
@@ -46,13 +47,30 @@ CONFIG_DESCRIPTIONS = {
 }
 
 
-def _run_single_seed(args: Tuple[int, List[str], int, int]) -> Tuple[int, Dict[str, dict]]:
+def _run_single_seed(args: Tuple[int, List[str], int, int, bool, str]) -> Tuple[int, Dict[str, dict]]:
     """Worker task running 7 configs on a single seed."""
-    s, symbols, n_bars, n_trials = args
+    s, symbols, n_bars, n_trials, zero_friction, tie_break = args
     feed = MarketDataFeed(seed=s)
     # Strict zero-drift martingale random walk (annual_drift=0.0)
     data = feed.get_multi_symbol_universe(symbols, n_bars=n_bars, annual_drift=0.0)
-    runner = AblationSuiteRunner(n_trials_logged=n_trials, seed=s)
+
+    if zero_friction:
+        zero_fees = StatutoryFeeConfig(
+            stt_delivery_rate=0.0,
+            stt_intraday_sell_rate=0.0,
+            brokerage_per_order_cap=0.0,
+            brokerage_rate=0.0,
+            exchange_txn_charge_rate=0.0,
+            sebi_turnover_rate=0.0,
+            stamp_duty_buy_rate=0.0,
+            gst_rate=0.0,
+            market_impact_gamma=0.0,
+        )
+        cfg = AlphaCouncilConfig(fees=zero_fees)
+    else:
+        cfg = None
+
+    runner = AblationSuiteRunner(n_trials_logged=n_trials, seed=s, config=cfg, tie_break=tie_break)
     results = runner.run_full_suite(data)
 
     seed_dict = {}
@@ -87,6 +105,8 @@ def run_ablation_distribution(
     n_bars: int = 250,
     n_seeds: int = 30,
     n_trials: int = 150,
+    zero_friction: bool = False,
+    tie_break: str = "stop_first",
     raw_output_path: str = None,
 ) -> Tuple[Dict[str, Dict[str, List[float]]], List[dict]]:
     """Runs ablation suite across N seeds in parallel and returns stats + raw records."""
@@ -104,7 +124,7 @@ def run_ablation_distribution(
     }
     raw_records = []
 
-    tasks = [(s, symbols, n_bars, n_trials) for s in range(1, n_seeds + 1)]
+    tasks = [(s, symbols, n_bars, n_trials, zero_friction, tie_break) for s in range(1, n_seeds + 1)]
     max_workers = min(os.cpu_count() or 1, 16)
 
     # Execute in parallel across available CPU cores
@@ -179,6 +199,28 @@ def format_markdown_table(stats: Dict[str, Dict[str, List[float]]], n_seeds: int
     return "\n".join(lines)
 
 
+def format_friction_share_table(stats: Dict[str, Dict[str, List[float]]], universe_label: str) -> str:
+    """Formats detailed per-config friction share breakdown."""
+    lines = [
+        f"### Per-Configuration Friction Share Analysis ({universe_label})",
+        "",
+        "| Configuration | Mean Gross PnL | Mean Friction Drag | Mean Net PnL | Friction Share of Loss |",
+        "| :--- | :---: | :---: | :---: | :---: |",
+    ]
+    for c in CONFIGS:
+        gr = float(np.mean(stats[c]["gross"]))
+        fr = float(np.mean(stats[c]["friction"]))
+        net = gr - fr
+        if gr < 0:
+            gross_loss = abs(gr)
+            share_pct = (fr / (fr + gross_loss)) * 100.0
+            share_str = f"{share_pct:.1f}%"
+        else:
+            share_str = ">100% (Gross PnL is positive; 100% of loss is statutory friction)"
+        lines.append(f"| `{c}` | ₹{gr:,.0f} | ₹{fr:,.0f} | ₹{net:,.0f} | **{share_str}** |")
+    return "\n".join(lines)
+
+
 def print_paired_stats(stats: Dict[str, Dict[str, List[float]]], universe_name: str):
     """Computes and prints paired difference statistics across identical seeds."""
     print(f"\n--- Paired Difference Statistics ({universe_name}) ---")
@@ -202,39 +244,59 @@ def main():
     parser.add_argument("--seeds", type=int, default=30, help="Number of random seeds to evaluate")
     parser.add_argument("--bars", type=int, default=250, help="Bars per symbol (default 250)")
     parser.add_argument("--universe", choices=["5", "25", "both"], default="both", help="Universe size: 5, 25, or both")
+    parser.add_argument("--zero-friction", action="store_true", help="Execute with zero statutory transaction friction")
+    parser.add_argument("--tie-break", choices=["stop_first", "close"], default="stop_first", help="Tie-break resolution when both stop and target touched in bar")
     args = parser.parse_args()
 
     results_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "test_results")
+    suffix = "_zerofriction" if args.zero_friction else ""
+    if args.tie_break != "stop_first":
+        suffix += f"_{args.tie_break}"
 
     if args.universe == "both":
         # Universe 1: 5 symbols, 250 bars
         u1_symbols = DEFAULT_SYMBOLS_5
-        u1_label = "5 NSE Constituents, 250 bars"
-        u1_raw_path = os.path.join(results_dir, "ablation_raw_seeds_5symbols.json")
-        print(f"Executing {args.seeds} seeds on {u1_label}...")
-        stats1, _ = run_ablation_distribution(u1_symbols, n_bars=250, n_seeds=args.seeds, raw_output_path=u1_raw_path)
+        u1_label = f"5 NSE Constituents, 250 bars{' (Zero Friction)' if args.zero_friction else ''}"
+        u1_raw_path = os.path.join(results_dir, f"ablation_raw_seeds_5symbols{suffix}.json")
+        print(f"Executing {args.seeds} seeds on {u1_label} [Tie-break: {args.tie_break}]...")
+        stats1, _ = run_ablation_distribution(
+            u1_symbols, n_bars=250, n_seeds=args.seeds, zero_friction=args.zero_friction,
+            tie_break=args.tie_break, raw_output_path=u1_raw_path
+        )
         md1 = format_markdown_table(stats1, args.seeds, u1_label)
         print("\n" + md1 + "\n")
+        if not args.zero_friction:
+            print(format_friction_share_table(stats1, "5 Symbols, 250 bars") + "\n")
         print_paired_stats(stats1, "5 Symbols")
 
         # Universe 2: 25 symbols, 500 bars
         u2_symbols = DEFAULT_SYMBOLS_25
-        u2_label = "25 NSE Constituents, 500 bars"
-        u2_raw_path = os.path.join(results_dir, "ablation_raw_seeds_25symbols.json")
-        print(f"\nExecuting {args.seeds} seeds on {u2_label}...")
-        stats2, _ = run_ablation_distribution(u2_symbols, n_bars=500, n_seeds=args.seeds, raw_output_path=u2_raw_path)
+        u2_label = f"25 NSE Constituents, 500 bars{' (Zero Friction)' if args.zero_friction else ''}"
+        u2_raw_path = os.path.join(results_dir, f"ablation_raw_seeds_25symbols{suffix}.json")
+        print(f"\nExecuting {args.seeds} seeds on {u2_label} [Tie-break: {args.tie_break}]...")
+        stats2, _ = run_ablation_distribution(
+            u2_symbols, n_bars=500, n_seeds=args.seeds, zero_friction=args.zero_friction,
+            tie_break=args.tie_break, raw_output_path=u2_raw_path
+        )
         md2 = format_markdown_table(stats2, args.seeds, u2_label)
-        print("\n" + md2)
+        print("\n" + md2 + "\n")
+        if not args.zero_friction:
+            print(format_friction_share_table(stats2, "25 Symbols, 500 bars") + "\n")
         print_paired_stats(stats2, "25 Symbols")
     else:
         symbols = DEFAULT_SYMBOLS_5 if args.universe == "5" else DEFAULT_SYMBOLS_25
-        u_label = f"{len(symbols)} NSE Constituents, {args.bars} bars"
-        raw_path = os.path.join(results_dir, f"ablation_raw_seeds_{len(symbols)}symbols.json")
-        print(f"Executing {args.seeds} seeds on {u_label}...")
+        u_label = f"{len(symbols)} NSE Constituents, {args.bars} bars{' (Zero Friction)' if args.zero_friction else ''}"
+        raw_path = os.path.join(results_dir, f"ablation_raw_seeds_{len(symbols)}symbols{suffix}.json")
+        print(f"Executing {args.seeds} seeds on {u_label} [Tie-break: {args.tie_break}]...")
 
-        stats, _ = run_ablation_distribution(symbols, n_bars=args.bars, n_seeds=args.seeds, raw_output_path=raw_path)
+        stats, _ = run_ablation_distribution(
+            symbols, n_bars=args.bars, n_seeds=args.seeds, zero_friction=args.zero_friction,
+            tie_break=args.tie_break, raw_output_path=raw_path
+        )
         md = format_markdown_table(stats, args.seeds, u_label)
-        print("\n" + md)
+        print("\n" + md + "\n")
+        if not args.zero_friction:
+            print(format_friction_share_table(stats, f"{len(symbols)} Symbols") + "\n")
         print_paired_stats(stats, f"{len(symbols)} Symbols")
 
 

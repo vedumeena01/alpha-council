@@ -10,7 +10,7 @@
 
 RFC v1.0 se lekar v5.0 tak jo journey rahi hai, uska reflection ab actual Python code me clear dikh raha hai. Pehle jo sirf architecture diagrams aur text pitches the, ab unka **100% deterministic, type-safe Python implementation** khada ho chuka hai. 
 
-130 out of 130 unit tests pass ho rahe hain, Ruff linter zero warnings par clean hai, aur mathematical units (equity risk vs notional) ka separation strictly maintain kiya gaya hai. 
+133 out of 133 unit tests pass ho rahe hain, Ruff linter zero warnings par clean hai, aur mathematical units (equity risk vs notional) ka separation strictly maintain kiya gaya hai. 
 
 Lekin ek institutional quant reviewer ka kaam sirf taarif karna nahi, balki un **edge cases, boundary vulnerabilities, aur microstructure leaks** ko nikalna hai jo live capital deployment me drawdown karwa sakte hain. Neeche har ek module ka granular review aur specific bug list di gayi hai.
 
@@ -136,7 +136,7 @@ Lekin ek institutional quant reviewer ka kaam sirf taarif karna nahi, balki un *
 | **Risk Enforcement** | Deterministic Hard Gates | **VERIFIED (PASS)** | Peak HWM halt & fail-closed pre-trade active. Circuit proximity gates enforced. |
 | **Mathematical Sizing** | Exact Unit Consistency | **VERIFIED (PASS)** | Vol-targeted sizing with BSS cold-start protection and 20% notional cap. |
 | **Execution Microstructure**| Non-Zero Statutory Friction | **VERIFIED (PASS)** | SEBI Oct 2024 tariffs & Almgren-Chriss impact modeled across both order legs. |
-| **Code Modularity** | Unit Test Coverage | **VERIFIED (PASS)** | 130/130 deterministic pytest checks passing, Ruff clean. |
+| **Code Modularity** | Unit Test Coverage | **VERIFIED (PASS)** | 133/133 deterministic pytest checks passing, Ruff clean. |
 
 ---
 

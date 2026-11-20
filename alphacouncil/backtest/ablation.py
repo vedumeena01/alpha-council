@@ -20,10 +20,12 @@ class AblationSuiteRunner:
         n_trials_logged: int = 150,
         seed: int = 42,
         config: Optional[AlphaCouncilConfig] = None,
+        tie_break: str = "stop_first",
     ):
         self.n_trials_logged = n_trials_logged
         self.seed = seed
         self.config = config or AlphaCouncilConfig()
+        self.tie_break = tie_break
 
     def run_full_suite(
         self, universe_data: Dict[str, List[Bar]]
@@ -44,6 +46,7 @@ class AblationSuiteRunner:
             use_pit_filter=False,
             use_atr_stop=False,
             seed=self.seed,
+            tie_break=self.tie_break,
         )
         results["alpha_Null"] = eng_null.run(
             universe_data, config_name="α_Null (Random Coin Flip)", n_trials=self.n_trials_logged
@@ -60,6 +63,7 @@ class AblationSuiteRunner:
             use_pit_filter=True,
             use_atr_stop=False,
             seed=self.seed + 1,
+            tie_break=self.tie_break,
         )
         results["alpha_Null_Time"] = eng_null_time.run(
             universe_data, config_name="α_Null+Time (Random + Filter)", n_trials=self.n_trials_logged
@@ -76,6 +80,7 @@ class AblationSuiteRunner:
             use_pit_filter=False,
             use_atr_stop=True,
             seed=self.seed + 2,
+            tie_break=self.tie_break,
         )
         results["alpha_Null_SMC"] = eng_null_smc.run(
             universe_data, config_name="α_Null+SMC (Random + ATR Stop)", n_trials=self.n_trials_logged
@@ -92,6 +97,7 @@ class AblationSuiteRunner:
             use_pit_filter=False,
             use_atr_stop=False,
             seed=self.seed,
+            tie_break=self.tie_break,
         )
         results["alpha_Tech"] = eng_tech.run(
             universe_data, config_name="α_Tech (Sweep Signal Alone)", n_trials=self.n_trials_logged
@@ -108,6 +114,7 @@ class AblationSuiteRunner:
             use_pit_filter=False,
             use_atr_stop=True,
             seed=self.seed,
+            tie_break=self.tie_break,
         )
         results["alpha_Tech_Risk"] = eng_tech_risk.run(
             universe_data, config_name="α_Tech+Risk (Sweep + Vol-Risk)", n_trials=self.n_trials_logged
@@ -124,6 +131,7 @@ class AblationSuiteRunner:
             use_pit_filter=True,
             use_atr_stop=True,
             seed=self.seed,
+            tie_break=self.tie_break,
         )
         results["alpha_Tech_Fund"] = eng_tech_fund.run(
             universe_data, config_name="α_Tech+Fund (Sweep + PIT Filter)", n_trials=self.n_trials_logged
@@ -140,6 +148,7 @@ class AblationSuiteRunner:
             use_pit_filter=True,
             use_atr_stop=True,
             seed=self.seed,
+            tie_break=self.tie_break,
         )
         results["alpha_Council"] = eng_council.run(
             universe_data, config_name="α_Council (Full System RFC v5.0)", n_trials=self.n_trials_logged
