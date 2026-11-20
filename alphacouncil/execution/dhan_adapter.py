@@ -76,6 +76,19 @@ NSE_SECURITY_ID_MAP = {
 }
 
 
+def snap_to_nse_tick(price: float, tick: float = 0.05) -> float:
+    """Snaps any floating point price to the nearest valid NSE exchange tick."""
+    if tick <= 0:
+        return round(price, 2)
+    return round(round(price / tick) * tick, 2)
+
+
+def is_valid_nse_tick(price: float, tick: float = 0.05) -> bool:
+    """Validates whether a price adheres strictly to the exchange tick grid."""
+    remainder = round((price * 100) % (tick * 100), 2)
+    return remainder in (0.0, round(tick * 100, 2))
+
+
 class DhanExecutionAdapter:
     """
     Production-grade execution interface for DhanHQ API.
@@ -139,22 +152,94 @@ class DhanExecutionAdapter:
         target_price: float,
         stop_loss_price: float,
         product_type: DhanProductType = DhanProductType.CNC,
+        auto_snap_ticks: bool = True,
+        allow_duplicate_symbol: bool = True,
     ) -> DhanExecutionResponse:
         """
         Submits a native Dhan Forever Order (GTT OCO) placing entry, target, and stop-loss together.
         Ensures strict price tick constraints (multiples of ₹0.05).
         """
-        # Microstructure Validation: Tick Size Enforcement (₹0.05)
-        for name, px in [("entry", entry_price), ("target", target_price), ("stop_loss", stop_loss_price)]:
-            if round((px * 100) % 5, 2) not in (0.0, 5.0):
-                raise ValueError(f"Dhan requires prices in multiples of ₹0.05. {name} price ₹{px} is invalid.")
-
         if quantity <= 0:
-            raise ValueError(f"Quantity must be a positive integer, got {quantity}.")
+            resp = DhanExecutionResponse(
+                success=False,
+                order_status="REJECTED_ZERO_QUANTITY",
+                message=f"Quantity must be a positive integer, got {quantity}.",
+                error_code="INVALID_QUANTITY",
+            )
+            self.order_history.append(resp)
+            return resp
 
-        sec_id = self.resolve_security_id(symbol)
+        # Idempotency Protection: check for duplicate active GTT order on same symbol
+        if not allow_duplicate_symbol:
+            existing = [
+                oid for oid, req in self.active_gtt_orders.items()
+                if req.symbol == symbol
+            ]
+            if existing:
+                resp = DhanExecutionResponse(
+                    success=False,
+                    order_status="REJECTED_DUPLICATE_ORDER",
+                    message=f"Active GTT order already exists for {symbol}: {existing[0]}",
+                    error_code="DUPLICATE_ORDER",
+                )
+                self.order_history.append(resp)
+                return resp
 
-        # Build GTT OCO Request
+        # Microstructure Tick Snapping / Validation (₹0.05)
+        if auto_snap_ticks:
+            entry_price = snap_to_nse_tick(entry_price)
+            target_price = snap_to_nse_tick(target_price)
+            stop_loss_price = snap_to_nse_tick(stop_loss_price)
+        else:
+            for name, px in [("entry", entry_price), ("target", target_price), ("stop_loss", stop_loss_price)]:
+                if not is_valid_nse_tick(px):
+                    resp = DhanExecutionResponse(
+                        success=False,
+                        order_status="REJECTED_TICK_SIZE",
+                        message=f"Dhan requires prices in multiples of ₹0.05. {name} price ₹{px} is invalid.",
+                        error_code="INVALID_TICK_SIZE",
+                    )
+                    self.order_history.append(resp)
+                    return resp
+
+        # Structural Geometry Validation
+        if target_price <= entry_price:
+            resp = DhanExecutionResponse(
+                success=False,
+                order_status="REJECTED_INVALID_GEOMETRY",
+                message=f"Target price (₹{target_price}) must be higher than entry price (₹{entry_price}) for BUY order.",
+                error_code="INVALID_TARGET",
+            )
+            self.order_history.append(resp)
+            return resp
+
+        if stop_loss_price >= entry_price:
+            resp = DhanExecutionResponse(
+                success=False,
+                order_status="REJECTED_INVALID_GEOMETRY",
+                message=f"Stop-loss price (₹{stop_loss_price}) must be lower than entry price (₹{entry_price}) for BUY order.",
+                error_code="INVALID_STOP_LOSS",
+            )
+            self.order_history.append(resp)
+            return resp
+
+        try:
+            sec_id = self.resolve_security_id(symbol)
+        except ValueError as err:
+            resp = DhanExecutionResponse(
+                success=False,
+                order_status="REJECTED_UNKNOWN_SYMBOL",
+                message=str(err),
+                error_code="UNKNOWN_SECURITY_ID",
+            )
+            self.order_history.append(resp)
+            return resp
+
+        # Build GTT OCO Request with tick-snapped trigger prices
+        entry_trigger = snap_to_nse_tick(max(entry_price * 1.001, entry_price + 0.05))
+        target_trigger = snap_to_nse_tick(min(target_price * 0.999, target_price - 0.05))
+        stop_trigger = snap_to_nse_tick(max(stop_loss_price * 1.001, stop_loss_price + 0.05))
+
         req = DhanGTTOrderRequest(
             security_id=sec_id,
             symbol=symbol,
@@ -162,12 +247,12 @@ class DhanExecutionAdapter:
             transaction_type="BUY",
             product_type=product_type,
             quantity=quantity,
-            entry_price=round(entry_price, 2),
-            entry_trigger_price=round(entry_price * 1.001, 2),  # Slight trigger proximity
-            target_price=round(target_price, 2),
-            target_trigger_price=round(target_price * 0.999, 2),
-            stop_loss_price=round(stop_loss_price, 2),
-            stop_loss_trigger_price=round(stop_loss_price * 1.001, 2),
+            entry_price=entry_price,
+            entry_trigger_price=entry_trigger,
+            target_price=target_price,
+            target_trigger_price=target_trigger,
+            stop_loss_price=stop_loss_price,
+            stop_loss_trigger_price=stop_trigger,
             order_flag="OCO",
         )
 

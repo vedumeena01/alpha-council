@@ -47,6 +47,7 @@ CI Status: GitHub Actions 100% Green (Python 3.10, 3.11, 3.12, 3.13)
 ---
 
 ## 🗂️ File Directory
+- [`DEEP_DHAN_TESTING_FAILURE_REPORT.md`](DEEP_DHAN_TESTING_FAILURE_REPORT.md) - **DhanHQ Deep Integration Testing, Bug Hunting Loops 1 & 2, and Exhaustive Real-World Failure Mode Audit.**
 - [`REAL_NSE_DATA_ANALYSIS_REPORT.md`](REAL_NSE_DATA_ANALYSIS_REPORT.md) - **Real NSE Market Data Empirical Audit & 2-Year Historical Validation across 10 liquid Indian equities (4,960 bars).**
 - [`ablation_raw_seeds_5symbols.json`](ablation_raw_seeds_5symbols.json) - **Raw per-seed empirical records across 30 seeds for the 5-symbol 250-bar ablation suite (210 evaluations).**
 - [`ablation_raw_seeds_25symbols.json`](ablation_raw_seeds_25symbols.json) - **Raw per-seed empirical records across 30 seeds for the 25-symbol 500-bar ablation suite (210 evaluations).**
