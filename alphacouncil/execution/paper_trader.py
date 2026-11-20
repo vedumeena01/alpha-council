@@ -78,6 +78,8 @@ class PaperTradeRecord:
     realized_rrr: float = 0.0
     gap_slippage_inr: float = 0.0
     holding_period_days: int = 0
+    is_simulation: bool = True
+    simulation_environment: str = "CALIBRATED_STOCHASTIC_NSE"
     is_closed: bool = False
 
 
@@ -334,7 +336,7 @@ class ForwardPaperTestingEngine:
                 fill_price = bar.open if bar.open < order.limit_price else order.limit_price
 
                 self.trade_counter += 1
-                trade_id = f"PTRD-{self.trade_counter:03d}"
+                trade_id = f"SIM-TRD-{self.trade_counter:03d}"
 
                 self.active_positions[symbol] = ActivePaperPosition(
                     trade_id=trade_id,

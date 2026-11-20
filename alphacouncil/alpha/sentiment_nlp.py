@@ -28,7 +28,10 @@ class ContaminationResult:
 
 class FinBertSentimentExtractor:
     """
-    Deterministic Financial Lexicon & Sentiment Featurizer (Prototype Stub).
+    Research Prototype Stub / Synthetic Lexicon Featurizer.
+    Evaluates synthetic financial text excerpts via deterministic keyword mapping
+    in zero-GPU and offline testing environments.
+    In live production, connects to real-time SEBI corporate filings / RSS news feeds.
     Outputs numerical feature S_NLP in [-1.0, 1.0] orthogonal to momentum.
     """
 

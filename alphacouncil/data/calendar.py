@@ -31,7 +31,7 @@ class PointInTimeCalendar:
         if symbol not in self.events:
             sym_offset = sum(ord(c) for c in symbol) % 8
             evts = []
-            for yr in [2024, 2025, 2026, 2027]:
+            for yr in [2023, 2024, 2025, 2026, 2027]:
                 for m, q_name in [(1, "Q3"), (4, "Q4"), (7, "Q1"), (10, "Q2")]:
                     day_intim = min(28, 8 + sym_offset)
                     day_earn = min(28, 14 + sym_offset)
@@ -87,8 +87,10 @@ class PointInTimeCalendar:
 
     def get_latest_headline(self, symbol: str, current_date: str) -> str:
         """
-        Point-in-time financial news disclosure feed for FinBERT featurization.
-        Eliminates future lookahead by keying exclusively off current or historical dates.
+        Research Prototype Stub / Synthetic Lexicon Disclosure Feeder.
+        Generates reproducible headline excerpts for testing the NLP feature pipeline
+        without lookahead leakage.
+        In live production, replace with real-time SEBI / NSE RSS disclosure feed parser.
         """
         self._ensure_symbol_events(symbol)
         if self.is_earnings_within_window(symbol, current_date, days_ahead=5):

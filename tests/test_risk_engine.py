@@ -56,9 +56,9 @@ def test_sizing_invalidation_noise_trap_skipped():
 
 
 def test_sizing_cold_start_and_defensive_modes():
-    engine = PositionSizingEngine()
+    engine = PositionSizingEngine(cold_start_trade_threshold=50)
 
-    # Cold start (<200 trades)
+    # Cold start (<50 trades, even if BSS and win prob provided)
     res_cold = engine.compute_size(
         symbol="RELIANCE",
         entry_price=1000.0,
@@ -67,12 +67,14 @@ def test_sizing_cold_start_and_defensive_modes():
         atr14=15.0,
         realized_annual_vol=0.15,
         current_equity=10_000_000.0,
-        historical_closed_trades_count=100,
+        historical_closed_trades_count=25,
+        rolling_bss=0.12,
+        estimated_win_prob=0.60,
     )
     assert res_cold.regime_mode == "COLD_START"
     assert res_cold.shares_quantity > 0
 
-    # Defensive mode (BSS <= 0, trades >= 200, estimated_win_prob provided)
+    # Defensive mode (BSS <= 0, trades >= threshold, estimated_win_prob provided)
     res_def = engine.compute_size(
         symbol="RELIANCE",
         entry_price=1000.0,
@@ -81,12 +83,31 @@ def test_sizing_cold_start_and_defensive_modes():
         atr14=15.0,
         realized_annual_vol=0.15,
         current_equity=10_000_000.0,
-        historical_closed_trades_count=250,
+        historical_closed_trades_count=60,
         rolling_bss=-0.05,  # Uncalibrated
         estimated_win_prob=0.55,
     )
     assert res_def.regime_mode == "DEFENSIVE"
     assert res_def.tau_effective == 0.005  # Halved from 1% to 0.5%
+
+
+def test_sizing_calibrated_kelly_transition():
+    engine = PositionSizingEngine(cold_start_trade_threshold=50)
+    # Calibrated Kelly mode (BSS > 0, trades >= 50, valid edge)
+    res_kelly = engine.compute_size(
+        symbol="RELIANCE",
+        entry_price=1000.0,
+        stop_price=980.0,
+        target_price=1040.0,
+        atr14=15.0,
+        realized_annual_vol=0.15,
+        current_equity=10_000_000.0,
+        historical_closed_trades_count=60,
+        rolling_bss=0.12,  # Calibrated predictive skill!
+        estimated_win_prob=0.60,
+    )
+    assert res_kelly.regime_mode == "CALIBRATED_KELLY"
+    assert res_kelly.shares_quantity > 0
 
 
 def test_sizing_nan_fail_closed():

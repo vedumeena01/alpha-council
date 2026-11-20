@@ -37,9 +37,9 @@
 
 ```text
 Modules: zone_engine.py + sector_engine.py + pattern_engine.py + gap_engine.py + trap_and_pattern_engine.py + scanner_and_trailing_engine.py + gtf_risk.py + paper_trader.py
-Total Suite Tests: 130 (100% Passed)
+Total Suite Tests: 131 (100% Passed)
 Cumulative Zone, Sector, Pattern, Gap, Trap, Trailing & Forward Tests: 104 (100% Passed)
-Risk & Execution Guardrail Tests: 26 (100% Passed)
+Risk & Execution Guardrail Tests: 27 (100% Passed)
 Linter Status: Ruff 0 errors, 0 warnings
 CI Status: GitHub Actions 100% Green (Python 3.10, 3.11, 3.12, 3.13)
 ```
@@ -47,8 +47,8 @@ CI Status: GitHub Actions 100% Green (Python 3.10, 3.11, 3.12, 3.13)
 ---
 
 ## 🗂️ File Directory
-- [`FORWARD_PAPER_TESTING_REPORT.md`](FORWARD_PAPER_TESTING_REPORT.md) - **Simulated Walk-Forward Paper Testing Audit Report (+1.48% Net PnL, 37.50% Win Rate, 2.31x Asymmetry, ₹24,908 Statutory Drag, ₹16,929 Gap Drag).**
-- [`paper_trading_journal.json`](paper_trading_journal.json) - **Machine-readable trade journal with granular tick-by-tick logs for all 92 closed trades.**
+- [`FORWARD_PAPER_TESTING_REPORT.md`](FORWARD_PAPER_TESTING_REPORT.md) - **Simulated Walk-Forward Paper Testing Audit Report (+0.19% Net PnL, 35.42% Win Rate, 1.85x Asymmetry, ₹24,759 Statutory Drag, ₹16,888 Gap Drag, 2023-2024 Historical Dates).**
+- [`paper_trading_journal.json`](paper_trading_journal.json) - **Machine-readable trade journal with granular tick-by-tick logs for all 48 closed trades.**
 - [`EPISODE_01_TEST_RESULTS.md`](EPISODE_01_TEST_RESULTS.md) - Session partitions & candle anatomy.
 - [`EPISODE_02_TEST_RESULTS.md`](EPISODE_02_TEST_RESULTS.md) - 50% candle classification.
 - [`EPISODE_03_TEST_RESULTS.md`](EPISODE_03_TEST_RESULTS.md) - Zone marking & freshness.

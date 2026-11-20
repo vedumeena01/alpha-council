@@ -40,12 +40,14 @@ class PositionSizingEngine:
         max_risk_ceiling: float = 0.015,    # 1.5% max risk
         max_notional_pct: float = 0.20,     # 20% max single-stock notional
         min_atr_multiple: float = 0.25,      # Skip if stop < 0.25 * ATR (filters micro-noise without over-discarding sweeps)
+        cold_start_trade_threshold: int = 50,# Minimum closed trades required to exit cold start
     ):
         self.base_risk_fraction = base_risk_fraction
         self.target_annual_vol = target_annual_vol
         self.max_risk_ceiling = max_risk_ceiling
         self.max_notional_pct = max_notional_pct
         self.min_atr_multiple = min_atr_multiple
+        self.cold_start_trade_threshold = cold_start_trade_threshold
 
     @staticmethod
     def calculate_brier_skill_score(
@@ -139,11 +141,11 @@ class PositionSizingEngine:
 
         # 3. Regime Mode & Effective Risk Selection
         f_star_risk = 0.0
-        # Cold start check: Requires at least 200 closed trades AND valid BSS AND valid win prob
-        if historical_closed_trades_count < 200 or rolling_bss is None or estimated_win_prob is None:
+        # Cold start check: Requires at least cold_start_trade_threshold closed trades AND valid BSS AND valid win prob
+        if historical_closed_trades_count < self.cold_start_trade_threshold or rolling_bss is None or estimated_win_prob is None:
             regime = "COLD_START"
             tau_eff = min(tau_vol, 0.010)  # Capped at 1.0% in cold start
-            msg = f"Cold start (trades={historical_closed_trades_count}<200 or uncalibrated). Governed strictly by Vol-Targeting (Risk={tau_eff*100:.2f}%)."
+            msg = f"Cold start (trades={historical_closed_trades_count}<{self.cold_start_trade_threshold} or uncalibrated). Governed strictly by Vol-Targeting (Risk={tau_eff*100:.2f}%)."
         elif rolling_bss <= 0.0:
             regime = "DEFENSIVE"
             tau_eff = min(0.5 * tau_vol, 0.010)  # Defensive risk strictly <= cold-start cap (max 1.0%)

@@ -33,7 +33,7 @@ class RiskParameters(BaseModel):
     mwpl_ban_entry_threshold: float = Field(default=0.95, description="95% MWPL F&O derivative hedge ban entry")
     mwpl_ban_exit_threshold: float = Field(default=0.80, description="80% MWPL F&O derivative hedge ban exit")
     min_atr_stop_multiple: float = Field(default=0.25, description="Skip setup if stop distance < 0.25 * ATR14 (micro-noise filter)")
-    cold_start_trade_threshold: int = Field(default=200, description="Bypass Kelly until 200 trades closed")
+    cold_start_trade_threshold: int = Field(default=50, description="Bypass Kelly until 50 trades closed (calibrated for swing trading)")
     rolling_calibration_window: int = Field(default=250, description="Rolling window for Brier Skill Score")
 
 

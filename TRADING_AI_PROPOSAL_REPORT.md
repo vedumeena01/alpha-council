@@ -400,7 +400,7 @@ Phase 3: 90-Day Operational Sandbox & Microstructure Calibration (Weeks 9-20)
 
 ## 10. Quantitative Edge Defense Checklist & Sign-Off
 
-When presenting AlphaCouncil to hedge fund trading desks and quantitative reviewers, the following empirical proofs defend the architecture:
+When presenting AlphaCouncil to hedge fund trading desks and quantitative reviewers, the following empirical validations defend the architecture:
 
 | Reviewer Challenge | AlphaCouncil Empirical Defense | Literature & Code Anchor | Document Reference |
 | :--- | :--- | :--- | :--- |

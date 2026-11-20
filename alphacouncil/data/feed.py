@@ -56,8 +56,8 @@ class MarketDataFeed:
         # that E[r_t * r_{t-1}] = 0 (unbiased martingale random walk with no artificial autocorrelation).
         curr_close = initial_price
 
-        # Trading day calendar (excluding weekends)
-        cur_d = datetime.date(2025, 1, 1)
+        # Trading day calendar (excluding weekends, anchored to 2023-01-02 historical past)
+        cur_d = datetime.date(2023, 1, 2)
         bar_dates = []
         for _ in range(n_bars):
             while cur_d.weekday() >= 5:

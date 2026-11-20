@@ -68,6 +68,8 @@ class BacktestEngine:
         use_pit_filter: bool = True,
         use_atr_stop: bool = True,
         random_entry: bool = False,
+        sweep_lookback: int = 15,
+        sweep_volume_factor: float = 1.2,
         seed: Optional[int] = None,
     ):
         self.config = config
@@ -82,7 +84,7 @@ class BacktestEngine:
 
         # Subsystems
         self.calendar = PointInTimeCalendar()
-        self.sweep_detector = LiquiditySweepDetector(lookback=20, volume_factor=1.5)
+        self.sweep_detector = LiquiditySweepDetector(lookback=sweep_lookback, volume_factor=sweep_volume_factor)
         self.nlp = FinBertSentimentExtractor()
         self.triple_barrier = TripleBarrierLabeler(payoff_ratio=2.0, max_vertical_days=5)
         self.pre_trade = PreTradeRiskEngine(max_single_stock_pct=0.20)
@@ -90,6 +92,7 @@ class BacktestEngine:
             base_risk_fraction=config.risk.base_risk_fraction,
             target_annual_vol=config.risk.target_annual_volatility,
             min_atr_multiple=config.risk.min_atr_stop_multiple if use_atr_stop else 0.0,
+            cold_start_trade_threshold=getattr(config.risk, "cold_start_trade_threshold", 50),
         )
         self.circuit_guard = CircuitBandGuard(proximity_threshold_pct=0.015)
         self.kill_switch = IntradayKillSwitch()
@@ -325,10 +328,11 @@ class BacktestEngine:
                             else:
                                 ann_vol = self.config.risk.target_annual_volatility  # Flat risk baseline
 
-                            # Honest calibration: Cold start until 200 empirical closed trades exist
+                            # Dynamic regime transition: Cold start until threshold empirical closed trades exist
                             trades_count = len(completed_trades)
-                            if self.use_kelly_cap and trades_count >= 200:
-                                recent = completed_trades[-250:]
+                            if self.use_kelly_cap and trades_count >= self.sizing.cold_start_trade_threshold:
+                                calib_window = getattr(self.config.risk, "rolling_calibration_window", 250)
+                                recent = completed_trades[-calib_window:]
                                 p_list = [t.predicted_win_prob for t in recent]
                                 o_list = [1 if t.net_pnl_inr > 0 else 0 for t in recent]
                                 empirical_bss = PositionSizingEngine.calculate_brier_skill_score(p_list, o_list)

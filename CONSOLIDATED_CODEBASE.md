@@ -29,8 +29,7 @@
 
 ---
 
-### 1. Configuration & Statutory Parameters
-**File:** [alphacouncil/config.py](alphacouncil/config.py)
+## 1. Configuration & Statutory Parameters (`alphacouncil/config.py`)
 
 ```python
 """
@@ -68,7 +67,7 @@ class RiskParameters(BaseModel):
     mwpl_ban_entry_threshold: float = Field(default=0.95, description="95% MWPL F&O derivative hedge ban entry")
     mwpl_ban_exit_threshold: float = Field(default=0.80, description="80% MWPL F&O derivative hedge ban exit")
     min_atr_stop_multiple: float = Field(default=0.25, description="Skip setup if stop distance < 0.25 * ATR14 (micro-noise filter)")
-    cold_start_trade_threshold: int = Field(default=200, description="Bypass Kelly until 200 trades closed")
+    cold_start_trade_threshold: int = Field(default=50, description="Bypass Kelly until 50 trades closed (calibrated for swing trading)")
     rolling_calibration_window: int = Field(default=250, description="Rolling window for Brier Skill Score")
 
 
@@ -90,11 +89,12 @@ class AlphaCouncilConfig(BaseModel):
 
 # Global default configuration instance
 DEFAULT_CONFIG = AlphaCouncilConfig()
+
 ```
+
 ---
 
-### 2. Market Data Feed & Synthetic Generator
-**File:** [alphacouncil/data/feed.py](alphacouncil/data/feed.py)
+## 2. Market Data Feed & Synthetic Generator (`alphacouncil/data/feed.py`)
 
 ```python
 """
@@ -155,8 +155,8 @@ class MarketDataFeed:
         # that E[r_t * r_{t-1}] = 0 (unbiased martingale random walk with no artificial autocorrelation).
         curr_close = initial_price
 
-        # Trading day calendar (excluding weekends)
-        cur_d = datetime.date(2025, 1, 1)
+        # Trading day calendar (excluding weekends, anchored to 2023-01-02 historical past)
+        cur_d = datetime.date(2023, 1, 2)
         bar_dates = []
         for _ in range(n_bars):
             while cur_d.weekday() >= 5:
@@ -260,11 +260,12 @@ class MarketDataFeed:
             px = base_prices.get(sym, 1000.0)
             dataset[sym] = self.generate_series(symbol=sym, n_bars=n_bars, initial_price=px)
         return dataset
+
 ```
+
 ---
 
-### 3. Point-in-Time Corporate Calendar & LODR 29
-**File:** [alphacouncil/data/calendar.py](alphacouncil/data/calendar.py)
+## 3. Point-in-Time Corporate Calendar & LODR 29 (`alphacouncil/data/calendar.py`)
 
 ```python
 """
@@ -300,7 +301,7 @@ class PointInTimeCalendar:
         if symbol not in self.events:
             sym_offset = sum(ord(c) for c in symbol) % 8
             evts = []
-            for yr in [2024, 2025, 2026, 2027]:
+            for yr in [2023, 2024, 2025, 2026, 2027]:
                 for m, q_name in [(1, "Q3"), (4, "Q4"), (7, "Q1"), (10, "Q2")]:
                     day_intim = min(28, 8 + sym_offset)
                     day_earn = min(28, 14 + sym_offset)
@@ -356,8 +357,10 @@ class PointInTimeCalendar:
 
     def get_latest_headline(self, symbol: str, current_date: str) -> str:
         """
-        Point-in-time financial news disclosure feed for FinBERT featurization.
-        Eliminates future lookahead by keying exclusively off current or historical dates.
+        Research Prototype Stub / Synthetic Lexicon Disclosure Feeder.
+        Generates reproducible headline excerpts for testing the NLP feature pipeline
+        without lookahead leakage.
+        In live production, replace with real-time SEBI / NSE RSS disclosure feed parser.
         """
         self._ensure_symbol_events(symbol)
         if self.is_earnings_within_window(symbol, current_date, days_ahead=5):
@@ -370,11 +373,12 @@ class PointInTimeCalendar:
         elif date_hash % 11 == 0:
             return f"{symbol} regulatory note: management cautions on raw material headwinds and potential margin contraction."
         return f"{symbol} standard disclosures: operations in line with guidance; routine capital deployment."
+
 ```
+
 ---
 
-### 4. Demand & Supply Zone Core Engine (GTF Model)
-**File:** [alphacouncil/alpha/zone_engine.py](alphacouncil/alpha/zone_engine.py)
+## 4. Demand & Supply Zone Core Engine (GTF Model) (`alphacouncil/alpha/zone_engine.py`)
 
 ```python
 """
@@ -3526,11 +3530,12 @@ class DemandSupplyEngine:
             entry_price=zone.entry_price,
             initial_stop_loss=zone.stop_loss,
         )
+
 ```
+
 ---
 
-### 5. Deterministic Liquidity Sweep Detector (H1)
-**File:** [alphacouncil/alpha/sweep_detector.py](alphacouncil/alpha/sweep_detector.py)
+## 5. Deterministic Liquidity Sweep Detector (H1) (`alphacouncil/alpha/sweep_detector.py`)
 
 ```python
 """
@@ -3653,11 +3658,12 @@ class LiquiditySweepDetector:
             if sig and sig.signal == 1:
                 signals.append(sig)
         return signals
+
 ```
+
 ---
 
-### 6. López de Prado Triple Barrier & OU Half-Life
-**File:** [alphacouncil/alpha/triple_barrier.py](alphacouncil/alpha/triple_barrier.py)
+## 6. López de Prado Triple Barrier & OU Half-Life (`alphacouncil/alpha/triple_barrier.py`)
 
 ```python
 """
@@ -3784,11 +3790,12 @@ class TripleBarrierLabeler:
             holding_period_days=limit,
             is_success=(ret > 0.0),
         )
+
 ```
+
 ---
 
-### 7. FinBERT Sentiment & Binomial Audit (H2)
-**File:** [alphacouncil/alpha/sentiment_nlp.py](alphacouncil/alpha/sentiment_nlp.py)
+## 7. FinBERT Sentiment & Binomial Audit (H2) (`alphacouncil/alpha/sentiment_nlp.py`)
 
 ```python
 """
@@ -3821,7 +3828,10 @@ class ContaminationResult:
 
 class FinBertSentimentExtractor:
     """
-    Deterministic Financial Lexicon & Sentiment Featurizer (Prototype Stub).
+    Research Prototype Stub / Synthetic Lexicon Featurizer.
+    Evaluates synthetic financial text excerpts via deterministic keyword mapping
+    in zero-GPU and offline testing environments.
+    In live production, connects to real-time SEBI corporate filings / RSS news feeds.
     Outputs numerical feature S_NLP in [-1.0, 1.0] orthogonal to momentum.
     """
 
@@ -3912,11 +3922,12 @@ class FinBertSentimentExtractor:
         normalized_indices = list(range(len(dates)))
         rebased_prices = [round((p / prices[0]) * 100.0, 2) for p in prices]
         return synthetic_symbol, normalized_indices, rebased_prices
+
 ```
+
 ---
 
-### 8. Sectoral Analysis Engine (Episode 16)
-**File:** [alphacouncil/alpha/sector_engine.py](alphacouncil/alpha/sector_engine.py)
+## 8. Sectoral Analysis Engine (Episode 16) (`alphacouncil/alpha/sector_engine.py`)
 
 ```python
 """
@@ -4448,11 +4459,12 @@ class SectorAnalysisEngine:
             rejection_reasons=rejection_reasons,
             advisory=advisory,
         )
+
 ```
+
 ---
 
-### 9. Candlestick Patterns Truth Engine (Episode 17)
-**File:** [alphacouncil/alpha/pattern_engine.py](alphacouncil/alpha/pattern_engine.py)
+## 9. Candlestick Patterns Truth Engine (Episode 17) (`alphacouncil/alpha/pattern_engine.py`)
 
 ```python
 """
@@ -4767,11 +4779,12 @@ class CandlestickPatternTruthEngine:
             ConventionalPatternType.NO_PATTERN: "Standard order flow without textbook candlestick formation.",
         }
         return translations.get(pattern, "Standard price action.")
+
 ```
+
 ---
 
-### 10. Gap Theory Engine (Episode 18)
-**File:** [alphacouncil/alpha/gap_engine.py](alphacouncil/alpha/gap_engine.py)
+## 10. Gap Theory Engine (Episode 18) (`alphacouncil/alpha/gap_engine.py`)
 
 ```python
 """
@@ -5179,11 +5192,12 @@ class GapTheoryEngine:
             is_demand_zone=is_demand_zone,
             advisory_message=msg,
         )
+
 ```
+
 ---
 
-### 11. Market Traps & LOTL Engine (Episode 19)
-**File:** [alphacouncil/alpha/trap_and_pattern_engine.py](alphacouncil/alpha/trap_and_pattern_engine.py)
+## 11. Market Traps & LOTL Engine (Episode 19) (`alphacouncil/alpha/trap_and_pattern_engine.py`)
 
 ```python
 """
@@ -5661,11 +5675,12 @@ class MarketTrapsAndPatternTruthEngine:
             trade_score_bonus=0,
             advisory_message=f"RSI reading {rsi_value:.1f} is neutral. No indicator bonus awarded.",
         )
+
 ```
+
 ---
 
-### 12. High-Speed Stock Scanner & Dynamic Trailing Engine (Episode 20)
-**File:** [alphacouncil/alpha/scanner_and_trailing_engine.py](alphacouncil/alpha/scanner_and_trailing_engine.py)
+## 12. High-Speed Stock Scanner & Dynamic Trailing Engine (Episode 20) (`alphacouncil/alpha/scanner_and_trailing_engine.py`)
 
 ```python
 """
@@ -5946,11 +5961,12 @@ class TopDownScannerEngine:
             f"TRADE PLAN: {trade_style} Long ({score_ratio}) | Entry: ₹{entry:.2f} | SL: ₹{stop_loss:.2f} | Tgt: ₹{target:.2f} | RRR: {rrr:.1f}:1\n"
             f"ACTION: Pre-set Price Alert at ₹{entry + 2.0:.2f}. Review intermediate trend upon mobile alert."
         )
+
 ```
+
 ---
 
-### 13. Pre-Trade Risk Engine & Concentration Limits
-**File:** [alphacouncil/risk/pre_trade.py](alphacouncil/risk/pre_trade.py)
+## 13. Pre-Trade Risk Engine & Concentration Limits (`alphacouncil/risk/pre_trade.py`)
 
 ```python
 """
@@ -6150,11 +6166,12 @@ class PreTradeRiskEngine:
             adjusted_quantity=proposed_quantity,
             reason="PRE_TRADE_PASSED: All boundary checks green",
         )
+
 ```
+
 ---
 
-### 14. Position Sizing & Kelly Calibration
-**File:** [alphacouncil/risk/sizing.py](alphacouncil/risk/sizing.py)
+## 14. Position Sizing & Kelly Calibration (`alphacouncil/risk/sizing.py`)
 
 ```python
 """
@@ -6199,12 +6216,14 @@ class PositionSizingEngine:
         max_risk_ceiling: float = 0.015,    # 1.5% max risk
         max_notional_pct: float = 0.20,     # 20% max single-stock notional
         min_atr_multiple: float = 0.25,      # Skip if stop < 0.25 * ATR (filters micro-noise without over-discarding sweeps)
+        cold_start_trade_threshold: int = 50,# Minimum closed trades required to exit cold start
     ):
         self.base_risk_fraction = base_risk_fraction
         self.target_annual_vol = target_annual_vol
         self.max_risk_ceiling = max_risk_ceiling
         self.max_notional_pct = max_notional_pct
         self.min_atr_multiple = min_atr_multiple
+        self.cold_start_trade_threshold = cold_start_trade_threshold
 
     @staticmethod
     def calculate_brier_skill_score(
@@ -6298,11 +6317,11 @@ class PositionSizingEngine:
 
         # 3. Regime Mode & Effective Risk Selection
         f_star_risk = 0.0
-        # Cold start check: Requires at least 200 closed trades AND valid BSS AND valid win prob
-        if historical_closed_trades_count < 200 or rolling_bss is None or estimated_win_prob is None:
+        # Cold start check: Requires at least cold_start_trade_threshold closed trades AND valid BSS AND valid win prob
+        if historical_closed_trades_count < self.cold_start_trade_threshold or rolling_bss is None or estimated_win_prob is None:
             regime = "COLD_START"
             tau_eff = min(tau_vol, 0.010)  # Capped at 1.0% in cold start
-            msg = f"Cold start (trades={historical_closed_trades_count}<200 or uncalibrated). Governed strictly by Vol-Targeting (Risk={tau_eff*100:.2f}%)."
+            msg = f"Cold start (trades={historical_closed_trades_count}<{self.cold_start_trade_threshold} or uncalibrated). Governed strictly by Vol-Targeting (Risk={tau_eff*100:.2f}%)."
         elif rolling_bss <= 0.0:
             regime = "DEFENSIVE"
             tau_eff = min(0.5 * tau_vol, 0.010)  # Defensive risk strictly <= cold-start cap (max 1.0%)
@@ -6384,11 +6403,12 @@ class PositionSizingEngine:
             regime_mode=regime,
             rationale=msg,
         )
+
 ```
+
 ---
 
-### 15. López de Prado Meta-Labeler Downscaler
-**File:** [alphacouncil/risk/meta_labeler.py](alphacouncil/risk/meta_labeler.py)
+## 15. López de Prado Meta-Labeler Downscaler (`alphacouncil/risk/meta_labeler.py`)
 
 ```python
 """
@@ -6497,11 +6517,12 @@ class LopezDePradoMetaLabeler:
             sentiment_score=round(sentiment_score, 4),
             reasoning=reason,
         )
+
 ```
+
 ---
 
-### 16. Intraday Kill-Switch & Monthly Session Halt
-**File:** [alphacouncil/risk/kill_switch.py](alphacouncil/risk/kill_switch.py)
+## 16. Intraday Kill-Switch & Monthly Session Halt (`alphacouncil/risk/kill_switch.py`)
 
 ```python
 """
@@ -6701,11 +6722,12 @@ class IntradayKillSwitch:
         """
         elapsed = time.time() - self.last_heartbeat_time
         return elapsed < max_allowed_miss_sec
+
 ```
+
 ---
 
-### 17. Direction-Aware Circuit Band Guard
-**File:** [alphacouncil/risk/circuits.py](alphacouncil/risk/circuits.py)
+## 17. Direction-Aware Circuit Band Guard (`alphacouncil/risk/circuits.py`)
 
 ```python
 """
@@ -6833,11 +6855,12 @@ class MWPLBanTracker:
             )
 
         return True, "HEDGING_NORMAL: OI within permissible limits."
+
 ```
+
 ---
 
-### 18. GTF Risk Management & Capital Protection Engine
-**File:** [alphacouncil/risk/gtf_risk.py](alphacouncil/risk/gtf_risk.py)
+## 18. GTF Risk Management & Capital Protection Engine (`alphacouncil/risk/gtf_risk.py`)
 
 ```python
 """
@@ -7142,11 +7165,12 @@ class GTFRiskManager:
             monthly_return_pct=monthly_return_pct,
             annual_return_pct=annual_return_pct,
         )
+
 ```
+
 ---
 
-### 19. Statutory Indian Market Friction Model (SEBI Oct 2024)
-**File:** [alphacouncil/execution/friction.py](alphacouncil/execution/friction.py)
+## 19. Statutory Indian Market Friction Model (SEBI Oct 2024) (`alphacouncil/execution/friction.py`)
 
 ```python
 """
@@ -7273,11 +7297,12 @@ class IndianMarketFrictionModel:
             total_friction_inr=round(total_friction, 2),
             effective_friction_bps=round(effective_bps, 2),
         )
+
 ```
+
 ---
 
-### 20. Idempotent OMS & Broker GTT Bracket Sync
-**File:** [alphacouncil/execution/oms.py](alphacouncil/execution/oms.py)
+## 20. Idempotent OMS & Broker GTT Bracket Sync (`alphacouncil/execution/oms.py`)
 
 ```python
 """
@@ -7526,11 +7551,12 @@ class IdempotentOMS:
             "status": "Entry order and linked stops/targets canceled cleanly",
         })
         return True
+
 ```
+
 ---
 
-### 21. Purged Walk-Forward Backtesting Engine
-**File:** [alphacouncil/backtest/engine.py](alphacouncil/backtest/engine.py)
+## 21. Purged Walk-Forward Backtesting Engine (`alphacouncil/backtest/engine.py`)
 
 ```python
 """
@@ -7603,6 +7629,8 @@ class BacktestEngine:
         use_pit_filter: bool = True,
         use_atr_stop: bool = True,
         random_entry: bool = False,
+        sweep_lookback: int = 15,
+        sweep_volume_factor: float = 1.2,
         seed: Optional[int] = None,
     ):
         self.config = config
@@ -7617,7 +7645,7 @@ class BacktestEngine:
 
         # Subsystems
         self.calendar = PointInTimeCalendar()
-        self.sweep_detector = LiquiditySweepDetector(lookback=20, volume_factor=1.5)
+        self.sweep_detector = LiquiditySweepDetector(lookback=sweep_lookback, volume_factor=sweep_volume_factor)
         self.nlp = FinBertSentimentExtractor()
         self.triple_barrier = TripleBarrierLabeler(payoff_ratio=2.0, max_vertical_days=5)
         self.pre_trade = PreTradeRiskEngine(max_single_stock_pct=0.20)
@@ -7625,6 +7653,7 @@ class BacktestEngine:
             base_risk_fraction=config.risk.base_risk_fraction,
             target_annual_vol=config.risk.target_annual_volatility,
             min_atr_multiple=config.risk.min_atr_stop_multiple if use_atr_stop else 0.0,
+            cold_start_trade_threshold=getattr(config.risk, "cold_start_trade_threshold", 50),
         )
         self.circuit_guard = CircuitBandGuard(proximity_threshold_pct=0.015)
         self.kill_switch = IntradayKillSwitch()
@@ -7860,10 +7889,11 @@ class BacktestEngine:
                             else:
                                 ann_vol = self.config.risk.target_annual_volatility  # Flat risk baseline
 
-                            # Honest calibration: Cold start until 200 empirical closed trades exist
+                            # Dynamic regime transition: Cold start until threshold empirical closed trades exist
                             trades_count = len(completed_trades)
-                            if self.use_kelly_cap and trades_count >= 200:
-                                recent = completed_trades[-250:]
+                            if self.use_kelly_cap and trades_count >= self.sizing.cold_start_trade_threshold:
+                                calib_window = getattr(self.config.risk, "rolling_calibration_window", 250)
+                                recent = completed_trades[-calib_window:]
                                 p_list = [t.predicted_win_prob for t in recent]
                                 o_list = [1 if t.net_pnl_inr > 0 else 0 for t in recent]
                                 empirical_bss = PositionSizingEngine.calculate_brier_skill_score(p_list, o_list)
@@ -7951,11 +7981,12 @@ class BacktestEngine:
             signals_skipped_noise_trap=skipped_noise,
             noise_trap_skip_rate_pct=round(skip_rate, 2),
         )
+
 ```
+
 ---
 
-### 22. Deflated Sharpe Ratio (DSR) & Quant Metrics
-**File:** [alphacouncil/backtest/metrics.py](alphacouncil/backtest/metrics.py)
+## 22. Deflated Sharpe Ratio (DSR) & Quant Metrics (`alphacouncil/backtest/metrics.py`)
 
 ```python
 """
@@ -8180,11 +8211,12 @@ class QuantMetricsCalculator:
             total_trades=n_trades,
             trials_logged=n_trials_logged,
         )
+
 ```
+
 ---
 
-### 23. 7-Model Orthogonal Ablation Suite
-**File:** [alphacouncil/backtest/ablation.py](alphacouncil/backtest/ablation.py)
+## 23. 7-Model Orthogonal Ablation Suite (`alphacouncil/backtest/ablation.py`)
 
 ```python
 """
@@ -8321,11 +8353,12 @@ class AblationSuiteRunner:
         )
 
         return results
+
 ```
+
 ---
 
-### 24. Interactive Bloomberg Dashboard UI
-**File:** [alphacouncil/ui/dashboard.py](alphacouncil/ui/dashboard.py)
+## 24. Interactive Bloomberg Dashboard UI (`alphacouncil/ui/dashboard.py`)
 
 ```python
 """
@@ -8485,11 +8518,12 @@ class AlphaCouncilDashboard:
         panel = Panel(panel_text, title="Lookahead Bias Defense", border_style="cyan")
         self.console.print(panel)
         self.console.print()
+
 ```
+
 ---
 
-### 25. Master Research Demo Runner
-**File:** [alphacouncil/run_council.py](alphacouncil/run_council.py)
+## 25. Master Research Demo Runner (`alphacouncil/run_council.py`)
 
 ```python
 """
@@ -8661,11 +8695,12 @@ def run_interactive_pitch_demo():
 
 if __name__ == "__main__":
     run_interactive_pitch_demo()
+
 ```
+
 ---
 
-### 26. Forward Paper Testing Engine & Pullback Order Lifecycle
-**File:** [alphacouncil/execution/paper_trader.py](alphacouncil/execution/paper_trader.py)
+## 26. Forward Paper Testing Engine & Pullback Order Lifecycle (`alphacouncil/execution/paper_trader.py`)
 
 ```python
 """
@@ -8748,6 +8783,8 @@ class PaperTradeRecord:
     realized_rrr: float = 0.0
     gap_slippage_inr: float = 0.0
     holding_period_days: int = 0
+    is_simulation: bool = True
+    simulation_environment: str = "CALIBRATED_STOCHASTIC_NSE"
     is_closed: bool = False
 
 
@@ -9004,7 +9041,7 @@ class ForwardPaperTestingEngine:
                 fill_price = bar.open if bar.open < order.limit_price else order.limit_price
 
                 self.trade_counter += 1
-                trade_id = f"PTRD-{self.trade_counter:03d}"
+                trade_id = f"SIM-TRD-{self.trade_counter:03d}"
 
                 self.active_positions[symbol] = ActivePaperPosition(
                     trade_id=trade_id,
@@ -9334,5 +9371,8 @@ class ForwardPaperTestingEngine:
 
         with open(filepath, "w", encoding="utf-8") as f:
             json.dump([asdict(t) for t in self.completed_trades], f, indent=2, cls=NpEncoder)
+
 ```
+
 ---
+
