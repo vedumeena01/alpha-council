@@ -67,7 +67,7 @@ class RiskParameters(BaseModel):
     mwpl_ban_entry_threshold: float = Field(default=0.95, description="95% MWPL F&O derivative hedge ban entry")
     mwpl_ban_exit_threshold: float = Field(default=0.80, description="80% MWPL F&O derivative hedge ban exit")
     min_atr_stop_multiple: float = Field(default=0.25, description="Skip setup if stop distance < 0.25 * ATR14 (micro-noise filter)")
-    cold_start_trade_threshold: int = Field(default=50, description="Bypass Kelly until 50 trades closed (calibrated for swing trading)")
+    cold_start_trade_threshold: int = Field(default=50, description="Test harness threshold: 50 trades. Asymptotic institutional production standard is 200 trades.")
     rolling_calibration_window: int = Field(default=250, description="Rolling window for Brier Skill Score")
 
 
@@ -105,7 +105,6 @@ daily volume variations, and dynamic circuit limits.
 
 from dataclasses import dataclass
 from typing import List, Dict
-import datetime
 import numpy as np
 
 
@@ -155,14 +154,10 @@ class MarketDataFeed:
         # that E[r_t * r_{t-1}] = 0 (unbiased martingale random walk with no artificial autocorrelation).
         curr_close = initial_price
 
-        # Trading day calendar (excluding weekends, anchored to 2023-01-02 historical past)
-        cur_d = datetime.date(2023, 1, 2)
-        bar_dates = []
-        for _ in range(n_bars):
-            while cur_d.weekday() >= 5:
-                cur_d += datetime.timedelta(days=1)
-            bar_dates.append(cur_d.isoformat())
-            cur_d += datetime.timedelta(days=1)
+        # Simulation Day Index calendar: Unambiguous SIM-D001 through SIM-D{n}
+        # Explicitly isolates synthetic jump-diffusion simulation from real exchange tick feeds,
+        # preventing any confusion with actual historical NSE market quotes.
+        bar_dates = [f"SIM-D{i+1:03d}" for i in range(n_bars)]
 
         bars: List[Bar] = []
         highs = []
@@ -301,6 +296,7 @@ class PointInTimeCalendar:
         if symbol not in self.events:
             sym_offset = sum(ord(c) for c in symbol) % 8
             evts = []
+            # Calendar year events (for ISO calendar date feeds)
             for yr in [2023, 2024, 2025, 2026, 2027]:
                 for m, q_name in [(1, "Q3"), (4, "Q4"), (7, "Q1"), (10, "Q2")]:
                     day_intim = min(28, 8 + sym_offset)
@@ -311,24 +307,50 @@ class PointInTimeCalendar:
                         earnings_announcement_date=f"{yr}-{m:02d}-{day_earn:02d}",
                         financial_quarter=f"{q_name}-FY{yr%100 + (1 if m >= 4 else 0)}",
                     ))
+            # Simulation day events (for unambiguous SIM-D001 synthetic day index feeds)
+            for q_idx in range(1, 16):
+                q_earn_day = (q_idx * 63) - 15 + sym_offset
+                q_intim_day = q_earn_day - 5
+                evts.append(CorporateEarningsEvent(
+                    symbol=symbol,
+                    board_meeting_intimation_date=f"SIM-D{q_intim_day:03d}",
+                    earnings_announcement_date=f"SIM-D{q_earn_day:03d}",
+                    financial_quarter=f"SIM-Q{q_idx}",
+                ))
             self.events[symbol] = evts
 
     def is_earnings_within_window(
         self, symbol: str, current_date: str, days_ahead: int = 1
     ) -> bool:
         """
-        Returns True if a scheduled earnings release falls within `days_ahead` calendar days.
+        Returns True if a scheduled earnings release falls within `days_ahead` trading/calendar days.
         Used to enforce the 100% position liquidation rule 24 hours prior to earnings.
+        Supports both ISO calendar dates ('YYYY-MM-DD') and Simulation Day Indices ('SIM-D045').
         """
         self._ensure_symbol_events(symbol)
         symbol_events = self.events.get(symbol, [])
+
+        if current_date.startswith("SIM-D"):
+            try:
+                curr_day_num = int(current_date[5:8])
+                for evt in symbol_events:
+                    if evt.earnings_announcement_date.startswith("SIM-D"):
+                        earn_day_num = int(evt.earnings_announcement_date[5:8])
+                        diff_days = earn_day_num - curr_day_num
+                        if 0 <= diff_days <= days_ahead:
+                            return True
+            except Exception:
+                pass
+            return False
+
         try:
             curr_d = datetime.date.fromisoformat(current_date[:10])
             for evt in symbol_events:
-                earn_d = datetime.date.fromisoformat(evt.earnings_announcement_date[:10])
-                diff_days = (earn_d - curr_d).days
-                if 0 <= diff_days <= days_ahead:
-                    return True
+                if not evt.earnings_announcement_date.startswith("SIM-D"):
+                    earn_d = datetime.date.fromisoformat(evt.earnings_announcement_date[:10])
+                    diff_days = (earn_d - curr_d).days
+                    if 0 <= diff_days <= days_ahead:
+                        return True
         except Exception:
             for evt in symbol_events:
                 if evt.earnings_announcement_date == current_date:
@@ -6216,7 +6238,7 @@ class PositionSizingEngine:
         max_risk_ceiling: float = 0.015,    # 1.5% max risk
         max_notional_pct: float = 0.20,     # 20% max single-stock notional
         min_atr_multiple: float = 0.25,      # Skip if stop < 0.25 * ATR (filters micro-noise without over-discarding sweeps)
-        cold_start_trade_threshold: int = 50,# Minimum closed trades required to exit cold start
+        cold_start_trade_threshold: int = 50, # Minimum closed trades to exit cold start (50 for test harness; 200 for institutional prod)
     ):
         self.base_risk_fraction = base_risk_fraction
         self.target_annual_vol = target_annual_vol
@@ -7633,6 +7655,11 @@ class BacktestEngine:
         sweep_volume_factor: float = 1.2,
         seed: Optional[int] = None,
     ):
+        """
+        Backtest engine with modular toggles for the 7-model orthogonal ablation suite.
+        Note: On synthetic feeds where volume is i.i.d. lognormal noise, sweep_lookback=15 and
+        sweep_volume_factor=1.2 act as test-harness code-path exercisers, not production alpha defaults.
+        """
         self.config = config
         self.use_sweep_signal = use_sweep_signal
         self.use_vol_sizing = use_vol_sizing
@@ -8901,16 +8928,20 @@ class ForwardPaperTestingEngine:
         timestamps = [b.timestamp for b in universe_data[self.universe[0]]]
 
         circuit_breakers_count = 0
-        current_month = ""
+        current_month = -1
 
         # Step day-by-day (start after bar 30 to allow lookback for ATR and zones)
         for t_idx in range(30, n_bars):
             today_date = timestamps[t_idx]
-            month_key = today_date[:7]
 
-            if month_key != current_month:
-                current_month = month_key
-                self.kill_switch.reset_daily_session(self.current_equity)
+            # Month rollover in simulation trading days (21 trading days per NSE month)
+            month_idx = t_idx // 21
+            if month_idx != current_month:
+                current_month = month_idx
+                self.kill_switch.reset_monthly_session(self.current_equity)
+
+            # Reset intraday peak-HWM tracking at the start of each daily trading session
+            self.kill_switch.reset_daily_session(self.current_equity)
 
             # A. Evaluate Active Positions on Bar t (Gaps, Targets, Stops)
             self._evaluate_active_positions(

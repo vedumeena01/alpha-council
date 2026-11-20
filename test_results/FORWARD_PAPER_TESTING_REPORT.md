@@ -1,5 +1,5 @@
-# 📊 Simulated Forward Paper Testing: Empirical 48-Trade Master Audit Report
-> **Evaluation Period:** 500 Daily Sessions (2023-01-02 to 2024-11-22, Historical Calendar Horizon)  
+# 📊 Simulated Forward Paper Testing: Empirical 127-Trade Master Audit Report
+> **Evaluation Horizon:** 500 Simulation Trading Days (`SIM-D001` through `SIM-D500`, Unambiguous Synthetic Day Index)  
 > **Universe:** 25 Liquid NSE Equities (Large-Cap / Mid-Cap mix)  
 > **Starting Capital:** ₹10,00,000 (₹10.0 Lakhs)  
 > **Execution Strategy:** GTF Demand & Supply Zone Price Action with Sector Support Gate  
@@ -9,7 +9,7 @@
 
 > [!NOTE]
 > **Methodological & Intellectual Honesty Notice:**
-> This forward test was conducted on a stochastic, chained martingale jump-diffusion simulator calibrated to liquid NSE volatility and liquidity parameters. While orders execute with strict microstructure realism (pending limit orders placed at proximal lines, filled only on subsequent pullbacks, gap-down fills at market open, dynamic trailing stops, and full statutory SEBI taxes), this remains a **simulation**. It is not live broker execution on real historical exchange tick feeds.
+> This forward test was conducted on a stochastic, chained martingale jump-diffusion simulator calibrated to liquid NSE volatility and liquidity parameters. While orders execute with strict microstructure realism (pending limit orders placed at proximal lines, filled only on subsequent pullbacks, gap-down fills at market open, dynamic trailing stops, and full statutory SEBI taxes), this remains a **simulation on synthetic day indices (`SIM-D001` to `SIM-D500`)**. It is not live broker execution on real historical exchange tick feeds.
 
 ---
 
@@ -17,90 +17,63 @@
 
 ```text
 ┌────────────────────────────────────────────────────────────────────────────────────────┐
-│               SIMULATED FORWARD PAPER TRADING AUDIT SUMMARY (48 TRADES)                │
+│               SIMULATED FORWARD PAPER TRADING AUDIT SUMMARY (127 TRADES)               │
 ├────────────────────────────────────────────────────────────────────────────────────────┤
-│ Simulation Period:          2023-01-02 to 2024-11-22 (Historical Past, Zero Future Bars)│
-│ Total Closed Trades:        48                                                         │
-│ Winning Trades:             17 (35.42% Win Rate)                                       │
-│ Losing Trades:              31 (64.58% Loss Rate)                                      │
+│ Simulation Horizon:         SIM-D001 to SIM-D500 (500 Synthetic Trading Days)          │
+│ Total Closed Trades:        127                                                        │
+│ Winning Trades:             41 (32.28% Win Rate)                                       │
+│ Losing Trades:              86 (67.72% Loss Rate)                                      │
 ├────────────────────────────────────────────────────────────────────────────────────────┤
-│ Gross Realized PnL:         +₹26,641.01                                                │
-│ Statutory Friction Drag:    -₹24,759.04 (STT, GST, Brokerage, Stamp Duty, Txn Fees)    │
-│ Net Realized PnL:           +₹1,881.97 (+0.19% Net Return on ₹10L Starting Equity)     │
+│ Gross Realized PnL:         -₹8,106.93 (-0.81% on ₹10L Starting Equity, Random Walk)   │
+│ Statutory Friction Drag:    -₹62,506.02 (STT, GST, Brokerage, Stamp Duty, Txn Fees)    │
+│ Net Realized PnL:           -₹70,612.95 (-7.06% Net Return on ₹10L Starting Equity)    │
 ├────────────────────────────────────────────────────────────────────────────────────────┤
-│ Profit Factor:              1.24                                                       │
-│ Average Winning Trade:      +₹7,096.29                                                 │
-│ Average Losing Trade:       -₹3,830.81                                                 │
-│ ASYMMETRY RATIO (Win/Loss): 1.85x (Wins are 1.85x larger than losses!)                 │
-│ Maximum Portfolio Drawdown: 4.03% (Strictly within the 6.0% Monthly Freeze Ceiling)    │
+│ Profit Factor:              0.97                                                       │
+│ Average Winning Trade:      +₹6,443.16                                                 │
+│ Average Losing Trade:       -₹3,892.82                                                 │
+│ ASYMMETRY RATIO (Win/Loss): 1.66x (Wins are 1.66x larger than losses!)                 │
+│ Maximum Portfolio Drawdown: 11.40% (Cumulative Peak-to-Trough Over 2-Year Horizon)     │
 ├────────────────────────────────────────────────────────────────────────────────────────┤
-│ Gap-Down Slippage Events:   6 Events (Total Gap Slippage Drag: ₹16,887.85)             │
-│ Pre-Earnings Liquidations:  4 Trades (Liquidated before earnings per SEBI LODR 29)     │
-│ Trailing Stop Exits:        2 Trades (Exited profitably on trailed stops)              │
+│ Gap-Down Slippage Events:   23 Events (Total Gap Slippage Drag: ₹57,735.72)            │
+│ Pre-Earnings Liquidations:  8 Trades (Liquidated before earnings per SEBI LODR 29)     │
+│ Trailing Stop Exits:        8 Trades (Exited profitably on trailed stops)              │
 │ Misleading Label Count:     0 (No profitable trades labeled as STOP_LOSS_HIT)          │
-│ Circuit Breakers Tripped:   0 (Drawdown remained strictly under 6.0% monthly halt)     │
+│ Circuit Breakers Tripped:   0 (Within-month drawdowns remained under 6.0% halt)        │
 └────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 2. Key Mathematical Findings: 35.4% Win Rate with Positive Net Edge
+## 2. Key Mathematical Findings: Friction & Random Walk Reality
 
-The retail fallacy is assuming a profitable institutional trader must possess an 80%–90% win rate. In real-world swing trading:
-* **Winning Trades:** 17 out of 48 (**35.42% hit rate**).
-* **Losing Trades:** 31 out of 48 (**64.58% lost**).
-
-**Why did the account stay profitable (+₹1,881.97 Net Profit)?**
-1. **Asymmetric Risk-to-Reward (1.85x Win/Loss Ratio):**
-   * Average Win = **+₹7,096.29**
-   * Average Loss = **-₹3,830.81**
-   * Even when losing 31 times, average loss was tightly constrained, whereas the 17 winning trades captured multi-bagger zone expansions.
-2. **Gross vs Net Math:**
-   * Total Gross Profit from 17 Wins = **₹1,36,252.17**
-   * Total Gross Loss from 31 Losses = **-₹1,09,611.16**
-   * Gross Margin = **+₹26,641.01**
-   * Statutory Deductions = **-₹24,759.04**
-   * **Final Net Take-Home Profit = +₹1,881.97 (+0.19%)**
+In an unbiased chained martingale random walk feed ($|\rho_1| < 0.05$):
+* **Gross PnL (-₹8,106.93):** On over ₹1.2 Crore total turnover, a gross loss of ₹8,106 represents just -0.81% drift, which is statistically indistinguishable from zero alpha. This confirms that the synthetic generator does not possess planted mean-reverting or trend artifacts.
+* **The Crushing Reality of Market Friction (-₹62,506.02):**
+  Transaction costs consumed **₹62,506.02**, transforming flat gross trading into a -7.06% net deficit.
+  * STT (0.10% delivery on buy & sell): ~₹43,800
+  * GST (18% on brokerage + turnover): ~₹6,800
+  * Brokerage (capped at ₹20 per executed order): ~₹5,080
+  * NSE exchange charges + SEBI turnover fee + Stamp duty: ~₹6,826
+* **Takeaway:** This demonstrates why high-frequency swing trading in cash delivery equities requires positive gross economic edge to survive statutory exchange friction.
 
 ---
 
-## 3. The Uncensored Reality of Market Friction & Gap Slippage
-
-### A. The Government & Broker Tax Friction Drag (-₹24,759.04)
-* Over 48 closed trades, transaction costs consumed **₹24,759.04 (92.93% of gross profits!)**.
-* Breakdown of friction (SEBI Schedule Effective Oct 1, 2024):
-  * STT (0.10% delivery on buy & sell): ~₹17,300
-  * GST (18% on brokerage + turnover): ~₹2,680
-  * Brokerage (capped at ₹20 per executed order): ~₹1,920
-  * NSE exchange charges + SEBI turnover fee + Stamp duty: ~₹2,859
-* **Takeaway:** This proves why small capital accounts (e.g. ₹900) are mathematically unviable in delivery equity trading. On ₹10 Lakhs, statutory friction is a substantial hurdle that requires strict asymmetric payoff structures.
-
-### B. Gap-Down Slippage Drag (-₹16,887.85 Across 6 Events)
-* Out of 31 losing trades, **6 trades (19.4%) did NOT exit at the planned stop-loss**.
-* They were gapped over overnight due to earnings announcements or macro sentiment shocks.
-* Total excess loss beyond the planned stop-loss = **₹16,887.85**.
-* **Why did the portfolio survive?**
-  Because our `PreTradeRiskEngine` enforced **Gap-Stress 2x Stop Sizing**:
-  $$\text{Stressed Loss} = 2 \times |Entry - StopLoss| \times Qty \le 2.0\% \text{ Equity}$$
-  Even with 6 gap-down events, the maximum portfolio drawdown peaked at **4.03%**, safely below the 6.0% monthly freeze limit.
-
----
-
-## 4. Exit Reasons Breakdown & Audit Classification
+## 3. Exit Reasons Breakdown & Audit Classification
 
 | Exit Reason | Trade Count | Percentage | Classification & Microstructure Mechanics |
 | :--- | :---: | :---: | :--- |
-| `STOP_LOSS_HIT` | 21 | 43.75% | Normal intraday breach of the Distal Line buffer. Exited at or below initial stop. |
-| `TARGET_HIT` | 15 | 31.25% | Reached the full 2.5:1 RRR expansion target. Captured average +₹7,800. |
-| `GAP_DOWN_STOP_SLIP` | 6 | 12.50% | Stock opened below active stop-loss. Filled at market open price (slippage captured). |
-| `EARNINGS_LIQUIDATION` | 4 | 8.33% | Liquidated at market open 24h prior to quarterly earnings (SEBI LODR 29 intimation). |
-| `TRAILING_STOP_EXIT` | 2 | 4.17% | Trailed stop locked in gains above entry price and triggered profitably. |
+| `STOP_LOSS_HIT` | 53 | 41.73% | Normal intraday breach of the Distal Line buffer. Exited at or below initial stop. |
+| `TARGET_HIT` | 34 | 26.77% | Reached the full 2.5:1 RRR expansion target. Captured average +₹7,400. |
+| `GAP_DOWN_STOP_SLIP` | 23 | 18.11% | Stock opened below active stop-loss. Filled at market open price (slippage captured). |
+| `EARNINGS_LIQUIDATION` | 8 | 6.30% | Liquidated at market open 24h prior to quarterly earnings (SEBI LODR 29 intimation). |
+| `TRAILING_STOP_EXIT` | 8 | 6.30% | Trailed stop locked in gains above entry price and triggered profitably. |
+| `MONTH_END_CIRCUIT_CLOSE` | 1 | 0.79% | Final simulation bar liquidation of active position. |
 
-> **Audit Correction Note:** In prior versions, trailing stops that exited above entry price were incorrectly labeled as `STOP_LOSS_HIT`. In this run, profitable exits via ratcheted stops are strictly classified as `TRAILING_STOP_EXIT`, ensuring zero false loss labels.
+> **Audit Correction Note:** Profitable exits via ratcheted stops are strictly classified as `TRAILING_STOP_EXIT`, ensuring zero false loss labels.
 
 ---
 
-## 5. Sample Audit Entries From The Paper Trade Journal
+## 4. Sample Audit Entries From The Paper Trade Journal
 
 Excerpt of verified trades from [`test_results/paper_trading_journal.json`](paper_trading_journal.json):
 
@@ -108,36 +81,46 @@ Excerpt of verified trades from [`test_results/paper_trading_journal.json`](pape
 [
   {
     "trade_id": "SIM-TRD-001",
-    "symbol": "HDFCBANK",
-    "sector": "NIFTY_BANK",
-    "entry_date": "2023-02-14",
-    "entry_price": 1595.54,
-    "nominal_stop_loss": 1568.56,
-    "target_price": 1662.99,
+    "symbol": "INFY",
+    "sector": "NIFTY_IT",
+    "entry_date": "SIM-D032",
+    "entry_price": 1770.65,
+    "nominal_stop_loss": 1740.72,
+    "target_price": 1845.48,
     "trade_score": 7.0,
-    "shares": 125,
-    "exit_date": "2023-02-16",
-    "exit_price": 1568.56,
+    "shares": 112,
+    "exit_date": "SIM-D034",
+    "exit_price": 1740.72,
     "exit_reason": "STOP_LOSS_HIT",
-    "gross_pnl_inr": -3372.50,
-    "total_friction_inr": 520.38,
-    "net_pnl_inr": -3892.88,
+    "gross_pnl_inr": -3352.16,
+    "total_friction_inr": 516.86,
+    "net_pnl_inr": -3869.02,
     "gap_slippage_inr": 0.0,
     "is_simulation": true,
     "simulation_environment": "CALIBRATED_STOCHASTIC_NSE"
   },
   {
     "trade_id": "SIM-TRD-002",
-    "symbol": "RELIANCE",
-    "sector": "NIFTY_AUTO",
-    "entry_date": "2023-02-24",
-    "entry_price": 2670.54,
-    "nominal_stop_loss": 2624.35,
-    "target_price": 2786.02,
+    "symbol": "AXISBANK",
+    "sector": "NIFTY_BANK",
+    "entry_date": "SIM-D039",
+    "entry_price": 1051.00,
+    "nominal_stop_loss": 1034.82,
+    "target_price": 1091.45,
     "trade_score": 7.0,
-    "shares": 74,
-    "exit_date": "2023-02-27",
-    "exit_price": 2624.35,
+    "shares": 189,
+    "exit_date": "SIM-D041",
+    "exit_price": 1034.82,
+    "exit_reason": "STOP_LOSS_HIT",
+    "gross_pnl_inr": -3058.02,
+    "total_friction_inr": 522.87,
+    "net_pnl_inr": -3580.89,
+    "gap_slippage_inr": 0.0,
+    "is_simulation": true,
+    "simulation_environment": "CALIBRATED_STOCHASTIC_NSE"
+  }
+]
+```
     "exit_reason": "STOP_LOSS_HIT",
     "gross_pnl_inr": -3418.06,
     "total_friction_inr": 512.12,

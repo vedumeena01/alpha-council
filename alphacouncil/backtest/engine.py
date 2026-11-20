@@ -72,6 +72,11 @@ class BacktestEngine:
         sweep_volume_factor: float = 1.2,
         seed: Optional[int] = None,
     ):
+        """
+        Backtest engine with modular toggles for the 7-model orthogonal ablation suite.
+        Note: On synthetic feeds where volume is i.i.d. lognormal noise, sweep_lookback=15 and
+        sweep_volume_factor=1.2 act as test-harness code-path exercisers, not production alpha defaults.
+        """
         self.config = config
         self.use_sweep_signal = use_sweep_signal
         self.use_vol_sizing = use_vol_sizing

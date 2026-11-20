@@ -249,7 +249,7 @@ AlphaCouncil computes statutory transaction friction according to exchange and S
 | **Alpha Discovery ($H_1$)** | Structural Liquidity Sweep Detector | Lookahead-free completed bar $t$ evaluation; execution on $t+1$ Open. News gap-downs invalidated. |
 | **Meta-Labeling ($H_2$)** | Marcos López de Prado Triple Barrier | Decouples direction from sizing. Dynamic OU half-life vertical barrier with continuous AR(1) solution. |
 | **Pre-Trade Risk Gate** | NautilusTrader Fail-Closed Architecture | Synchronous rate limiter, 20% single-stock notional cap, fail-closed on equity resolution. |
-| **Position Sizing** | Volatility Targeting + Fractional Kelly | Cold-start protection (<200 trades) bypasses Kelly; BSS calibration required before Kelly sizing. |
+| **Position Sizing** | Volatility Targeting + Fractional Kelly | Cold-start protection: 50 trades in test harness (`cold_start_trade_threshold=50`) to exercise calibration; 200 trades production requirement. BSS calibration required before Kelly sizing. |
 | **Capital Preservation** | Peak-HWM Intraday Halt & Monthly Freeze | 2.0% intraday HWM halt, 6.0% monthly committee freeze. Exits always execute even when entries are halted. |
 | **NSE Microstructure** | SEBI Oct 1 2024 Statutory Tariff Engine | Direct deduction of STT, ₹20 Brokerage cap, NSE charges, SEBI fees, Stamp duty, GST, and Almgren-Chriss slippage. |
 | **Execution Safety** | Idempotent OMS & Broker-Side GTT Sync | Deterministic client order IDs; contingent broker-side GTT stops activated only upon entry fill. |

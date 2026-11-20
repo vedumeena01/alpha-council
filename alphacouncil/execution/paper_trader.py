@@ -196,16 +196,20 @@ class ForwardPaperTestingEngine:
         timestamps = [b.timestamp for b in universe_data[self.universe[0]]]
 
         circuit_breakers_count = 0
-        current_month = ""
+        current_month = -1
 
         # Step day-by-day (start after bar 30 to allow lookback for ATR and zones)
         for t_idx in range(30, n_bars):
             today_date = timestamps[t_idx]
-            month_key = today_date[:7]
 
-            if month_key != current_month:
-                current_month = month_key
-                self.kill_switch.reset_daily_session(self.current_equity)
+            # Month rollover in simulation trading days (21 trading days per NSE month)
+            month_idx = t_idx // 21
+            if month_idx != current_month:
+                current_month = month_idx
+                self.kill_switch.reset_monthly_session(self.current_equity)
+
+            # Reset intraday peak-HWM tracking at the start of each daily trading session
+            self.kill_switch.reset_daily_session(self.current_equity)
 
             # A. Evaluate Active Positions on Bar t (Gaps, Targets, Stops)
             self._evaluate_active_positions(

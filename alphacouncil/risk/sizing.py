@@ -40,7 +40,7 @@ class PositionSizingEngine:
         max_risk_ceiling: float = 0.015,    # 1.5% max risk
         max_notional_pct: float = 0.20,     # 20% max single-stock notional
         min_atr_multiple: float = 0.25,      # Skip if stop < 0.25 * ATR (filters micro-noise without over-discarding sweeps)
-        cold_start_trade_threshold: int = 50,# Minimum closed trades required to exit cold start
+        cold_start_trade_threshold: int = 50, # Minimum closed trades to exit cold start (50 for test harness; 200 for institutional prod)
     ):
         self.base_risk_fraction = base_risk_fraction
         self.target_annual_vol = target_annual_vol

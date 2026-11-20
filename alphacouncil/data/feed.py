@@ -6,7 +6,6 @@ daily volume variations, and dynamic circuit limits.
 
 from dataclasses import dataclass
 from typing import List, Dict
-import datetime
 import numpy as np
 
 
@@ -56,14 +55,10 @@ class MarketDataFeed:
         # that E[r_t * r_{t-1}] = 0 (unbiased martingale random walk with no artificial autocorrelation).
         curr_close = initial_price
 
-        # Trading day calendar (excluding weekends, anchored to 2023-01-02 historical past)
-        cur_d = datetime.date(2023, 1, 2)
-        bar_dates = []
-        for _ in range(n_bars):
-            while cur_d.weekday() >= 5:
-                cur_d += datetime.timedelta(days=1)
-            bar_dates.append(cur_d.isoformat())
-            cur_d += datetime.timedelta(days=1)
+        # Simulation Day Index calendar: Unambiguous SIM-D001 through SIM-D{n}
+        # Explicitly isolates synthetic jump-diffusion simulation from real exchange tick feeds,
+        # preventing any confusion with actual historical NSE market quotes.
+        bar_dates = [f"SIM-D{i+1:03d}" for i in range(n_bars)]
 
         bars: List[Bar] = []
         highs = []

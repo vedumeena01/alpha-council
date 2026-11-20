@@ -24,12 +24,12 @@ Neeche AlphaCouncil ke **5 Core Dimensions** par sabse kadve, genuine aur rigoro
 
 ---
 
-### 🔴 Con 1.2: Kelly Criterion Hypersensitivity & Cold-Start Paralysis
-- **Location:** `alphacouncil/risk/sizing.py` (`compute_size`)
+### 🔴 Con 1.2: Kelly Criterion Hypersensitivity & Cold-Start Calibration
+- **Location:** `alphacouncil/risk/sizing.py` (`compute_size`), `alphacouncil/config.py`
 - **Vulnerability:** Kelly formula $f^* = \frac{p \cdot b - (1-p)}{b}$ probability $p$ aur payoff $b$ ke estimation error ke prati **extreme sensitive** hota hai.
-- **Why it's a Con:** Code me rule hai ki jab tak 200 trades close nahi hote aur rolling Brier Skill Score (BSS) positive nahi hota, tab tak Kelly bypass hoke `COLD_START` ya `DEFENSIVE` mode me rehta hai. 
-  Daily swing trading me 200 trades complete hone me **12 se 18 mahine** lag jayenge! Iska matlab pehle pure saal Kelly sizing engine inactive rahega aur fixed 1% vol-targeting par chalega.
-- **Interview Defense:** *"Ye intentional conservative risk-first design hai. Uncalibrated probabilities par Kelly chalana 'gambler's ruin' ka formula hai. Cold-start me 1% vol-targeting capital preserve karti hai jab tak statistical sample significance achieve na ho."*
+- **Why it's a Con:** Code me rule hai ki jab tak closed trades `cold_start_trade_threshold` cross nahi karte aur rolling Brier Skill Score (BSS) positive nahi hota, tab tak Kelly bypass hoke `COLD_START` ya `DEFENSIVE` mode me rehta hai. 
+  Codebase me testing harness ke liye default `cold_start_trade_threshold = 50` set hai taaki simulation runs me calibration path exercise ho sake, jabki institutional production deployment me **200 trades** mandatory hain kyunki 50 trades par Brier Score sampling variance high rehta hai. Daily swing trading me 200 trades complete hone me **12 se 18 mahine** lag jayenge, isliye cold-start phase me system vol-targeting par rehta hai.
+- **Interview Defense:** *"Ye intentional conservative risk-first design hai. Uncalibrated probabilities par Kelly chalana 'gambler's ruin' ka formula hai. Test harness me 50 trades code-path exercise karte hain, par production me 200 trades ka threshold statistical sample significance ke liye zaroori hai."*
 
 ---
 

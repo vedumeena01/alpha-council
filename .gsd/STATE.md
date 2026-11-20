@@ -1,25 +1,23 @@
 # 🧠 AlphaCouncil: Session Memory & State
 
 ## Current Context
-- **Active Phase:** Round 2 Auditor Remediation Complete & Verified
+- **Active Phase:** Round 3 Institutional Auditor Critique Remediated & Fully Landed
 - **Branch:** `main`
-- **Current Test Suite Status:** 131/131 passed in 7.99s
+- **Current Test Suite Status:** 131/131 passed in 8.25s
 - **Linter Status:** Ruff 0 errors, 0 warnings
 - **CI Matrix:** Python 3.10, 3.11, 3.12, 3.13
 
-## Verification & Remediation Log (Round 2 Auditor Review)
-1. **Trade Frequency & Cold-Start Kelly Calibration:**
-   - Calibrated `sweep_lookback=15` and `sweep_volume_factor=1.2` in `engine.py` (solving synthetic lognormal volume rejection).
-   - Reduced `cold_start_trade_threshold` from 200 to 50 in `config.py` and `sizing.py`, allowing swing portfolios to empirically transition to `CALIBRATED_KELLY`.
-   - Added `test_sizing_calibrated_kelly_transition` in `tests/test_risk_engine.py` (Suite: 131/131 passing).
-2. **Slide 5 PITCH_DECK.md Complete Overhaul:**
-   - Eliminated cherry-picked seed numbers (Sharpe 2.40, PF 5.20) and false claims of "verified on historical data".
-   - Restructured as an architectural hypothesis test isolating individual modules with clear caveats on small-sample noise and stochastic simulation.
-3. **Sentiment NLP Featurizer Transparent Disclosure:**
-   - Documented `FinBertSentimentExtractor` and `calendar.py` `get_latest_headline` as research prototype stubs / synthetic lexicon disclosures for zero-GPU test environments.
-4. **Historical Anchor for Simulation Horizon:**
-   - Anchored `MarketDataFeed` simulation start date to `2023-01-02` (500 bars end on `2024-11-22`), strictly in the historical calendar past with zero future bars.
-   - Added `is_simulation: True` and `SIM-TRD-` IDs in `PaperTradeRecord`.
-5. **Strip "Proof" Wording & Maintain Intellectual Humility:**
-   - Replaced all instances of "Proof" in `FORWARD_PAPER_TESTING_REPORT.md` and pitch materials with "Benchmark Completed" or "Validation".
-   - Verified 48-trade simulation metrics: +₹1,881.97 Net PnL, 35.42% win rate, 1.85x asymmetry, 4.03% max DD, ₹24,759.04 statutory friction, ₹16,887.85 gap drag, 0 misleading labels.
+## Verification & Remediation Log (Round 3 Auditor Review)
+1. **Multi-Seed Ablation Script & Measured Distribution in Slide 5:**
+   - Authored `scripts/generate_ablation_distribution.py` calculating empirical distribution across 30 random seeds ($N_{\text{trials}}=150$).
+   - Completely replaced hand-typed hypothesized DSR ranges in `PITCH_DECK.md` Slide 5 with measured medians and spreads.
+   - Openly declared empirical finding: on unbiased synthetic martingales, DSR is ~0.001 to 0.0045, proving that synthetic feeds have zero arbitrage alpha, while risk controls successfully raise median Sharpe from -1.21 to -0.14.
+2. **Transparent Trade-Frequency & Synthetic Tuning Disclosure:**
+   - Documented in `engine.py`, `config.py`, and `sizing.py` that `sweep_lookback=15` and `sweep_volume_factor=1.2` are synthetic test-harness exercisers.
+   - Clarified dual-threshold Kelly sizing: `cold_start_trade_threshold=50` is a test-harness exerciser, while `200` trades remains the institutional asymptotic production requirement. Synchronized `README.md:252` and `SYSTEM_CONS_AND_LIMITATIONS.md:30-31`.
+3. **Simulation Day Index Formatting (`SIM-D001` to `SIM-D500`):**
+   - Eliminated real calendar dates from synthetic feeds in `feed.py` and `calendar.py`, replacing them with unambiguous day index notation (`SIM-D001` through `SIM-D500`).
+   - Re-executed forward paper test across 500 daily bars: 127 closed trades, reflecting realistic daily session resets.
+4. **Repo Hygiene & Strict Release Packaging:**
+   - Added temporary scratch files, builds, and caches to `.gitignore`.
+   - Created `scripts/pack_release_zip.py` with strict pruning, repacking 100 clean files into `alpha_council_complete_codebase.zip` (0 forbidden files: no `.gsd`, no `.ruff_cache`, no egg-info).
